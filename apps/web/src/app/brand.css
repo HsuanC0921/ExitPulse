@@ -1,0 +1,8 @@
+:host { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; color: var(--on-band, #fff); }
+.mark { display: block; flex: none; width: var(--brand-mark-size, 40px); height: auto; transition: width .4s cubic-bezier(.22, 1, .36, 1); }
+.lockup { display: grid; min-width: 0; }
+.wordmark { font-family: Barlow, 'Noto Sans TC', sans-serif; font-size: var(--brand-word-size, 2rem); font-weight: 700; font-kerning: normal; letter-spacing: -.012em; line-height: 1.02; white-space: nowrap; transition: font-size .4s cubic-bezier(.22, 1, .36, 1); }
+.pulse { font-weight: 800; }
+:host(.compact) { --brand-mark-size: 28px; --brand-word-size: 1.25rem; gap: var(--sp-2); }
+:host(.compact) .tagline { max-height: 0; opacity: 0; }
+.tagline { max-height: 1.6em; overflow: hidden; font-size: var(--fs-xs); font-weight: 700; line-height: 1.6; transition: max-height .4s cubic-bezier(.22, 1, .36, 1), opacity .2s linear; }

@@ -1,0 +1,634 @@
+{
+  "generatedAt": "2026-11-18T19:31:30.353Z",
+  "distributions": {
+    "radius": [
+      {
+        "val": "4px",
+        "count": 2876,
+        "selectors": [
+          "button",
+          "b.badge",
+          "div.distance-bar",
+          "i.swatch.line",
+          "span.rank.top",
+          "span.meter"
+        ]
+      },
+      {
+        "val": "8px",
+        "count": 878,
+        "selectors": [
+          "div.map-tools",
+          "summary",
+          "button.map-reset",
+          "button.map-reset.tower-switch",
+          "button.theme-switch",
+          "button.map-reset.map-about"
+        ]
+      },
+      {
+        "val": "50%",
+        "count": 856,
+        "selectors": [
+          "span.theme-track",
+          "span.rank",
+          "summary",
+          "i.swatch.dot"
+        ]
+      },
+      {
+        "val": "12px",
+        "count": 40,
+        "selectors": [
+          "aside.panel",
+          "div.flowbar",
+          "section.time-player",
+          "div.flowbar.folded"
+        ]
+      },
+      {
+        "val": "2px",
+        "count": 24,
+        "selectors": [
+          "i"
+        ]
+      },
+      {
+        "val": "999px",
+        "count": 16,
+        "selectors": [
+          "b.personality-pill",
+          "b.personality-pill.role-pill"
+        ]
+      }
+    ],
+    "fontSize": [
+      {
+        "val": "12px",
+        "count": 4500,
+        "selectors": [
+          "span",
+          "span.tagline",
+          "i",
+          "em",
+          "span.count",
+          "span.sr-only"
+        ]
+      },
+      {
+        "val": "16px",
+        "count": 1740,
+        "selectors": [
+          "span",
+          "h2",
+          "span.nm",
+          "p.headline",
+          "span.delta.plain",
+          "h2.player-station"
+        ]
+      },
+      {
+        "val": "18px",
+        "count": 360,
+        "selectors": [
+          "span.delta",
+          "span.delta.down"
+        ]
+      },
+      {
+        "val": "14px",
+        "count": 108,
+        "selectors": [
+          "span",
+          "span.sr-only",
+          "b",
+          "strong",
+          "span.pill-main",
+          "time.pill-main"
+        ]
+      },
+      {
+        "val": "10px",
+        "count": 48,
+        "selectors": [
+          "small"
+        ]
+      },
+      {
+        "val": "20px",
+        "count": 44,
+        "selectors": [
+          "span.wordmark",
+          "span.pulse",
+          "strong.hour"
+        ]
+      },
+      {
+        "val": "26px",
+        "count": 36,
+        "selectors": [
+          "span.wordmark",
+          "span.pulse"
+        ]
+      },
+      {
+        "val": "32px",
+        "count": 24,
+        "selectors": [
+          "span.wordmark",
+          "span.pulse"
+        ]
+      }
+    ],
+    "fontWeight": [
+      {
+        "val": "700",
+        "count": 3236,
+        "selectors": [
+          "span",
+          "span.wordmark",
+          "span.tagline",
+          "span.sr-only",
+          "em",
+          "span.rank"
+        ]
+      },
+      {
+        "val": "800",
+        "count": 1972,
+        "selectors": [
+          "span.pulse",
+          "b",
+          "h2",
+          "button",
+          "b.badge",
+          "span.delta"
+        ]
+      },
+      {
+        "val": "400",
+        "count": 1652,
+        "selectors": [
+          "span",
+          "i",
+          "span.count",
+          "span.sr-only",
+          "button",
+          "p.event-guard"
+        ]
+      }
+    ],
+    "btnHeight": [
+      {
+        "val": "44px",
+        "count": 516,
+        "selectors": [
+          "button.map-reset",
+          "button.map-reset.tower-switch",
+          "button.theme-switch",
+          "button.map-reset.map-about",
+          "button.primary",
+          "button.pause"
+        ]
+      },
+      {
+        "val": "36px",
+        "count": 82,
+        "selectors": [
+          "button.icon-button.panel-wide-btn",
+          "button.icon-button",
+          "button.sort-reverse",
+          "button",
+          "button.more",
+          "button.explore-cond-toggle"
+        ]
+      }
+    ],
+    "padX": [
+      {
+        "val": "4px/4px",
+        "count": 1648,
+        "selectors": [
+          "button",
+          "b.badge",
+          "button.date-link"
+        ]
+      },
+      {
+        "val": "8px/8px",
+        "count": 922,
+        "selectors": [
+          "button.sort-reverse",
+          "button",
+          "button.station-info-link",
+          "button.peak-hour"
+        ]
+      },
+      {
+        "val": "10px/10px",
+        "count": 210,
+        "selectors": [
+          "button.map-reset",
+          "button.map-reset.tower-switch",
+          "button.theme-switch",
+          "button.map-reset.map-about",
+          "button",
+          "button.explore-cond-toggle"
+        ]
+      },
+      {
+        "val": "6px/6px",
+        "count": 148,
+        "selectors": [
+          "button.icon-button.panel-wide-btn",
+          "button.icon-button",
+          "button.pause",
+          "button",
+          "button.icon",
+          "button.fold"
+        ]
+      },
+      {
+        "val": "12px/12px",
+        "count": 100,
+        "selectors": [
+          "button.section-toggle",
+          "button.more",
+          "button",
+          "button.pill",
+          "button.date-link"
+        ]
+      },
+      {
+        "val": "2px/2px",
+        "count": 80,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "10px/28px",
+        "count": 40,
+        "selectors": [
+          "select"
+        ]
+      },
+      {
+        "val": "32px/10px",
+        "count": 12,
+        "selectors": [
+          "input"
+        ]
+      },
+      {
+        "val": "8px/24px",
+        "count": 12,
+        "selectors": [
+          "select"
+        ]
+      },
+      {
+        "val": "16px/16px",
+        "count": 8,
+        "selectors": [
+          "button.primary"
+        ]
+      }
+    ],
+    "gap": [
+      {
+        "val": "4px",
+        "count": 1970,
+        "selectors": [
+          "summary",
+          "button.map-reset",
+          "button.map-reset.tower-switch",
+          "button.theme-switch",
+          "button.map-reset.map-about",
+          "div.segmented.view-tabs"
+        ]
+      },
+      {
+        "val": "2px",
+        "count": 1452,
+        "selectors": [
+          "div.map-tools",
+          "div.sign-actions",
+          "span.codes",
+          "div.segmented",
+          "div.mobile-switch",
+          "button"
+        ]
+      },
+      {
+        "val": "2px 8px",
+        "count": 1208,
+        "selectors": [
+          "span.names",
+          "small.row-meta",
+          "p.glance-title"
+        ]
+      },
+      {
+        "val": "8px",
+        "count": 1022,
+        "selectors": [
+          "app-brand",
+          "div.tools",
+          "button",
+          "header.mobile-bar",
+          "div.fields",
+          "div.grid"
+        ]
+      },
+      {
+        "val": "12px",
+        "count": 60,
+        "selectors": [
+          "header.sign",
+          "div.ranking-head",
+          "div.list-head",
+          "div.player-heading"
+        ]
+      },
+      {
+        "val": "0px 8px",
+        "count": 32,
+        "selectors": [
+          "button.section-toggle",
+          "span",
+          "h2.player-station",
+          "div.time-annotation",
+          "button.peak-hour"
+        ]
+      },
+      {
+        "val": "4px 12px",
+        "count": 32,
+        "selectors": [
+          "div.block-head.list-title",
+          "p.explore-legend"
+        ]
+      },
+      {
+        "val": "6px",
+        "count": 24,
+        "selectors": [
+          "p.event-guard",
+          "ul",
+          "p.event-guard.event-note"
+        ]
+      },
+      {
+        "val": "4px 8px",
+        "count": 24,
+        "selectors": [
+          "div.head-controls",
+          "div.playback"
+        ]
+      },
+      {
+        "val": "normal 6px",
+        "count": 24,
+        "selectors": [
+          "li"
+        ]
+      }
+    ]
+  },
+  "outliersTop20": [
+    {
+      "category": "font-size",
+      "val": "10px",
+      "count": 48,
+      "selectors": [
+        "small"
+      ]
+    },
+    {
+      "category": "border-radius",
+      "val": "2px",
+      "count": 24,
+      "selectors": [
+        "i"
+      ]
+    },
+    {
+      "category": "gap",
+      "val": "6px",
+      "count": 24,
+      "selectors": [
+        "p.event-guard",
+        "ul",
+        "p.event-guard.event-note"
+      ]
+    },
+    {
+      "category": "gap",
+      "val": "normal 6px",
+      "count": 24,
+      "selectors": [
+        "li"
+      ]
+    }
+  ],
+  "components": {
+    "button": [
+      {
+        "val": "h=44px r=8px fs=12px",
+        "count": 478,
+        "selectors": [
+          "button.map-reset",
+          "button.map-reset.tower-switch",
+          "button.theme-switch",
+          "button.map-reset.map-about",
+          "button.icon-button.panel-wide-btn",
+          "button.icon-button"
+        ]
+      },
+      {
+        "val": "h=36px r=8px fs=12px",
+        "count": 80,
+        "selectors": [
+          "button.icon-button.panel-wide-btn",
+          "button.icon-button",
+          "button",
+          "button.more",
+          "button.explore-cond-toggle",
+          "button.date-link"
+        ]
+      },
+      {
+        "val": "h=44px r=8px fs=14px",
+        "count": 22,
+        "selectors": [
+          "button.pause",
+          "button.sort-reverse"
+        ]
+      },
+      {
+        "val": "h=44px r=8px fs=16px",
+        "count": 8,
+        "selectors": [
+          "button.primary"
+        ]
+      },
+      {
+        "val": "h=44px r=0px fs=14px",
+        "count": 8,
+        "selectors": [
+          "button.flow-fold"
+        ]
+      },
+      {
+        "val": "h=36px r=8px fs=14px",
+        "count": 2,
+        "selectors": [
+          "button.sort-reverse"
+        ]
+      }
+    ],
+    "rowCardButton": [
+      {
+        "val": "h=85px r=0px fs=14px",
+        "count": 240,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "h=70px r=0px fs=14px",
+        "count": 238,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "h=95px r=0px fs=14px",
+        "count": 216,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "h=69px r=0px fs=14px",
+        "count": 144,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "h=56px r=0px fs=12px",
+        "count": 108,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "h=44px r=0px fs=14px",
+        "count": 60,
+        "selectors": [
+          "button",
+          "button.pill"
+        ]
+      },
+      {
+        "val": "h=44px r=0px fs=12px",
+        "count": 12,
+        "selectors": [
+          "button.result-tools-toggle"
+        ]
+      },
+      {
+        "val": "h=44px r=8px fs=12px",
+        "count": 8,
+        "selectors": [
+          "button.peak-hour"
+        ]
+      },
+      {
+        "val": "h=73px r=0px fs=14px",
+        "count": 4,
+        "selectors": [
+          "button.section-toggle"
+        ]
+      },
+      {
+        "val": "h=36px r=0px fs=12px",
+        "count": 4,
+        "selectors": [
+          "button.result-tools-toggle"
+        ]
+      },
+      {
+        "val": "h=94px r=0px fs=14px",
+        "count": 2,
+        "selectors": [
+          "button"
+        ]
+      }
+    ],
+    "chip": [
+      {
+        "val": "h=44px r=4px fs=12px",
+        "count": 60,
+        "selectors": [
+          "button"
+        ]
+      },
+      {
+        "val": "h=36px r=4px fs=12px",
+        "count": 12,
+        "selectors": [
+          "button"
+        ]
+      }
+    ],
+    "input": [
+      {
+        "val": "h=44px r=8px fs=14px",
+        "count": 10,
+        "selectors": [
+          "input"
+        ]
+      },
+      {
+        "val": "h=36px r=8px fs=14px",
+        "count": 2,
+        "selectors": [
+          "input"
+        ]
+      }
+    ],
+    "select": [
+      {
+        "val": "h=44px r=8px fs=14px",
+        "count": 46,
+        "selectors": [
+          "select"
+        ]
+      },
+      {
+        "val": "h=36px r=8px fs=14px",
+        "count": 6,
+        "selectors": [
+          "select"
+        ]
+      }
+    ],
+    "badge": [
+      {
+        "val": "h=20px r=4px fs=12px",
+        "count": 1604,
+        "selectors": [
+          "b.badge"
+        ]
+      }
+    ]
+  },
+  "contrastFails": [],
+  "smallTouch": [],
+  "rowMisalign": [],
+  "verticalSqueeze": [],
+  "axeViolations": []
+}

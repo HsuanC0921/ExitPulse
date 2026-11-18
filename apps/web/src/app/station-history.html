@@ -1,0 +1,24 @@
+@if (events().length) {
+  <details class="station-history">
+    <summary>
+      <span>車站沿革</span>
+      <span class="history-count">{{ events().length }} 筆附來源紀錄</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <ol class="history-list">
+      @for (event of events(); track event.date + event.title) {
+        <li [attr.data-kind]="event.kind" [class.in-period]="selectedPeriod()?.slice(0, 7) === event.date.slice(0, 7)">
+          <time [attr.datetime]="event.date">{{ event.date.replaceAll('-', '/') }}</time>
+          <div class="history-event">
+            <strong>{{ event.title }}</strong>
+            <span>{{ event.detail }}</span>
+          </div>
+          <a [href]="event.source" target="_blank" rel="noopener" [attr.aria-label]="event.title + '來源'">來源</a>
+          @if (availableMonths().includes(event.date.slice(0, 7))) {
+            <button type="button" (click)="inspect(event.date)" [attr.aria-label]="'查看 ' + event.date.slice(0, 7) + ' 的人流'">看當月人流</button>
+          }
+        </li>
+      }
+    </ol>
+  </details>
+}

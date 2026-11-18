@@ -1,0 +1,72 @@
+<section class="first-query" [class.collapsed]="collapsed()" aria-labelledby="first-query-title">
+  <div class="first-query-heading">
+    <span class="first-query-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15"/><circle cx="18" cy="19" r="3"/><circle cx="6" cy="5" r="3"/></svg>
+    </span>
+    <div class="first-query-title-wrap">
+      <h2 id="first-query-title">從一個車站開始</h2>
+    </div>
+    <button type="button" class="first-query-toggle" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="collapsed() ? '展開查詢卡片' : '收合以露出地圖'" (click)="collapsed.set(!collapsed())">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="collapsed() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg>
+    </button>
+  </div>
+
+  @if (!collapsed()) {
+  <form class="first-query-search" (submit)="$event.preventDefault(); submit()">
+  <label class="first-query-label" for="first-query-station">車站名稱或代號</label>
+  <input
+    id="first-query-station"
+    type="search"
+    autocomplete="off"
+    maxlength="40"
+    placeholder="例如：台北車站、BL12"
+    [value]="query()"
+    (input)="query.set($any($event.target).value)"
+  >
+  </form>
+
+  @if (matches().length) {
+    <ul id="first-query-matches" class="first-query-matches" aria-label="符合的車站">
+      @for (station of matches(); track station.name) {
+        <li>
+          <button type="button" (click)="select(station)">
+            <span class="first-query-station-name">{{ station.name }}</span>
+            @if (station.lines?.length) {
+              <span class="first-query-lines" aria-label="路線代號">
+                @for (line of station.lines; track line.code) {
+                  <span class="first-query-line" [attr.data-line]="line.line" [style.--line-color]="line.color">{{ line.code }}</span>
+                }
+              </span>
+            }
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </li>
+      }
+    </ul>
+  } @else if (query().trim().length >= 1) {
+    <p class="first-query-empty" role="status">沒有符合的車站</p>
+  }
+
+  <button class="first-query-place" type="button" (click)="searchPlace()">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+    @if (query().trim()) { <span>用「{{ query().trim() }}」找附近車站</span> } @else { <span>用地名或景點找附近車站</span> }
+  </button>
+
+  <button class="first-query-compare" type="button" (click)="comparePairs.emit()">
+    <span>或比較兩個月份的人流變化</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+  </button>
+
+  <div class="first-query-presets" role="group" aria-label="直接看例子">
+    <span class="first-query-presets-label">直接看例子</span>
+    <div class="first-query-preset-list">
+      @for (preset of presets; track preset.label) {
+        <button type="button" (click)="choosePreset.emit(preset)" [title]="preset.detail">
+          <strong>{{ preset.label }}</strong>
+          <span>{{ preset.detail }}</span>
+        </button>
+      }
+    </div>
+  </div>
+  }
+</section>

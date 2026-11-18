@@ -1,0 +1,836 @@
+<button type="button" class="explore-cond-toggle" [attr.aria-expanded]="conditionsOpen()" aria-controls="explore-query-body" (click)="conditionsOpen.set(!conditionsOpen())">
+  <span>{{ conditionsOpen() ? '收合條件' : (mode() === 'station' ? station() + ' · ' : '全線 · ') + (unit() === 'date' ? periodDate() : periodBaseText()) + ' · ' + hoursText() + (comparePeriod() ? ' · 對照 ' + compareText() : '') }}</span>
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="conditionsOpen() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg>
+</button>
+<div id="explore-query-body" [hidden]="!conditionsOpen()">
+<div class="query" role="group" aria-label="查詢條件">
+  @if (mode() === 'station') {
+    <div class="query-item" [class.open]="editing() === 'station'">
+      <button type="button" class="pill" [attr.aria-expanded]="editing() === 'station'" aria-controls="editor-station" (click)="toggle('station')">
+        <span class="pill-label">車站</span>
+        <span class="pill-value"><span class="station-badges">@for (l of linesOf()(station()); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, station()) }}</b> }</span><span class="pill-main">{{ station() }}</span></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      @if (editing() === 'station') {
+        <div class="editor" id="editor-station">
+          <div class="chips" role="group" aria-label="選擇路線">
+            @for (code of lineCodes; track code) {
+              <button type="button" [attr.aria-pressed]="pickerLine() === code" [style.--line]="'var(--' + code + ')'" [attr.data-code]="code" (click)="pickerLine.set(code)">{{ lineNames[code] }}</button>
+            }
+          </div>
+          <ol class="line-stations" [style.--line]="'var(--' + pickerLine() + ')'" [attr.aria-label]="lineNames[pickerLine()] + '車站'">
+            @for (s of lineOrder()[pickerLine()]; track s) {
+              <li><button type="button" [attr.aria-pressed]="station() === s" [disabled]="stationUnavailable(s)" (click)="pickStation(s)">
+                <b class="badge" [style.--line]="pickerLine()" [attr.data-code]="pickerLine()">{{ stationCode(pickerLine(), s) }}</b><span>{{ s }}@if (stationUnavailable(s)) { <small>尚無資料</small> }</span>
+              </button></li>
+            }
+          </ol>
+          <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" list="all-stations" placeholder="或直接輸入站名" aria-label="輸入站名" (change)="allStations().includes($any($event.target).value) && pickStation($any($event.target).value); $any($event.target).value = ''">
+          </label>
+          <datalist id="all-stations">@for (s of allStations(); track s) { <option [value]="s"></option> }</datalist>
+        </div>
+      }
+    </div>
+  }
+
+  <div class="query-item" [class.open]="editing() === 'time'">
+    <button type="button" class="pill" [attr.aria-expanded]="editing() === 'time'" aria-controls="editor-time" (click)="toggle('time')">
+      <span class="pill-label">時間</span>
+      <span class="pill-value">@if (unit() === 'date') { <time class="pill-main" [attr.datetime]="date()">{{ periodDate() }}</time> } @else { <span class="pill-main">{{ periodBaseText() }}</span> }<span class="period-hours">{{ hoursText() }}</span></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    @if (editing() === 'time') {
+      <div class="editor" id="editor-time">
+        <div class="segmented inline full" role="group" aria-label="時間單位">
+          <button type="button" [attr.aria-pressed]="unit() === 'month'" (click)="setUnit('month')">整月平均</button>
+          <button type="button" [attr.aria-pressed]="unit() === 'date'" (click)="setUnit('date')">單一天</button>
+        </div>
+        @if (unit() === 'date') {
+          <div class="grid">
+            <label class="field"><span>月份</span><span class="select"><select (change)="setMonth($any($event.target).value)">@for (m of availableMonths(); track m) { <option [value]="m" [selected]="m === month()">{{ m }}</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            <label class="field"><span>日期</span><span class="select"><select (change)="date.set($any($event.target).value)">@for (d of dateOptions(); track d) { <option [value]="d" [selected]="d === date()">{{ +d.slice(8) }} 日（{{ dayName(d) }}）</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+          </div>
+          <div class="stepper">
+            <button type="button" [disabled]="!prevDate()" (click)="step(prevDate())">前一天</button>
+            <span class="stepper-day"><b>{{ periodDate() }}</b>@if (dateNote()) { <small>{{ dateNote() }}</small> }</span>
+            <button type="button" [disabled]="!nextDate()" (click)="step(nextDate())">後一天</button>
+          </div>
+        } @else {
+          <label class="field"><span>月份</span><span class="select"><select (change)="setMonth($any($event.target).value)">@for (m of availableMonths(); track m) { <option [value]="m" [selected]="m === month()">{{ m }}</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+          <div class="field"><span>日期類型</span><div class="segmented inline small day-types" role="group" aria-label="日期類型">@for (d of dayTypes; track d) { <button type="button" [attr.aria-pressed]="days() === d" (click)="days.set(d)">{{ dayLabels[d] }}</button> }</div></div>
+        }
+        <div class="field"><span>進站時段</span><div class="segmented inline small bands" role="group" aria-label="進站時段">@for (b of bands; track b[0]) { <button type="button" [attr.aria-pressed]="band() === b[0]" (click)="band.set(b[0])">{{ b[1] }}</button> }</div></div>
+        <button type="button" class="done" (click)="editing.set(null)">完成</button>
+      </div>
+    }
+  </div>
+
+  <div class="query-item" [class.open]="editing() === 'compare'">
+    <button type="button" class="pill" [attr.aria-expanded]="editing() === 'compare'" aria-controls="editor-compare" (click)="toggle('compare')">
+      <span class="pill-label">對照</span>
+      <span class="pill-value"><span class="pill-main" [class.placeholder]="!comparePeriod()">{{ comparePeriod() ? compareText() : '不對照' }}</span></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    @if (editing() === 'compare') {
+      <div class="editor" id="editor-compare">
+        <div class="segmented inline small compare-choices" role="group" aria-label="選擇對照時間">
+          <button type="button" [attr.aria-pressed]="compareChoice() === 'none'" (click)="setCompare(null)">不比</button>
+          <button type="button" [attr.aria-pressed]="compareChoice() === 'prev'" [disabled]="!presets().prev" [title]="presets().prev ?? '沒有資料'" (click)="setCompare(presets().prev)">{{ presets().prevLabel }}</button>
+          <button type="button" [attr.aria-pressed]="compareChoice() === 'yoy'" [disabled]="!presets().yoy" [title]="presets().yoy ?? '沒有資料'" (click)="setCompare(presets().yoy)">{{ presets().yoyLabel }}</button>
+          <button type="button" [attr.aria-pressed]="compareChoice() === 'custom'" (click)="customCompare()">自訂</button>
+          @if (comparePeriod()) { <button type="button" (click)="swap()">對調</button> }
+        </div>
+        @if (compareChoice() === 'custom') {
+          <div class="segmented inline full" role="group" aria-label="對照的時間單位">
+            <button type="button" [attr.aria-pressed]="compareUnit() === 'month'" (click)="compareUnit.set('month')">整月平均</button>
+            <button type="button" [attr.aria-pressed]="compareUnit() === 'date'" (click)="compareUnit.set('date')">單一天</button>
+          </div>
+          <div class="grid" [class.single]="compareUnit() !== 'date'">
+            <label class="field"><span>對照月份</span><span class="select"><select (change)="setCompareMonth($any($event.target).value)">@for (m of availableMonths(); track m) { <option [value]="m" [selected]="m === compareMonth()">{{ m }}</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            @if (compareUnit() === 'date') {
+              <label class="field"><span>對照日期</span><span class="select"><select (change)="compareDate.set($any($event.target).value)">@for (d of compareDateOptions(); track d) { <option [value]="d" [selected]="d === compareDate()">{{ +d.slice(8) }} 日（{{ dayName(d) }}）</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            }
+          </div>
+        }
+        <button type="button" class="done" (click)="editing.set(null)">完成</button>
+      </div>
+    }
+  </div>
+
+  @if (mode() === 'station') {
+    <div class="query-item" [class.open]="editing() === 'peer'">
+      <button type="button" class="pill" [attr.aria-expanded]="editing() === 'peer'" aria-controls="editor-peer" (click)="toggle('peer')">
+        <span class="pill-label">比站</span>
+        <span class="pill-value"><span class="pill-main" [class.placeholder]="!peerStation()">{{ peerStation() ? peerStation() : '選車站' }}</span></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      @if (editing() === 'peer') {
+        <div class="editor" id="editor-peer">
+          <div class="peer-picker">
+            <label class="field"><span>選擇對照車站</span><span class="select"><select (change)="focusRelation($any($event.target).value || null)">
+              <option value="" [selected]="!peerStation()">不比對</option>
+              @for (s of allStations(); track s) { <option [value]="s" [selected]="peerStation() === s" [disabled]="s === station() || stationUnavailable(s)">{{ s }}</option> }
+            </select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            @if (peerStation()) { <button type="button" class="peer-swap" (click)="swapPeer()">對調兩站</button> }
+          </div>
+          <button type="button" class="done" (click)="editing.set(null)">完成</button>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+</div>
+
+<div class="query-feedback" [class.failed]="failure() || unavailable() || sameAsCompare()" [hidden]="!sameAsCompare() && !unavailable() && !unrecorded() && !loading() && !failure()">
+  <span role="status">{{ sameAsCompare() ? '請選不同的對照時間' : unavailable() ? '這站尚無旅次資料' : unrecorded() ? '這個時段沒有旅次紀錄' : loading() ? '查詢中…' : failure() }}@if ((loading() || failure()) && (stationAnswer() || networkAnswer())) { <small>目前顯示上次結果</small> }</span>
+  @if (failure() && !unavailable() && !sameAsCompare()) { <button type="button" class="retry-inline" (click)="retry()">重新查詢</button> }
+</div>
+
+<div class="explore-result" [class.busy]="loading()" [attr.aria-busy]="loading()">
+  @if (availabilityNotice(); as notice) {
+    <div class="availability-banner" role="status">
+      <span>{{ notice }}</span>
+      <button type="button" aria-label="關閉提醒" (click)="availabilityNotice.set('')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+  }
+  @if (headline()) {
+    <p class="glance-title">
+      <span>{{ mode() === 'station' ? station() + ' · ' + (direction() === 'outbound' ? '去哪裡' : '從哪來') : '全線' }}</span>
+      <span>{{ (unit() === 'date' ? periodDate() : periodBaseText()) + ' · ' + hoursText() }}</span>
+    </p>
+    <div class="headline-row">
+      <p class="headline">{{ headline() }}</p>
+    </div>
+    @for (n of eventNotes(); track n.lead) {
+      <p class="event-guard event-note" role="note"><span class="lead">{{ n.lead }}</span><span class="items">@for (item of n.items; track $index) { <span class="nb">{{ item }}</span> }</span></p>
+    }
+    @if (mode() === 'station' && stationBenchText(); as bt) { <p class="event-guard" role="note">{{ bt }} <app-hint label="占全線進站" [alignToPanel]="true" [entries]="hints['networkShare']" /></p> }
+    @if (mode() === 'station' && stationGuardrail(); as gr) { <p class="event-guard" role="note"><svg class="guardrail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="nb">{{ gr }}</span></p> }
+  }
+  @if (mode() === 'station' && peerSummary(); as ps) {
+    <section class="peer-card" aria-label="兩站並排比較">
+      <div class="peer-head"><strong>{{ station() }}</strong><span>對照</span><strong>{{ peerStation() }}</strong></div>
+      <div class="peer-grid">
+        <div><small>進站</small><b>{{ ps.aEntries.value }}<small>{{ ps.aEntries.unit }}</small></b></div>
+        <div><small>進站</small><b>{{ ps.bEntries.value }}<small>{{ ps.bEntries.unit }}</small></b></div>
+        <div><small>出站</small><b>{{ ps.aExits.value }}<small>{{ ps.aExits.unit }}</small></b></div>
+        <div><small>出站</small><b>{{ ps.bExits.value }}<small>{{ ps.bExits.unit }}</small></b></div>
+        <div><small>尖峰進站</small><b>{{ ps.aPeak }}</b></div>
+        <div><small>尖峰進站</small><b>{{ ps.bPeak }}</b></div>
+      </div>
+      @if (ps.aPoints && ps.bPoints) {
+        <p class="chart-note">兩站各自的全站進站逐時趨勢</p>
+        <svg class="dual-chart" viewBox="0 0 240 64" role="img" [attr.aria-label]="station() + '與' + peerStation() + '24 小時進站曲線比較'">
+          <polyline class="line-b" [attr.points]="ps.bPoints" />
+          <polyline class="line-a" [attr.points]="ps.aPoints" />
+        </svg>
+        <div class="dual-legend"><span><i class="swatch a"></i>{{ station() }}</span><span><i class="swatch b"></i>{{ peerStation() }}</span></div>
+      }
+      <button type="button" class="peer-map-btn" (click)="showMap.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>在地圖上看</button>
+    </section>
+  }
+  @if (stats().length) {
+    <details class="explore-basis">
+      <summary><span>資料依據@if (mode() === 'station' && stationPersonality(); as sp) { <b class="personality-pill" [title]="sp.note">{{ sp.tag }}</b> }@if (mode() === 'station' && stationRoleTag(); as role) { <b class="personality-pill role-pill">像{{ role.role }}站</b> }</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+      @if (periodDaysNote(); as note) { <p class="basis-meta">{{ note }}</p> }
+      @if (compareBasisText(); as note) {
+        <p class="basis-meta">{{ note }}</p>
+        @if (sharedHourBands().length) {
+          <div class="chart-note">
+            <p>改用兩期都有紀錄的時段比較</p>
+            <div class="wide-tabs">
+              @for (range of sharedHourBands(); track range.start) {
+                <button type="button" (click)="applyHourBand(range)">{{ hourBandLabel(range) }}</button>
+              }
+            </div>
+          </div>
+        } @else {
+          <p class="basis-meta">目前查詢範圍沒有兩期共同有紀錄的時段。</p>
+        }
+      }
+      @if (exitGap()) { <p class="basis-meta">出站資料不足：已匯入的旅次資料沒涵蓋這站當目的站，暫不顯示出站、進出比與站型推論，進站人次不受影響。</p> }
+      @if (mode() === 'station' && stationRoleTag(); as role) {
+        <div class="role-basis">
+          <p><b>這站像{{ role.role }}站</b>（從人次推論，不是官方分類）</p>
+          <ul>@for (r of role.reasons; track r) { <li>{{ r }}</li> }</ul>
+        </div>
+      }
+      @if (mode() === 'station' && stationMetrics(); as sm) {
+        <div class="metrics-strip">
+          <div title="進站人次最多的小時及其占全日進站比例"><small>尖峰進站 <app-hint label="尖峰通勤傾向" [alignToPanel]="true" [entries]="hints['personality']" /></small><b>{{ sm.peakHour == null ? '—' : sm.peakHour + ' 點' }}@if (sm.peakSharePct != null) { <small>（{{ sm.peakSharePct }}%）</small> }</b><span class="meter" aria-hidden="true"><i [style.transform]="'scaleX(' + (sm.peakSharePct ?? 0) / 100 + ')'"></i></span></div>
+          <div title="進站除以出站人次，大於 1 表示進站多於出站"><small>進出比</small><b>{{ sm.ioRatio ?? '—' }}</b></div>
+          <div title="進站減去出站人次，正數為淨進站、負數為淨出站"><small>淨流向</small><b>{{ signed(sm.netFlow) }}</b>@if (sm.netFlow != null && stationAnswer(); as a) { <span class="diverge" [class.down]="sm.netFlow < 0" aria-hidden="true"><i [style.--w]="min(1, abs(sm.netFlow) / ((a.entries ?? 0) + (a.exits ?? 0) || 1) * 4)"></i></span> }</div>
+        </div>
+      }
+      <div class="stats" [class.single]="stats().length === 1">
+        @for (s of stats(); track s.label) {
+          <div class="stat" [attr.data-dir]="s.diff?.dir">
+            <span class="stat-label">{{ s.label }}</span>
+            <strong class="stat-value"><span>{{ s.now.value }}</span><small>{{ s.now.unit }}</small></strong>
+            @if (s.diff; as d) {
+              <span class="stat-delta"><b>{{ d.dir === 'flat' ? '大致持平' : d.pct }}</b>@if (d.dir !== 'flat') { <span>{{ d.words }}</span> }</span>
+              <span class="stat-bars" aria-hidden="true"><small>對照</small><i class="old" [style.--w]="s.wBefore"></i><small>目前</small><i [style.--w]="s.wNow"></i></span>
+            }
+          </div>
+        }
+      </div>
+      @if (movers(); as m) {
+        <ul class="movers">
+          @if (m.up; as u) { <li class="up"><button type="button" (click)="mode() === 'station' ? pickStation(u.station) : openStation.emit(u.station)"><span>增加最多</span><b>{{ u.station }}</b><em>{{ u.text }}</em></button></li> }
+          @if (m.down; as d) { <li class="down"><button type="button" (click)="mode() === 'station' ? pickStation(d.station) : openStation.emit(d.station)"><span>減少最多</span><b>{{ d.station }}</b><em>{{ d.text }}</em></button></li> }
+        </ul>
+      }
+    </details>
+  }
+
+  @if (headline()) {
+    <div class="section-bar">
+      <div class="segmented section-tabs" role="group" aria-label="結果內容" [style.--n]="sections().length">
+        @for (t of sections(); track t[0]) { <button type="button" [attr.aria-pressed]="activeSection() === t[0]" [title]="t[0] === 'list' ? (mode() === 'station' ? '往來站：與本站直接起訖的對方車站，不含轉乘經過' : '各站：全線各車站進站與出站人次') : ''" (click)="section.set(t[0])">{{ t[1] }}</button> }
+      </div>
+    </div>
+  }
+
+  <div [class.wide-backdrop]="wideView()" (click)="wideView() && $event.target === $event.currentTarget && setWideView(false)">
+  <div [class.wide-sheet]="wideView()" [attr.role]="wideView() ? 'dialog' : null" [attr.aria-modal]="wideView() ? 'true' : null" [attr.aria-label]="wideView() ? '放大檢視數據' : null" (keydown.escape)="wideView() && setWideView(false)">
+  @if (wideView()) {
+    <div class="wide-head">
+      <strong>{{ (mode() === 'station' ? station() : '全線') + ' · ' + (unit() === 'date' ? periodDate() : periodBaseText()) + ' · ' + hoursText() }}</strong>
+      <div class="wide-tabs">
+        @for (t of sections(); track t[0]) { <button type="button" [attr.aria-pressed]="activeSection() === t[0]" (click)="section.set(t[0])">{{ t[1] }}</button> }
+      </div>
+      <button type="button" class="wide-close" (click)="setWideView(false)">縮回側欄</button>
+    </div>
+  }
+  <div [class.wide-grid]="wideView()">
+  <div>
+
+  @if (mode() === 'station' && activeSection() === 'hours' && stationAnswer(); as a) {
+    @if (hourChart(); as h) {
+      <div class="block-head">
+        <h2>各時段人次</h2>
+        <div class="head-controls">
+          <div class="segmented inline small" role="group" aria-label="進站或出站">
+            <button type="button" [attr.aria-pressed]="hourSide() === 'entries'" (click)="hourSide.set('entries')">進站</button>
+            <button type="button" [attr.aria-pressed]="hourSide() === 'exits'" (click)="hourSide.set('exits')">出站</button>
+            <button type="button" [attr.aria-pressed]="hourSide() === 'both'" (click)="hourSide.set('both')">進出對照</button>
+            <button type="button" [attr.aria-pressed]="hourSide() === 'clock'" (click)="hourSide.set('clock')">環形指紋</button>
+          </div>
+          <button type="button" class="export" (click)="exportCsv('hourly')" [disabled]="loading() || !!failure() || sameAsCompare()">匯出逐時表格</button>
+        </div>
+      </div>
+      @if (h.busiestValue != null) {
+        <p class="chart-peak"><span>人次最多</span><b>{{ h.busiest }} 點</b><span>約 {{ h.busiestValue | number:'1.0-0' }} 人次{{ a.period.kind === 'date' ? '' : '／日' }}</span></p>
+      } @else { <p class="status">這段期間沒有逐時紀錄。</p> }
+      @if (hourSide() === 'clock' && radialClock(); as rc) {
+        <svg class="radial-clock" viewBox="-22 -14 244 228" [style.--line]="linesOf()(a.station)[0]?.color" role="img" [attr.aria-label]="a.station + '24 小時進站與出站環形指紋'">
+          <circle cx="100" cy="100" r="26" fill="none" stroke="var(--rule)" stroke-width="1" />
+          <circle cx="100" cy="100" r="55" fill="none" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 3" />
+          <circle cx="100" cy="100" r="84" fill="none" stroke="var(--rule)" stroke-width="1" />
+          <line x1="100" y1="12" x2="100" y2="188" stroke="var(--rule)" stroke-width="1" />
+          <line x1="12" y1="100" x2="188" y2="100" stroke="var(--rule)" stroke-width="1" />
+          @for (m of rc.missingHours; track m.h) {
+            <line [attr.x1]="m.x1" [attr.y1]="m.y1" [attr.x2]="m.x2" [attr.y2]="m.y2" stroke="var(--ink-2)" stroke-opacity=".35" stroke-width="1.2" stroke-dasharray="2 2"><title>{{ m.h }} 時無紀錄</title></line>
+          }
+          @for (d of rc.exitsPaths; track $index) {
+            <path [attr.d]="d" fill="none" stroke="var(--old)" stroke-width="2" stroke-dasharray="4 2" />
+          }
+          @for (d of rc.entriesPaths; track $index) {
+            <path [attr.d]="d" fill="var(--line, var(--ink))" fill-opacity=".14" stroke="var(--line, var(--ink))" stroke-width="2.2" />
+          }
+          <text x="100" y="3" text-anchor="middle" fill="var(--ink-2)">00</text>
+          <text x="196" y="104" text-anchor="start" fill="var(--ink-2)">06</text>
+          <text x="100" y="205" text-anchor="middle" fill="var(--ink-2)">12</text>
+          <text x="4" y="104" text-anchor="end" fill="var(--ink-2)">18</text>
+        </svg>
+        <div class="dual-legend"><span><i class="swatch a"></i>進站輪廓</span><span><i class="swatch b"></i>出站輪廓</span><span>內圈為 0 · 斷線為無紀錄</span><app-hint label="環形指紋" [alignToPanel]="true" [entries]="hints['radialClock']" /></div>
+      } @else if (h.both; as dual) {
+        <svg class="dual-chart" viewBox="0 0 240 64" [style.--line]="linesOf()(a.station)[0]?.color" role="img" [attr.aria-label]="a.station + '24 小時進站與出站曲線對照'">
+          <polyline class="line-b" [attr.points]="dual.exits" />
+          <polyline class="line-a" [attr.points]="dual.entries" />
+        </svg>
+        <div class="dual-legend"><span><i class="swatch a"></i>進站</span><span><i class="swatch b"></i>出站</span></div>
+      } @else {
+      <div class="hours" role="img" [attr.aria-label]="a.station + '各小時' + (hourSide() === 'entries' ? '進站' : '出站') + '人次'" [style.--line]="linesOf()(a.station)[0]?.color">
+        @for (b of h.bars; track b.h) {
+          <div class="hour" [class.picked]="b.picked" [title]="b.h + ' 點'">
+            @if (a.compare) { <b class="old" [class.unrecorded]="b.before == null" [style.transform]="b.before == null ? null : 'scaleY(' + b.before + ')'"></b> }
+            <b [class.unrecorded]="b.now == null" [style.transform]="b.now == null ? null : 'scaleY(' + b.now + ')'"></b>
+          </div>
+        }
+      </div>
+      }
+      @if (hourSide() !== 'clock') {
+        <div class="hour-axis" aria-hidden="true"><span>0</span><span>6</span><span>12</span><span>18</span><span>24 點</span></div>
+        <ul class="key">
+          @if (a.compare) { <li><i class="old"></i>{{ compareText() }}</li><li><i [style.background]="linesOf()(a.station)[0]?.color"></i>{{ periodText() }}</li> }
+          <li>外框：所選時段</li><li>斜線：無紀錄</li>
+        </ul>
+      }
+      <button type="button" class="result-tools-toggle" [attr.aria-expanded]="hourTableOpen()" (click)="hourTableOpen.set(!hourTableOpen())">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+        <span>各小時數字表（區分 0 與無紀錄）</span>
+      </button>
+      @if (hourTableOpen()) {
+        <div class="table-wrap result-tools-body" tabindex="0" role="region" aria-label="各小時進站與出站數字表">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">時段</th>
+                <th scope="col" class="num">進站</th>
+                <th scope="col" class="num">出站</th>
+                @if (a.compare) { <th scope="col" class="num">對照進站</th><th scope="col" class="num">增減</th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (hr of hourlyRows(); track hr.h) {
+                <tr>
+                  <th scope="row">{{ hr.h }} 點</th>
+                  <td class="num">{{ hr.entries == null ? '無紀錄' : (hr.entries | number:'1.0-0') }}</td>
+                  <td class="num">{{ hr.exits == null ? '無紀錄' : (hr.exits | number:'1.0-0') }}</td>
+                  @if (a.compare) {
+                    <td class="num">{{ hr.cmp == null ? '無紀錄' : (hr.cmp | number:'1.0-0') }}</td>
+                    <td class="num" [class.down]="(hr.delta ?? 0) < 0">{{ hr.delta == null ? '—' : signed(hr.delta) + (hr.pct == null ? '' : ' (' + signed(hr.pct, 1) + '%)') }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+
+  @if (activeSection() === 'days' && calendarChart(); as c) {
+    <app-month-calendar [chart]="c" [month]="month()" [firstDate]="firstDate()" [wideView]="wideView()" [selected]="unit() === 'date' ? date() : null" (pick)="pickDate($event)" />
+  }
+
+  @if (activeSection() === 'years' && trendChart(); as t) {
+    <div class="block-head">
+      <h2>歷年進站 <span class="section-period">{{ dayLabels[days()] }}平均</span></h2>
+      <div class="head-controls">
+        @if (recoveryIndex(); as idx) {
+          <span class="index-pill" [title]="'以 2017–2019 年（共 ' + idx.baseYears + ' 個同月）平均 = 100 計算'">基準指數 {{ idx.index }}%</span><app-hint label="基準指數" [alignToPanel]="true" [entries]="hints['recoveryIndex']" />
+        }
+        <div class="segmented inline small" role="group" aria-label="歷年圖表模式">
+          <button type="button" [attr.aria-pressed]="trendView() === 'bars'" (click)="trendView.set('bars')">逐月</button>
+          <button type="button" [attr.aria-pressed]="trendView() === 'sameMonth'" (click)="trendView.set('sameMonth')">同月跨年</button>
+          <button type="button" [attr.aria-pressed]="trendView() === 'line'" (click)="trendView.set('line')">走勢線</button>
+        </div>
+        <button type="button" class="export" (click)="exportCsv('trend')">匯出趨勢表格</button>
+      </div>
+    </div>
+    @if (trendView() === 'sameMonth') {
+      <p class="hint">僅比較每年 {{ t.targetMm }} 月的變化，點選長條可直接切換至該年。</p>
+      <div class="trend fit" role="group" aria-label="選擇同月年份">
+        @for (m of t.sameMonth; track m.month) {
+          <button type="button" class="month" [attr.aria-pressed]="unit() === 'month' && m.month === month()"
+            [title]="m.month + ' 每日 ' + (m.entries | number:'1.0-0') + ' 人次'" (click)="pickMonth(m.month)">
+            <b [style.transform]="'scaleY(' + m.height + ')'"></b>
+            <span><small>'{{ m.month.slice(2, 4) }}</small></span>
+          </button>
+        }
+      </div>
+    } @else if (trendView() === 'line') {
+      <svg class="dual-chart" viewBox="0 0 240 60" preserveAspectRatio="none" role="img" [attr.aria-label]="t.firstMonth + ' 至 ' + t.lastMonth + ' 歷年進站走勢折線圖'">
+        @if (t.baseY) { <line x1="0" x2="240" [attr.y1]="t.baseY" [attr.y2]="t.baseY" stroke="var(--old)" stroke-width="1" stroke-dasharray="3 3"/> }
+        @for (mk of t.markers; track mk.month) { <line class="event-line" [attr.x1]="mk.x" [attr.x2]="mk.x" y1="0" y2="60"><title>{{ mk.month }} {{ mk.label }}</title></line> }
+        <polyline class="line-a" [attr.points]="t.linePoints"/>
+      </svg>
+      <div class="dual-legend">
+        <span><i class="swatch a"></i>{{ t.firstMonth }} – {{ t.lastMonth }} 每日進站</span>
+        @if (t.baseY) { <span><i class="swatch b"></i>2017–2019 同月基準</span> }
+        @if (t.markers.length) { <span><i class="swatch event"></i>通車與重大事件</span> }
+      </div>
+      @if (t.milestones.length) {
+        <p class="hint">@for (ms of t.milestones; track ms.month) { <span>{{ ms.month }} {{ ms.label }}</span>@if (!$last) { <span> · </span> } }</p>
+      }
+    } @else {
+      <div class="trend" role="group" aria-label="選擇月份">
+        @for (m of t.months; track m.month) {
+          <button type="button" class="month" [class.year]="m.year" [class.none]="m.height == null" [attr.aria-pressed]="unit() === 'month' && m.month === month()"
+            [disabled]="m.height == null" [title]="m.month + (m.entries == null ? ' 沒有資料' : ' 每日 ' + (m.entries | number:'1.0-0') + ' 人次') + (m.milestone ? ' · ' + m.milestone : '')" [attr.aria-label]="(m.mark ? m.mark + ' ' : m.year ? m.month.slice(0, 4) + ' ' : '') + (+m.month.slice(5)) + '月，' + m.month + (m.entries == null ? ' 沒有資料' : ' 每日 ' + (m.entries | number:'1.0-0') + ' 人次') + (m.milestone ? '，' + m.milestone : '')" (click)="pickMonth(m.month)">
+            <b [style.transform]="'scaleY(' + (m.height ?? 0) + ')'"></b>
+            <span><small>{{ m.mark ?? (m.year ? m.month.slice(0, 4) : '') }}</small>{{ (m.mark || m.year ? ' ' : '') + (+m.month.slice(5)) }}月</span>
+          </button>
+        }
+      </div>
+      @if (t.milestones.length) {
+        <p class="hint">通車與重大事件：@for (ms of t.milestones; track ms.month) { <span>{{ ms.month }} {{ ms.label }}</span>@if (!$last) { <span> · </span> } }</p>
+      }
+    }
+  }
+
+  @if (activeSection() === 'days' && calendarLoading()) { <p class="status" role="status">正在載入每天人次…</p> }
+  @if (activeSection() === 'days' && calendarFailure()) { <div class="query-failure" role="alert"><p>每天人次暫時無法載入。</p><button type="button" class="retry" (click)="retryCalendar()">重新載入</button></div> }
+  @if (activeSection() === 'years' && trendLoading()) { <p class="status" role="status">正在載入歷年人次…</p> }
+  @if (activeSection() === 'years' && trendFailure()) { <div class="query-failure" role="alert"><p>歷年人次暫時無法載入。</p><button type="button" class="retry" (click)="retryTrend()">重新載入</button></div> }
+
+  @if (mode() === 'station' && activeSection() === 'list' && stationAnswer(); as a) {
+    <div class="block-head list-title">
+      <h2>{{ direction() === 'outbound' ? '從這站出發' : '抵達這站' }}</h2>
+      <div class="head-controls">
+        <div class="segmented inline small" role="group" aria-label="方向">
+          <button type="button" [attr.aria-pressed]="direction() === 'outbound'" (click)="direction.set('outbound')">去哪裡</button>
+          <button type="button" [attr.aria-pressed]="direction() === 'inbound'" (click)="direction.set('inbound')">從哪來</button>
+        </div>
+        <div class="segmented inline small" role="group" aria-label="顯示樣式">
+          <button type="button" [attr.aria-pressed]="listStyle() === 'cards'" (click)="listStyle.set('cards')">列表</button>
+          <button type="button" [attr.aria-pressed]="listStyle() === 'table'" (click)="listStyle.set('table')">資料表</button>
+        </div>
+      </div>
+    </div>
+    @if (distanceSummary(); as ds) {
+      <div class="distance-bands" role="group" [attr.aria-label]="(direction() === 'outbound' ? '出發' : '抵達') + '人次的距離分布'">
+        <p>{{ direction() === 'outbound' ? '從這站出發的人' : '來這站的人' }}平均搭 <b>{{ ds.averageKm.toFixed(1) }} 公里</b>（兩站直線距離，依人次加權）</p>
+        <div class="distance-bar" aria-hidden="true">@for (b of ds.bands; track b.label) { <i [style.flex-grow]="b.share" [attr.data-band]="$index"></i> }</div>
+        <ul>@for (b of ds.bands; track b.label) { <li><i [attr.data-band]="$index"></i><span>{{ b.label }}<small>{{ b.note }}</small></span><b>{{ b.share.toFixed(0) }}%</b><small>{{ b.stations }} 站</small></li> }</ul>
+      </div>
+    }
+    <div class="result-quick-bar">
+      <button type="button" class="result-tools-toggle" [attr.aria-expanded]="toolsOpen()" (click)="toolsOpen.set(!toolsOpen())"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg><span>篩選與匯出</span></button>
+      <label class="field sort"><span class="sr-only">排序方式</span><span class="select"><select (change)="relationSort.set($any($event.target).value)">
+        <option value="daily" [selected]="relationSort() === 'daily'">依人次</option>
+        <option value="share" [selected]="relationSort() === 'share'">依占比</option>
+        @if (a.compare) { <option value="change" [selected]="relationSort() === 'change'">依增減</option><option value="growth" [selected]="relationSort() === 'growth'">依成長率</option> }
+      </select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+    </div>
+    @if (toolsOpen()) {
+    <div class="result-tools-body">
+    <div class="tools">
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><input type="search" placeholder="篩選站名" aria-label="篩選站名" [value]="query()" (input)="query.set($any($event.target).value)"></label>
+      <button type="button" class="export" (click)="exportCsv()" [disabled]="loading() || !!failure() || sameAsCompare() || !relations().length" [attr.aria-label]="'匯出這 ' + relations().length + ' 站表格'" [title]="'匯出這 ' + relations().length + ' 站表格'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>匯出</span></button>
+    </div>
+    <div class="chips line-filter" role="group" aria-label="依路線篩選">
+      @for (code of lineCodes; track code) { <button type="button" [attr.aria-pressed]="lineFilter() === code" [style.--line]="'var(--' + code + ')'" [attr.data-code]="code" [title]="lineNames[code]" (click)="setLine(code)">{{ code }}</button> }
+    </div>
+    </div>
+    }
+    <div class="list-head" aria-hidden="true"><span>車站</span><span>{{ a.compare ? '增減（人次／日）' : (a.period.kind === 'date' ? '當天人次' : '每日人次') }}</span></div>
+    <p class="explore-legend" aria-hidden="true">
+      @if (a.compare) {
+        <span><i class="swatch line"></i>增加</span><span><i class="swatch dashed"></i>減少</span>
+      } @else {
+        <span><i class="swatch line"></i>線寬與箭頭數代表人次</span>
+      }
+    </p>
+    @if (listStyle() === 'table') {
+      <div class="table-wrap" tabindex="0" role="region" aria-label="起訖流向資料表">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col"><button type="button" (click)="sortRelationCol('station')">車站{{ relTableCol() === 'station' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              <th scope="col" class="num"><button type="button" (click)="sortRelationCol('daily')">人次{{ relTableCol() === 'daily' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              <th scope="col" class="num"><button type="button" (click)="sortRelationCol('share')">占比{{ relTableCol() === 'share' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              @if (a.compare) { <th scope="col" class="num"><button type="button" (click)="sortRelationCol('change')">增減{{ relTableCol() === 'change' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of tableRelations().slice(0, shown()); track r.station; let i = $index) {
+              <tr [class.selected]="focusedStation() === r.station" (click)="focusTableStation(r.station)">
+                <td>{{ i + 1 }}</td>
+                <td><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span></td>
+                <td class="num">{{ r.daily == null ? stationMissingLabel(r.station) : (r.daily | number:'1.0-0') }}</td>
+                <td class="num">{{ share(r) }}</td>
+                @if (a.compare) {
+                  <td class="num" [class.down]="(delta(r.daily, r.compareDaily) ?? 0) < 0">{{ r.daily == null ? '—' : r.compareDaily == null ? '新' : signed(delta(r.daily, r.compareDaily)) }}</td>
+                }
+              </tr>
+            } @empty { <tr><td [attr.colspan]="a.compare ? 5 : 4" class="status">沒有符合的車站。</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+    <ol class="relations">
+      @for (r of relations().slice(0, shown()); track r.station; let i = $index) {
+        <li><button type="button" [attr.aria-pressed]="focusedRelation() === r.station" (click)="selectRelation(r.station)" [title]="'比較本站與' + r.station">
+          <span class="rank" [class.top]="i < 3 || focusedRelation() === r.station">{{ i + 1 }}</span>
+          <span class="pair">
+            <span class="names"><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span></span>
+            @if (a.compare) { <span class="diverge" [class.down]="(delta(r.daily, r.compareDaily) ?? 0) < 0"><i [style.--w]="abs(delta(r.daily, r.compareDaily) ?? 0) / relationSwing()"></i></span> }
+            @else { <span class="meter" [style.--line]="linesOf()(r.station)[0]?.color"><i [style.transform]="'scaleX(' + (r.daily ?? 0) / relationScale() + ')'"></i></span> }
+            <small>@if (a.compare) { {{ r.compareDaily == null ? stationMissingLabel(r.station, comparePeriod()) : (r.compareDaily | number:'1.0-0') }} → }{{ r.daily == null ? stationMissingLabel(r.station) : (r.daily | number:'1.0-0') + ' 人次' }} · 占 {{ share(r) }}</small>
+          </span>
+          @if (a.compare) {
+            @if (r.daily == null) {
+              <span class="delta plain" title="本期尚無資料">—</span>
+            } @else if (r.compareDaily == null) {
+              <span class="delta state-new">新</span>
+            } @else {
+              <span class="delta" [class.down]="(delta(r.daily, r.compareDaily) ?? 0) < 0">{{ signed(delta(r.daily, r.compareDaily)) }}</span>
+            }
+          } @else {
+            <span class="delta plain">{{ r.daily == null ? '—' : (r.daily | number:'1.0-0') }}</span>
+          }
+        </button></li>
+      } @empty { <li class="status">沒有符合的車站。</li> }
+    </ol>
+    }
+    @if (relations().length > shown()) { <button type="button" class="more" (click)="more()">再顯示 {{ relations().length - shown() < 30 ? relations().length - shown() : 30 }} 站</button> }
+  }
+
+  @if (mode() === 'network' && activeSection() === 'list' && networkAnswer(); as a) {
+    <div class="block-head list-title">
+      <h2>各站進出</h2>
+      <div class="head-controls">
+        <span class="count">{{ networkRows().length }} 站</span>
+        <div class="segmented inline small" role="group" aria-label="顯示樣式">
+          <button type="button" [attr.aria-pressed]="listStyle() === 'cards'" (click)="listStyle.set('cards')">列表</button>
+          <button type="button" [attr.aria-pressed]="listStyle() === 'table'" (click)="listStyle.set('table')">資料表</button>
+          <button type="button" [attr.aria-pressed]="listStyle() === 'lines'" (click)="listStyle.set('lines')">路線</button>
+        </div>
+      </div>
+    </div>
+    <div class="result-quick-bar">
+      <button type="button" class="result-tools-toggle" [attr.aria-expanded]="toolsOpen()" (click)="toolsOpen.set(!toolsOpen())"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg><span>篩選與匯出</span></button>
+      <label class="field sort"><span class="sr-only">排序方式</span><span class="select"><select (change)="networkSort.set($any($event.target).value)">
+        <option value="entries" [selected]="networkSort() === 'entries'">依進站</option>
+        <option value="exits" [selected]="networkSort() === 'exits'">依出站</option>
+        @if (a.compare) { <option value="change" [selected]="networkSort() === 'change'">依增減</option><option value="growth" [selected]="networkSort() === 'growth'">依成長率</option> }
+      </select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+    </div>
+    @if (toolsOpen()) {
+    <div class="result-tools-body">
+    <div class="tools">
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><input type="search" placeholder="篩選站名" aria-label="篩選站名" [value]="query()" (input)="query.set($any($event.target).value)"></label>
+      <button type="button" class="export" (click)="exportCsv()" [disabled]="loading() || !!failure() || sameAsCompare() || !networkRows().length" [attr.aria-label]="'匯出這 ' + networkRows().length + ' 站表格'" [title]="'匯出這 ' + networkRows().length + ' 站表格'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>匯出</span></button>
+    </div>
+    <div class="chips line-filter" role="group" aria-label="依路線篩選">
+      @for (code of lineCodes; track code) { <button type="button" [attr.aria-pressed]="lineFilter() === code" [style.--line]="'var(--' + code + ')'" [attr.data-code]="code" [title]="lineNames[code]" (click)="setLine(code)">{{ code }}</button> }
+    </div>
+    </div>
+    }
+    <div class="list-head" aria-hidden="true"><span>車站</span><span>{{ a.compare ? '進站增減（人次／日）' : '進站 ／ 出站' }}</span></div>
+    <p class="explore-legend" aria-hidden="true">
+      <span><i class="swatch dot"></i>圓面積代表進站量</span>
+      @if (a.compare) { <span><i class="swatch hollow"></i>空心代表比對照期少</span> }
+    </p>
+    @if (listStyle() === 'table') {
+      <div class="table-wrap" tabindex="0" role="region" aria-label="全線各站旅次資料表">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col"><button type="button" (click)="sortNetworkCol('station')">車站{{ netTableCol() === 'station' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              <th scope="col" class="num"><button type="button" (click)="sortNetworkCol('entries')">進站{{ netTableCol() === 'entries' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              <th scope="col" class="num"><button type="button" (click)="sortNetworkCol('exits')">出站{{ netTableCol() === 'exits' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              <th scope="col" class="num"><button type="button" (click)="sortNetworkCol('net')">淨流{{ netTableCol() === 'net' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th>
+              @if (a.compare) { <th scope="col" class="num"><button type="button" (click)="sortNetworkCol('change')">增減{{ netTableCol() === 'change' ? (tableDir() === 'desc' ? ' ↓' : ' ↑') : '' }}</button></th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of tableNetworkRows().slice(0, shown()); track r.station; let i = $index) {
+              <tr [class.selected]="focusedStation() === r.station" (click)="focusTableStation(r.station)">
+                <td>{{ i + 1 }}</td>
+                <td><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span>@if (r.entries == null) { <b class="state-pill">{{ stationMissingLabel(r.station) }}</b> }</td>
+                <td class="num">{{ r.entries == null ? '—' : (r.entries | number:'1.0-0') }}</td>
+                <td class="num">{{ r.exits == null ? '—' : (r.exits | number:'1.0-0') }}</td>
+                <td class="num">{{ r.entries == null || r.exits == null ? '—' : signed(r.entries - r.exits) }}</td>
+                @if (a.compare) {
+                  <td class="num" [class.down]="(delta(r.entries, r.compareEntries) ?? 0) < 0">{{ r.entries == null ? '—' : r.compareEntries == null ? '新' : signed(delta(r.entries, r.compareEntries)) }}</td>
+                }
+              </tr>
+            } @empty { <tr><td [attr.colspan]="a.compare ? 6 : 5" class="status">沒有符合的車站。</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    } @else if (listStyle() === 'lines') {
+      @if (catalogLoading()) { <p class="status" role="status">正在載入路線通車資料…</p> }
+      @else if (catalogFailure()) {
+        <div class="query-failure" role="alert"><p>路線通車資料暫時無法載入。</p><button type="button" class="retry" (click)="retryCatalog()">重新載入</button></div>
+      }
+      <p class="hint">依該期已通車路線彙總車站進站量，轉乘站可計入多條路線。</p>
+      <ol class="relations">
+        @for (l of lineSummaries(); track l.code; let i = $index) {
+          <li><button type="button" [style.--line]="'var(--' + l.code + ')'" (click)="setLine(l.code); listStyle.set('cards')">
+            <span class="rank" [class.top]="i < 3">{{ i + 1 }}</span>
+            <span class="name-col">
+              <span class="name-row"><b>{{ l.name }}</b><span class="station-badges"><span class="badge" [attr.data-code]="l.code" [style.--line]="'var(--' + l.code + ')'">{{ l.code }}</span></span><small>{{ l.stationCount }} 站</small></span>
+              <span class="meter">
+                @if (l.compareEntries != null) { <i class="old" [style.transform]="'scaleX(' + (l.compareEntries / lineSummaryMax()) + ')'"></i> }
+                @if (l.entries != null) { <i [style.transform]="'scaleX(' + (l.entries / lineSummaryMax()) + ')'"></i> }
+              </span>
+              <small>
+                @if (l.partial && l.entries == null) { 月中通車，可改查單日 }
+                @else if (l.entries != null) {
+                  {{ a.period.kind === 'date' ? '當日' : '日均' }} {{ l.entries | number:'1.0-1' }} 人次
+                  @if (l.partial) { （未含月中通車站） }
+                } @else { {{ l.unopened ? '本期未通車' : '本期無紀錄' }} }
+                @if (a.compare) {
+                  · 對照期
+                  @if (l.comparePartial && l.compareEntries == null) { 月中通車 }
+                  @else if (l.compareEntries != null) {
+                    {{ l.compareEntries | number:'1.0-1' }} 人次
+                    @if (l.comparePartial) { （未含月中通車站） }
+                  } @else { {{ l.compareUnopened ? '未通車' : '無紀錄' }} }
+                }
+              </small>
+            </span>
+            @if (a.compare && !l.partial && !l.comparePartial && l.entries != null && l.compareEntries != null) {
+              <span class="delta" [class.down]="l.entries < l.compareEntries">{{ signed(l.entries - l.compareEntries) }}</span>
+            } @else if (!a.compare && l.share != null) {
+              <span class="delta plain">{{ l.share | number:'1.0-0' }}%</span>
+            }
+          </button></li>
+        }
+      </ol>
+    } @else {
+    <ol class="relations">
+      @for (r of networkRows().slice(0, shown()); track r.station; let i = $index) {
+        <li><button type="button" (click)="openStation.emit(r.station)" [title]="'看' + r.station + '的單站關係'">
+          <span class="rank" [class.top]="i < 3">{{ i + 1 }}</span>
+          <span class="pair">
+            <span class="names"><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span>@if (r.entries == null) { <b class="state-pill">{{ stationMissingLabel(r.station) }}</b> }</span>
+            @if (a.compare) { <span class="diverge" [class.down]="(delta(r.entries, r.compareEntries) ?? 0) < 0"><i [style.--w]="abs(delta(r.entries, r.compareEntries) ?? 0) / networkSwing()"></i></span> }
+            @else { <span class="meter" [style.--line]="linesOf()(r.station)[0]?.color"><i [style.transform]="'scaleX(' + (r.entries ?? 0) / networkScale() + ')'"></i></span> }
+            <small>@if (a.compare) { 進站 {{ r.compareEntries == null ? stationMissingLabel(r.station, comparePeriod()) : (r.compareEntries | number:'1.0-0') }} → {{ r.entries == null ? stationMissingLabel(r.station) : (r.entries | number:'1.0-0') }} } @else { 出站 {{ r.exits == null ? (r.exitCovered === false ? '資料不足' : '無紀錄') : (r.exits | number:'1.0-0') }} }</small>
+          </span>
+          @if (a.compare) {
+            @if (r.entries == null) {
+              <span class="delta plain" title="本期尚無資料">—</span>
+            } @else if (r.compareEntries == null) {
+              <span class="delta state-new">新</span>
+            } @else {
+              <span class="delta" [class.down]="(delta(r.entries, r.compareEntries) ?? 0) < 0">{{ signed(delta(r.entries, r.compareEntries)) }}</span>
+            }
+          } @else {
+            <span class="delta plain">{{ r.entries == null ? '—' : (r.entries | number:'1.0-0') }}</span>
+          }
+        </button></li>
+      } @empty { <li class="status">沒有符合的車站。</li> }
+    </ol>
+    }
+    @if (listStyle() !== 'lines' && networkRows().length > shown()) { <button type="button" class="more" (click)="more()">再顯示 {{ networkRows().length - shown() < 30 ? networkRows().length - shown() : 30 }} 站</button> }
+  }
+
+  @if (activeSection() === 'matrix') {
+    @if (matrixLoading()) { <p class="status" role="status">正在計算車站互搭表…</p> }
+    @else if (matrixFailure()) { <div class="query-failure" role="alert"><p>車站互搭表暫時無法載入。</p><button type="button" class="retry" (click)="retryMatrix()">重新載入</button></div> }
+    @else if (matrix(); as m) {
+      <div class="block-head"><span class="head-title"><h2>車站互搭表（前 {{ m.stations.length }} 大站）</h2><app-hint label="車站互搭表" [alignToPanel]="true" [entries]="hints['matrix']" /></span><span class="section-period">直欄迄站 · 橫列起站</span></div>
+      <p class="hint">對角線灰格是同站進出旅次（不計入色階最大值）。</p>
+      <app-od-matrix [matrix]="m" [max]="matrixMax()" [days]="days()" [compare]="comparePeriod()" (station)="openStation.emit($event)" (pair)="openPair.emit({ origin: $event.origin, destination: $event.destination, period: period(), weekend: days() === 'weekend', hours: band() })" />
+    }
+  }
+
+  @if (activeSection() === 'leaders') {
+    <div class="block-head"><span class="head-title"><h2>全線榜單</h2><app-hint label="全線榜單" [alignToPanel]="true" [entries]="hints['leaders']" /></span><span class="section-period">{{ periodText() }}</span></div>
+    @if (leadersLoading()) { <p class="status" role="status">正在統計排行榜…</p> }
+    @else if (leadersFailure()) { <div class="query-failure" role="alert"><p>榜單暫時無法載入。</p><button type="button" class="retry" (click)="retryLeaders()">重新載入</button></div> }
+    @else if (leaders(); as lb) {
+      @if (lb.busiestStations[0]; as top) {
+        <div class="stats">
+          <div class="stat"><span>最忙車站第 1 名</span><strong>{{ top.station }}</strong><small>{{ top.entries | number:'1.0-0' }} 進站／日</small></div>
+          @if (lb.risingStations?.[0]; as rise) {
+            <div class="stat"><span>成長最快第 1 名</span><strong>{{ rise.station }}</strong><small>+{{ rise.growthPct | number:'1.1-1' }}%（{{ rise.current | number:'1.0-0' }}／日）</small></div>
+          } @else if (lb.busiestPairs[0]; as pair) {
+            <div class="stat"><span>最忙站對第 1 名</span><strong>{{ pair.origin }}→{{ pair.destination }}</strong><small>{{ pair.daily | number:'1.0-0' }} 人次／日</small></div>
+          }
+        </div>
+      }
+      <p class="hint">依目前條件排前 10 名，若有對照期會再列出增減最多的車站（基準期至少 200 人次／日）。</p>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="最忙車站前 10 名">
+        <table class="data-table">
+          <caption>最忙車站前 10 名</caption>
+          <thead><tr><th scope="col">名次</th><th scope="col">車站</th><th scope="col" class="num">進站／日</th><th scope="col" class="num">出站／日</th></tr></thead>
+          <tbody>
+            @for (row of lb.busiestStations; track row.station; let i = $index) {
+              <tr><td>{{ i + 1 }}</td><td><button type="button" class="link-cell" (click)="pickStation(row.station)">{{ row.station }}</button></td><td class="num">{{ row.entries | number:'1.0-0' }}</td><td class="num">{{ row.exits | number:'1.0-0' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="最忙站對前 10 名">
+        <table class="data-table">
+          <caption>最忙站對前 10 名</caption>
+          <thead><tr><th scope="col">名次</th><th scope="col">起訖站對</th><th scope="col" class="num">每日人次</th></tr></thead>
+          <tbody>
+            @for (row of lb.busiestPairs; track row.origin + '-' + row.destination; let i = $index) {
+              <tr><td>{{ i + 1 }}</td><td><button type="button" class="link-cell" (click)="openPair.emit({ origin: row.origin, destination: row.destination, period: period(), weekend: days() === 'weekend', hours: band() })">{{ row.origin }} → {{ row.destination }}</button></td><td class="num">{{ row.daily | number:'1.0-0' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (lb.risingStations?.length) {
+        <div class="table-wrap" tabindex="0" role="region" aria-label="成長最多車站前 10 名">
+          <table class="data-table">
+            <caption>成長最多車站前 10 名</caption>
+            <thead><tr><th scope="col">名次</th><th scope="col">車站</th><th scope="col" class="num">本期／日</th><th scope="col" class="num">基準／日</th><th scope="col" class="num">成長</th></tr></thead>
+            <tbody>
+              @for (row of lb.risingStations; track row.station; let i = $index) {
+                <tr><td>{{ i + 1 }}</td><td><button type="button" class="link-cell" (click)="pickStation(row.station)">{{ row.station }}</button></td><td class="num">{{ row.current | number:'1.0-0' }}</td><td class="num">{{ row.baseline | number:'1.0-0' }}</td><td class="num">+{{ row.growthPct | number:'1.1-1' }}%</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      @if (lb.fallingStations?.length) {
+        <div class="table-wrap" tabindex="0" role="region" aria-label="減少最多車站前 10 名">
+          <table class="data-table">
+            <caption>減少最多車站前 10 名</caption>
+            <thead><tr><th scope="col">名次</th><th scope="col">車站</th><th scope="col" class="num">本期／日</th><th scope="col" class="num">基準／日</th><th scope="col" class="num">變化</th></tr></thead>
+            <tbody>
+              @for (row of lb.fallingStations; track row.station; let i = $index) {
+                <tr><td>{{ i + 1 }}</td><td><button type="button" class="link-cell" (click)="pickStation(row.station)">{{ row.station }}</button></td><td class="num">{{ row.current | number:'1.0-0' }}</td><td class="num">{{ row.baseline | number:'1.0-0' }}</td><td class="num">{{ row.growthPct | number:'1.1-1' }}%</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+
+  @if (activeSection() === 'coverage') {
+
+    @if (catalogLoading()) { <p class="status" role="status">正在載入資料紀錄範圍…</p> }
+    @else if (catalogFailure()) { <div class="query-failure" role="alert"><p>資料紀錄範圍暫時無法載入。</p><button type="button" class="retry" (click)="retryCatalog()">重新載入</button></div> }
+    @else if (catalog(); as cat) {
+      <div class="block-head"><span class="head-title"><h2>資料紀錄</h2><app-hint label="資料紀錄" [alignToPanel]="true" [entries]="hints['coverage']" /></span></div>
+      <div class="coverage-summary">
+        <div><small>已匯入月份</small><b>{{ cat.summary.months }} 個月</b></div>
+        <div><small>有效天數</small><b>{{ cat.summary.days | number }} 天</b></div>
+        <div><small>收錄車站</small><b>{{ cat.summary.stations }} 站</b></div>
+        <div><small>區間缺漏日</small><b>{{ cat.summary.missingDays }} 天</b></div>
+      </div>
+      <div class="segmented inline small" role="group" aria-label="紀錄檢視">
+        <button type="button" [attr.aria-pressed]="coverageTab() === 'stations'" (click)="coverageTab.set('stations')">依車站</button>
+        <button type="button" [attr.aria-pressed]="coverageTab() === 'months'" (click)="coverageTab.set('months')">依月份</button>
+      </div>
+      @if (coverageTab() === 'stations') {
+        <label class="search coverage-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><input type="search" placeholder="搜尋站名" aria-label="搜尋車站紀錄" [value]="coverageQuery()" (input)="coverageQuery.set($any($event.target).value)"></label>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="各站資料年份紀錄表">
+          <table class="data-table">
+            <thead><tr><th scope="col">車站</th><th scope="col">正式通車日</th><th scope="col">最早旅次紀錄</th><th scope="col">最新紀錄</th><th scope="col" class="num">天數</th></tr></thead>
+            <tbody>
+              @for (s of catalogStations(); track s.name) {
+                <tr (click)="openFromCoverageStation(s.name)">
+                  <td>{{ s.name }}</td>
+                  <td>{{ s.officialOpening ?? '—' }}</td>
+                  <td>{{ s.firstDate ?? '—' }}</td>
+                  <td>{{ s.lastDate ?? '—' }}</td>
+                  <td class="num">{{ s.days | number }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="table-wrap" tabindex="0" role="region" aria-label="各月份資料完整度表">
+          <table class="data-table">
+            <thead><tr><th scope="col">月份</th><th scope="col" class="num">天數</th><th scope="col" class="num">站數</th><th scope="col" class="num">缺漏</th></tr></thead>
+            <tbody>
+              @for (m of catalogMonths(); track m.month) {
+                <tr (click)="openFromCoverageMonth(m.month)">
+                  <td>{{ m.month }}</td>
+                  <td class="num">{{ m.days }}/{{ m.expectedDays }}</td>
+                  <td class="num">{{ m.stationCount }}</td>
+                  <td class="num">{{ m.missingDates.length }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+
+  </div>
+  @if (wideView()) {
+    <aside class="wide-aside" aria-label="並排圖表對照">
+      @if (mode() === 'station' && stationAnswer(); as a) {
+        <h2>24 小時進／出站對照</h2>
+        @if (dualHourPoints(); as dual) {
+          <svg class="dual-chart" viewBox="0 0 240 64" [style.--line]="linesOf()(a.station)[0]?.color" role="img" [attr.aria-label]="a.station + '24 小時進站與出站曲線'">
+            <polyline class="line-b" [attr.points]="dual.exits" />
+            <polyline class="line-a" [attr.points]="dual.entries" />
+          </svg>
+          <div class="dual-legend"><span><i class="swatch a"></i>進站</span><span><i class="swatch b"></i>出站</span></div>
+        }
+        @if (stationMetrics(); as sm) {
+          <div class="metrics-strip">
+            <div><small>尖峰進站</small><b>{{ sm.peakHour == null ? '—' : sm.peakHour + ' 點' }}</b></div>
+            <div><small>進出比</small><b>{{ sm.ioRatio ?? '—' }}</b></div>
+            <div><small>淨流向</small><b>{{ signed(sm.netFlow) }}</b></div>
+          </div>
+        }
+      } @else if (mode() === 'network' && networkAnswer(); as na) {
+        @if (lineSummaries().length) {
+          <h2>各路線日均進站比較</h2>
+          <ol class="relations">
+            @for (l of lineSummaries(); track l.code; let i = $index) {
+              <li><button type="button" [style.--line]="'var(--' + l.code + ')'" (click)="setLine(l.code); setWideView(false)">
+                <span class="rank" [class.top]="i < 3">{{ i + 1 }}</span>
+                <span class="name-col">
+                  <span class="name-row"><b>{{ l.name }}</b><small>{{ l.stationCount }} 站</small></span>
+                  <span class="meter">
+                    @if (l.compareEntries != null) { <i class="old" [style.transform]="'scaleX(' + (l.compareEntries / lineSummaryMax()) + ')'"></i> }
+                    @if (l.entries != null) { <i [style.transform]="'scaleX(' + (l.entries / lineSummaryMax()) + ')'"></i> }
+                  </span>
+                  <small>
+                    @if (l.partial && l.entries == null) { 月中通車，可改查單日 }
+                    @else if (l.entries != null) { {{ l.entries | number:'1.0-1' }} 人次 }
+                    @else { {{ l.unopened ? '本期未通車' : '本期無紀錄' }} }
+                    @if (na.compare) {
+                      · 對照 {{ l.comparePartial && l.compareEntries == null ? '月中通車' : l.compareEntries != null ? (l.compareEntries | number:'1.0-1') + ' 人次' : (l.compareUnopened ? '未通車' : '無紀錄') }}
+                    }
+                  </small>
+                </span>
+                @if (na.compare && !l.partial && !l.comparePartial && l.entries != null && l.compareEntries != null) {
+                  <span class="delta" [class.down]="l.entries < l.compareEntries">{{ signed(l.entries - l.compareEntries) }}</span>
+                } @else if (!na.compare && l.share != null) {
+                  <span class="delta plain">{{ l.share | number:'1.0-0' }}%</span>
+                }
+              </button></li>
+            }
+          </ol>
+        }
+      }
+    </aside>
+  }
+  </div>
+  </div>
+  </div>
+</div>

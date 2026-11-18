@@ -1,0 +1,38 @@
+http://:80 {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https:; worker-src 'self' blob:; font-src 'self' data: https:;"
+	}
+
+	handle /api/* {
+		reverse_proxy api:5011
+	}
+
+	handle /health {
+		reverse_proxy api:5011
+	}
+
+	handle /ready {
+		reverse_proxy api:5011
+	}
+
+	handle {
+		root * /srv/web/current
+		header /workers/maplibre-gl-worker.mjs >Content-Type "text/javascript"
+		@navigation {
+			header Accept *text/html*
+			not file {path}
+			not path /od/* /metro/*
+		}
+		rewrite @navigation /index.html
+
+		@hashed path_regexp ^/(?:[^/]+/)*[^/]+-[A-Za-z0-9]{8}\.(?:js|css|woff2?)$
+		@revalidate not path_regexp ^/(?:[^/]+/)*[^/]+-[A-Za-z0-9]{8}\.(?:js|css|woff2?)$
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		header @revalidate Cache-Control "no-cache, must-revalidate"
+		file_server
+	}
+}

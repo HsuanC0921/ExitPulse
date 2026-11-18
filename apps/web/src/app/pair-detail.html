@@ -1,0 +1,122 @@
+<aside #detailPanel class="detail" [class.closed]="!detailOpen()" [class.wide]="detailWide()" tabindex="-1" [attr.role]="detailWide() ? 'dialog' : null" [attr.aria-modal]="detailWide() ? 'true' : null" aria-label="兩站分析">
+  <header class="plates">
+    <div class="plate">@for (l of linesOfStation()(item().origin); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode()(l.code, item().origin) }}</b> }<span>{{ item().origin }}</span></div>
+    <svg class="to" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    <div class="plate">@for (l of linesOfStation()(item().destination); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode()(l.code, item().destination) }}</b> }<span>{{ item().destination }}</span></div>
+    <div class="detail-actions">
+      <button type="button" class="icon-button" [attr.aria-pressed]="isFavPair()" [attr.aria-label]="isFavPair() ? '取消收藏兩站' : '收藏這組兩站'" [title]="isFavPair() ? '取消收藏兩站' : '收藏這組兩站'" (click)="toggleFav.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.fill]="isFavPair() ? 'currentColor' : 'none'" d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg></button>
+      <button type="button" class="icon-button" [attr.aria-pressed]="detailWide()" [attr.aria-label]="detailWide() ? '縮回右側欄' : '橫向放大檢視'" [title]="detailWide() ? '縮回右側欄' : '橫向放大檢視'" (click)="toggleWide.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="detailWide() ? 'M14 10l7-7M20 10h-6V4M3 21l7-7M4 14h6v6' : 'M15 3h6v6M21 3l-7 7M3 21l7-7M9 21H3v-6'"/></svg></button>
+      @if (!detailWide()) { <button type="button" class="icon-button" [attr.aria-expanded]="detailOpen()" [attr.aria-label]="detailOpen() ? '收合兩站分析' : '展開兩站分析'" (click)="toggleOpen.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="detailOpen() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg></button> }
+      <button type="button" class="icon-button" aria-label="關閉兩站分析" (click)="close.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+  </header>
+
+  @if (detailOpen()) {
+    <div class="detail-body">
+      @if (mapMessage()) { <p class="status">{{ mapMessage() }}</p> }
+      <div class="result-lead">
+        <h2 class="headline">{{ story().headline }}</h2>
+        <p>{{ story().when }}</p>
+        @if (verdict()) { <p class="verdict">{{ verdict() }}</p> }
+        @for (note of cautions(); track note) { <p class="verdict caution"><span aria-hidden="true">△</span> {{ note }}</p> }
+      </div>
+      <div class="numbers">
+        <div><span>{{ data().baseline }}</span><strong>{{ dailyTrips()(counts()[0]) }}</strong><small>每日人次</small></div>
+        <div class="now" [style.--line]="lineOf()(item().origin)?.color"><span>{{ data().current }}</span><strong>{{ dailyTrips()(counts()[1]) }}</strong><small>每日人次</small></div>
+      </div>
+
+      @if (story().reversal) { <p class="callout">{{ story().reversal }}</p> }
+
+      <div class="pair-actions">
+        <button type="button" class="pair-action-primary" (click)="crowd.open()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg><span>人潮對比</span></button>
+        <app-crowd #crowd [origin]="item().origin" [destination]="item().destination" [baselineLabel]="data().baseline" [currentLabel]="data().current" [baseline]="item().baselineDaily" [current]="item().currentDaily" [profile]="profile()" [hours]="data().hours" />
+        <div class="pair-action-row">
+          <button type="button" (click)="focusStation.emit(item().origin)" [title]="'清單只看' + item().origin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg><span>只看 {{ item().origin }}</span></button>
+          <button type="button" (click)="focusStation.emit(item().destination)" [title]="'清單只看' + item().destination"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg><span>只看 {{ item().destination }}</span></button>
+        </div>
+        <div class="pair-action-row" [class.single]="!reversePair()">
+          @if (reversePair(); as back) {
+            <button type="button" (click)="choose.emit(back)" [title]="'換看' + back.origin + '→' + back.destination"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg><span>換看反向</span></button>
+          }
+          <button type="button" (click)="saveCard.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg><span>存成圖片</span></button>
+        </div>
+      </div>
+
+      <details class="evidence" [open]="detailWide()">
+        <summary><span>看分析細節</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <h3>從起站出發，有多少人搭到這裡？</h3>
+        <div class="bars" [style.--line]="lineOf()(item().origin)?.color">
+          <div><span>{{ data().baseline }}</span><i><b class="old" [style.transform]="'scaleX(' + story().shareA / story().scale + ')'"></b></i><em>{{ story().shareA | number:(story().shareA > 0 && story().shareA < 1 ? '1.2-2' : '1.1-1') }}%</em></div>
+          <div><span>{{ data().current }}</span><i><b [style.transform]="'scaleX(' + story().shareB / story().scale + ')'"></b></i><em>{{ story().shareB | number:(story().shareB > 0 && story().shareB < 1 ? '1.2-2' : '1.1-1') }}%</em></div>
+        </div>
+        <p class="body muted">{{ story().origin }}</p>
+
+        @if (chart(); as c) {
+          <h3>各時段人次</h3>
+          <p class="chart-peak"><span>{{ data().current }} 最多人搭的時段</span><b>{{ c.busiest }} 點</b><span>約 {{ c.busiestDaily | number }} 人次／日</span></p>
+          @if (c.offPeakTip) { <p class="body muted">{{ c.offPeakTip }}</p> }
+          <div class="hours" role="img" [attr.aria-label]="item().origin + '到' + item().destination + '各小時每日人次，' + data().current + '最多在 ' + c.busiest + ' 點'" [style.--line]="lineOf()(item().origin)?.color">
+            @for (h of c.hours; track h.h) {
+              <div class="hour" [class.picked]="h.selected" [class.missing]="h.missing">
+                <b class="old" [class.unrecorded]="h.a == null" [style.transform]="h.a == null ? null : 'scaleY(' + h.a / 100 + ')'"></b><b [class.unrecorded]="h.b == null" [style.transform]="h.b == null ? null : 'scaleY(' + h.b / 100 + ')'"></b>
+              </div>
+            }
+          </div>
+          <div class="hour-axis" aria-hidden="true"><span>0</span><span>6</span><span>12</span><span>18</span><span>24 點</span></div>
+          <details class="hour-table">
+            <summary><span>各小時數字表</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <div class="table-scroll" tabindex="0" role="region" aria-label="各小時每日人次數字表">
+              <table>
+                <caption class="visually-hidden">{{ item().origin }}到{{ item().destination }}，每個進站小時的每日人次</caption>
+                <thead><tr><th scope="col">時</th><th scope="col" class="num">{{ data().baseline }}</th><th scope="col" class="num">{{ data().current }}</th><th scope="col" class="num">差</th><th scope="col" class="num">變化</th></tr></thead>
+                <tbody>
+                  @for (row of hourTable(); track row.h) {
+                    <tr [class.picked]="row.selected">
+                      <th scope="row">{{ row.h }}</th>
+                      <td class="num">{{ row.a == null ? '無紀錄' : (row.a | number:(row.a < 10 ? '1.0-1' : '1.0-0')) }}</td>
+                      <td class="num">{{ row.b == null ? '無紀錄' : (row.b | number:(row.b < 10 ? '1.0-1' : '1.0-0')) }}</td>
+                      <td class="num">{{ row.diff == null ? '—' : (row.diff > 0 ? '+' : row.diff < 0 ? '−' : '') + ((row.diff < 0 ? -row.diff : row.diff) | number:((row.diff < 0 ? -row.diff : row.diff) < 10 ? '1.0-1' : '1.0-0')) }}</td>
+                      <td class="num">{{ row.pct == null ? '—' : (row.pct > 0 ? '+' : row.pct < 0 ? '−' : '') + ((row.pct < 0 ? -row.pct : row.pct) * 100 | number:'1.0-0') + '%' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <ul class="key"><li><i class="old"></i>{{ data().baseline }}</li><li><i [style.background]="lineOf()(item().origin)?.color"></i>{{ data().current }}</li><li>外框：所選時段</li><li>斜線：無紀錄</li></ul>
+        } @else if (profileError()) {
+          <h3>各時段人次</h3>
+          <p class="body muted">各時段資料暫時無法載入。<button type="button" class="retry-inline" (click)="retryProfile.emit()">重試</button></p>
+        }
+
+        <h3>回程</h3>
+        <p class="body route-readout"><span>{{ item().destination }} → {{ item().origin }}</span><span>每日 {{ dailyTrips()(item().reverseBaseline / data().days[0]) }} → {{ dailyTrips()(counts()[3]) }} 人次</span></p>
+
+        @if (siblings().length) {
+          <h3>從{{ item().origin }}出發的其他變化</h3>
+          <ul class="siblings">
+            @for (r of siblings(); track r.destination) {
+              <li><button type="button" (click)="choose.emit(r)"><span>{{ r.destination }}</span><b [class.down]="r.deltaSharePp < 0">{{ r.deltaSharePp > 0 ? '+' : '−' }}{{ (r.deltaSharePp < 0 ? -r.deltaSharePp : r.deltaSharePp) | number:'1.1-1' }}&nbsp;百分點</b></button></li>
+            }
+          </ul>
+        }
+
+        <details class="basis">
+          <summary><span>查看分析依據</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <dl>
+            <div><dt>原始人次</dt><dd>{{ item().baselineTrips | number }} → {{ item().currentTrips | number }}</dd></div>
+            <div><dt>有效天數 <app-hint label="有效天數" [entries]="[{ label: '有效天數', value: '實際納入平均的天數。工作日會排除國定假日並納入補班日。' }]" /></dt><dd>{{ data().days[0] }} → {{ data().days[1] }} 天</dd></div>
+            <div><dt>{{ item().origin }}出發總人次</dt><dd>{{ item().baselineOriginTotal | number }} → {{ item().currentOriginTotal | number }}</dd></div>
+            <div><dt>比例變化 <app-hint label="百分點" [entries]="[{ label: '百分點', value: '兩期占比直接相減的差值，避免基數小時百分比暴衝的錯覺。' }]" /></dt><dd>{{ item().deltaSharePp > 0 ? '+' : '' }}{{ item().deltaSharePp | number:'1.2-2' }} 百分點</dd></div>
+            <div><dt>反向原始人次</dt><dd>{{ item().reverseBaseline | number }} → {{ item().reverseCurrent | number }}</dd></div>
+            <div><dt>方向指數 <app-hint label="方向指數" [entries]="[{ label: '方向指數', value: '比較兩站去程與回程誰多，正負號相反代表主要流向已經對調。' }]" /></dt><dd>{{ item().directionBaseline == null ? '無' : (item().directionBaseline | number:'1.2-2') }} → {{ item().directionCurrent == null ? '無' : (item().directionCurrent | number:'1.2-2') }}</dd></div>
+            <div><dt>可比較車站</dt><dd>{{ data().commonStations }} 站</dd></div>
+          </dl>
+          <p class="note">比例是前往這站的人次，占起站前往所有可比較車站的總人次。</p>
+          <p class="note">方向指數＝（去程 − 回程）÷（去程＋回程）。判定反轉須同時符合：兩期正負相反、絕對值都至少 0.10、指數差至少 0.25，且兩期去回合計的每日人次都達到所選門檻。</p>
+          <p class="note">先依比例變化、人次規模與流向對調選出綜合分數最高的 500 組，再按你選的方式排序。這是比較規則，不是顯著性檢定。平日按星期區分，未排除國定假日。</p>
+        </details>
+      </details>
+    </div>
+  }
+</aside>

@@ -1,0 +1,13 @@
+**
+!requirements.txt
+!apps/
+!apps/api/
+!apps/api/**
+!apps/web/
+!apps/web/public/
+!apps/web/public/metro/
+!apps/web/public/metro/**
+!tools/
+!tools/**
+**/__pycache__/
+**/*.pyc

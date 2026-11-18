@@ -1,0 +1,13 @@
+[Unit]
+Description=ExitPulse Auxiliary Data Auto Update (Holidays & Station Info)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/exitpulse
+EnvironmentFile=/opt/exitpulse/.env
+ExecStart=/opt/exitpulse/.venv/bin/python -u /opt/exitpulse/tools/update_auxiliary.py
+Nice=10
+StandardOutput=journal
+StandardError=journal

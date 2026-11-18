@@ -1,0 +1,21 @@
+# 本機開發用 PostgreSQL。帳密只供本機，不要對外開放這個埠。
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: exitpulse
+      POSTGRES_PASSWORD: exitpulse
+      POSTGRES_DB: exitpulse
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    ports:
+      - "127.0.0.1:${EXITPULSE_DB_PORT:-55432}:5432"
+    volumes:
+      - exitpulse-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exitpulse -d exitpulse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  exitpulse-pgdata:

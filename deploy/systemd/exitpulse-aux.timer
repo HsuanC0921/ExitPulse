@@ -1,0 +1,10 @@
+[Unit]
+Description=Run ExitPulse Auxiliary Data Update Weekly
+
+[Timer]
+OnCalendar=Sun *-*-* 04:15:00
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

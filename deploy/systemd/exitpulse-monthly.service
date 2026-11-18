@@ -1,0 +1,15 @@
+[Unit]
+Description=ExitPulse Monthly OD Data Auto Update
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/exitpulse
+EnvironmentFile=/opt/exitpulse/.env
+ExecStart=/opt/exitpulse/.venv/bin/python -u /opt/exitpulse/tools/update_monthly.py
+Nice=10
+IOSchedulingClass=best-effort
+MemoryMax=1500M
+StandardOutput=journal
+StandardError=journal
