@@ -9,6 +9,7 @@ export type PairDetailData = {
   current: string;
   days: number[];
   hours: number[];
+  daysType?: 'weekday' | 'workday' | 'weekend';
   commonStations: number;
 };
 
@@ -20,6 +21,8 @@ export type PairDetailStory = {
   shareB: number;
   scale: number;
   origin: string;
+  /** 排序依據是占比時，上方兩格改顯示占比；其餘維持每日人次 */
+  tile: { a: string; b: string; unit: string } | null;
 };
 
 export type PairDetailChart = {

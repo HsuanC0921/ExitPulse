@@ -64,6 +64,7 @@ export class TimePlayer {
     const { sunrise, sunset } = solarTimes(this.date());
     return [
       { label: '日出／日落', value: `約 ${formatSolarTime(sunrise)}／${formatSolarTime(sunset)}（臺北）` },
+      { label: '選小時', value: '左右拖曳下方長條，或按方向鍵' },
       { label: '時段', value: '按進站時間統計' },
       { label: '全天', value: '合計整天人次' },
     ];

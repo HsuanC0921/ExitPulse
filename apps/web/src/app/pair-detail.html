@@ -18,11 +18,11 @@
         <h2 class="headline">{{ story().headline }}</h2>
         <p>{{ story().when }}</p>
         @if (verdict()) { <p class="verdict">{{ verdict() }}</p> }
-        @for (note of cautions(); track note) { <p class="verdict caution"><span aria-hidden="true">△</span> {{ note }}</p> }
+        @for (note of cautions(); track note) { <p class="verdict caution"><svg class="caution-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>{{ note }}</p> }
       </div>
       <div class="numbers">
-        <div><span>{{ data().baseline }}</span><strong>{{ dailyTrips()(counts()[0]) }}</strong><small>每日人次</small></div>
-        <div class="now" [style.--line]="lineOf()(item().origin)?.color"><span>{{ data().current }}</span><strong>{{ dailyTrips()(counts()[1]) }}</strong><small>每日人次</small></div>
+        <div><span>{{ data().baseline }}</span><strong>{{ story().tile?.a ?? dailyTrips()(counts()[0]) }}</strong><small>{{ story().tile?.unit ?? '每日人次' }}</small></div>
+        <div class="now" [style.--line]="lineOf()(item().origin)?.color"><span>{{ data().current }}</span><strong>{{ story().tile?.b ?? dailyTrips()(counts()[1]) }}</strong><small>{{ story().tile?.unit ?? '每日人次' }}</small></div>
       </div>
 
       @if (story().reversal) { <p class="callout">{{ story().reversal }}</p> }
@@ -110,11 +110,12 @@
             <div><dt>比例變化 <app-hint label="百分點" [entries]="[{ label: '百分點', value: '兩期占比直接相減的差值，避免基數小時百分比暴衝的錯覺。' }]" /></dt><dd>{{ item().deltaSharePp > 0 ? '+' : '' }}{{ item().deltaSharePp | number:'1.2-2' }} 百分點</dd></div>
             <div><dt>反向原始人次</dt><dd>{{ item().reverseBaseline | number }} → {{ item().reverseCurrent | number }}</dd></div>
             <div><dt>方向指數 <app-hint label="方向指數" [entries]="[{ label: '方向指數', value: '比較兩站去程與回程誰多，正負號相反代表主要流向已經對調。' }]" /></dt><dd>{{ item().directionBaseline == null ? '無' : (item().directionBaseline | number:'1.2-2') }} → {{ item().directionCurrent == null ? '無' : (item().directionCurrent | number:'1.2-2') }}</dd></div>
+            <div><dt>查詢時段</dt><dd>{{ data().hours[0] | number:'2.0-0' }}:00–{{ data().hours[1] | number:'2.0-0' }}:00</dd></div>
             <div><dt>可比較車站</dt><dd>{{ data().commonStations }} 站</dd></div>
           </dl>
-          <p class="note">比例是前往這站的人次，占起站前往所有可比較車站的總人次。</p>
+          <p class="note">比例是前往這站的人次，占起站前往所有可比較車站的總人次。板橋、大坪林、景安、頭前庄四座轉乘站因跨年站名寫法不同，在確認合併規則前暫不納入兩站比較。</p>
           <p class="note">方向指數＝（去程 − 回程）÷（去程＋回程）。判定反轉須同時符合：兩期正負相反、絕對值都至少 0.10、指數差至少 0.25，且兩期去回合計的每日人次都達到所選門檻。</p>
-          <p class="note">先依比例變化、人次規模與流向對調選出綜合分數最高的 500 組，再按你選的方式排序。這是比較規則，不是顯著性檢定。平日按星期區分，未排除國定假日。</p>
+          <p class="note">先依比例變化、人次規模與流向對調選出綜合分數最高的 500 組，再按你選的方式排序。這是比較規則，不是顯著性檢定。@if (data().daysType === 'workday') { 純工作日已依行事曆排除國定假日並納入補班日。 } @else { 平日按星期區分，未排除國定假日。 }</p>
         </details>
       </details>
     </div>

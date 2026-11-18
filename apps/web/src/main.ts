@@ -4,3 +4,9 @@ import { Radar } from './app/radar';
 
 bootstrapApplication(Radar, appConfig)
   .catch((err) => console.error(err));
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  });
+}

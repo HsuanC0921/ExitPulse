@@ -86,6 +86,21 @@ class RealDatabaseContract(unittest.TestCase):
         })
         self.assertEqual(r_bad.status_code, 400)
 
+    def test_pair_workday_uses_the_reference_calendar_for_ranking_and_hourly_profile(self):
+        params = {'baseline': '2022-09', 'current': '2026-09', 'days': 'workday',
+                  'origin': '南港', 'destination': '南港展覽館'}
+        radar = self.client.get('/api/v1/od/radar', params={**params, 'start': 7, 'end': 8})
+        pair = self.client.get('/api/v1/od/pair', params=params)
+        self.assertEqual(radar.status_code, 200)
+        self.assertEqual(pair.status_code, 200)
+        ranking, profile = radar.json(), pair.json()
+        self.assertEqual(ranking['daysType'], 'workday')
+        self.assertEqual(profile['daysType'], 'workday')
+        self.assertEqual(ranking['days'][1], 20)
+        self.assertEqual(profile['current']['forward'][7], round(ranking['results'][0]['currentDaily'], 1))
+        self.assertIsNone(profile['current']['forward'][2])
+        self.assertEqual(self.client.get('/api/v1/od/pair', params={**params, 'weekend': True}).status_code, 400)
+
     def test_remaining_endpoints_match_imported_functions(self):
         r_avail = self.client.get('/api/v1/od/availability')
         self.assertEqual(r_avail.status_code, 200)

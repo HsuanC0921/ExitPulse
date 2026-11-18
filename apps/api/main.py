@@ -2,6 +2,8 @@
 
 在專案根目錄啟動：uvicorn main:app --app-dir apps/api --host 127.0.0.1 --port 5011
 """
+import asyncio
+import hashlib
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -9,14 +11,14 @@ from datetime import date as Date
 from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, FastAPI, Query
+from fastapi import APIRouter, FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import AfterValidator
 
 from places import PlaceSearch, TooMany, UpstreamLimited, local_matches
-from runner import Busy, Runner, Unavailable
+from runner import CATALOG_TTL, Busy, Runner, Unavailable
 
 log = logging.getLogger('exitpulse.api')
 runner, places = Runner(), PlaceSearch()
@@ -36,6 +38,36 @@ async def lifespan(_):
 app = FastAPI(title='ExitPulse API', lifespan=lifespan, docs_url='/docs', redoc_url=None)
 # 站對排行的回應約 240 KB，壓縮後可省下大部分傳輸量
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+class CancelDisconnectedOdQuery:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        # OD GET handlers only read the query string, leaving receive available for disconnects.
+        if scope['type'] != 'http' or scope['method'] != 'GET' or not scope['path'].startswith('/api/v1/od/'):
+            await self.app(scope, receive, send)
+            return
+
+        async def wait_for_disconnect():
+            while (await receive())['type'] != 'http.disconnect':
+                pass
+
+        request = asyncio.create_task(self.app(scope, receive, send))
+        disconnected = asyncio.create_task(wait_for_disconnect())
+        try:
+            await asyncio.wait((request, disconnected), return_when=asyncio.FIRST_COMPLETED)
+            if request.done():
+                await request
+        finally:
+            for task in (request, disconnected):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(request, disconnected, return_exceptions=True)
+
+
+app.add_middleware(CancelDisconnectedOdQuery)
 api = APIRouter(prefix='/api/v1')
 
 
@@ -142,19 +174,34 @@ async def ready():
 
 
 # 目錄類查詢：已匯入月份、各站可用日期、查詢目錄
+async def directory_response(request, arguments):
+    reply = await analyse('od_postgres.py', arguments)
+    if reply.status_code != 200:
+        return reply
+    # Compression can change the bytes on the wire, so validate the underlying JSON weakly.
+    digest = '"' + hashlib.sha256(reply.body).hexdigest() + '"'
+    headers = {'ETag': 'W/' + digest, 'Cache-Control': f'public, max-age={CATALOG_TTL}',
+               'Vary': 'Accept-Encoding'}
+    condition = request.headers.get('if-none-match', '')
+    if condition.strip() == '*' or any(tag.strip().removeprefix('W/') == digest for tag in condition.split(',')):
+        return Response(status_code=304, headers=headers)
+    reply.headers.update(headers)
+    return reply
+
+
 @api.get('/od/months')
-async def months():
-    return await analyse('od_postgres.py', [])
+async def months(request: Request):
+    return await directory_response(request, [])
 
 
 @api.get('/od/availability')
-async def availability():
-    return await analyse('od_postgres.py', ['availability'])
+async def availability(request: Request):
+    return await directory_response(request, ['availability'])
 
 
 @api.get('/od/catalog')
-async def catalog():
-    return await analyse('od_postgres.py', ['catalog'])
+async def catalog(request: Request):
+    return await directory_response(request, ['catalog'])
 
 
 # 車站資訊：站碼、通車日、景點、出口
@@ -183,11 +230,13 @@ async def map_places(q: str):
 
 # 站對排行，帶 origin 與 destination 時只查單一站對
 @api.get('/od/radar')
-async def radar(baseline: str, current: str, start: int, end: int, weekend: bool, minimum: float | None = None,
-                type: str | None = None, origin: Name | None = None, destination: Name | None = None):
+async def radar(baseline: str, current: str, start: int, end: int, weekend: bool | None = None, minimum: float | None = None,
+                type: str | None = None, origin: Name | None = None, destination: Name | None = None,
+                days: str | None = None):
     floor, type = 20 if minimum is None else minimum, type or 'all'
     if (not is_month(baseline) or not is_month(current) or baseline == current or start < 0 or end > 24
-            or start >= end or not 0 <= floor <= 10000 or type not in CHANGE_TYPES):
+            or start >= end or not 0 <= floor <= 10000 or type not in CHANGE_TYPES
+            or not valid_pair_day_type(weekend, days)):
         return bad('請選擇不同月份、有效的進站時段與門檻。')
     arguments = [baseline, current, '--start', str(start), '--end', str(end), '--minimum', number(floor),
                  '--type', type, '--limit', '500']
@@ -195,7 +244,9 @@ async def radar(baseline: str, current: str, start: int, end: int, weekend: bool
         if not is_name(origin) or not is_name(destination) or origin == destination:
             return bad('請選兩個不同的車站。')
         arguments += ['--direct', origin, destination]
-    if weekend:
+    if days == 'workday':
+        arguments.append('--workday')
+    elif weekend:
         arguments.append('--weekend')
     return flag_truncated(await analyse('analyze_od.py', arguments))
 
@@ -214,13 +265,21 @@ def flag_truncated(reply):
 
 # 單一站對的兩期比較
 @api.get('/od/pair')
-async def pair(baseline: str, current: str, origin: Name, destination: Name, weekend: bool):
-    if not is_month(baseline) or not is_month(current) or not is_name(origin) or not is_name(destination) or origin == destination:
+async def pair(baseline: str, current: str, origin: Name, destination: Name, weekend: bool | None = None,
+               days: str | None = None):
+    if (not is_month(baseline) or not is_month(current) or not is_name(origin) or not is_name(destination)
+            or origin == destination or not valid_pair_day_type(weekend, days)):
         return bad('請選擇有效的月份與兩個不同車站。')
     arguments = [baseline, current, '--pair', origin, destination]
-    if weekend:
+    if days == 'workday':
+        arguments.append('--workday')
+    elif weekend:
         arguments.append('--weekend')
     return await analyse('analyze_od.py', arguments)
+
+
+def valid_pair_day_type(weekend, days):
+    return (days is None and weekend is not None) or (days == 'workday' and not weekend)
 
 
 # 單站往來

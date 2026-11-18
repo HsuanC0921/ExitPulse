@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import date
 
 from od_postgres import HoursMismatch as _BaseHoursMismatch, MonthNotFound, UncomparableError, metadata, open_month
+from query_od import _load_workday_totals, _workdays
 
 # 2026 uses line-prefixed names asymmetrically in origin and destination fields.
 # Keep these interchange stations out until the operator's naming rules are verified.
@@ -27,18 +28,24 @@ class HoursMismatch(_BaseHoursMismatch):
         super().__init__(payload or {}, message)
 
 
-def hour_dates(info, weekend):
-    candidate = {d for d in info['dates'] if (date.fromisoformat(d).weekday() >= 5) == bool(weekend)}
+def selected_dates(info, weekend, workdays):
+    if workdays is not None:
+        return set(info['dates']) & workdays
+    return {d for d in info['dates'] if (date.fromisoformat(d).weekday() >= 5) == bool(weekend)}
+
+
+def hour_dates(info, weekend, workdays=None):
+    candidate = selected_dates(info, weekend, workdays)
     return [set(info['hourDates'].get(str(h), [])) & candidate
             if 'hourDates' in info else candidate if h in info['hours'] else set()
             for h in range(24)]
 
 
-def hours_mismatch(baseline, current, start, end, weekend):
+def hours_mismatch(baseline, current, start, end, weekend, *, workday=False):
     periods = []
     for month in (baseline, current):
         with open_month(month) as db:
-            periods.append(hour_dates(metadata(db), weekend))
+            periods.append(hour_dates(metadata(db), weekend, _workdays(month) if workday else None))
     # A suggestion must pass the same date-coverage rule as the actual query.
     candidates = [(a, b) for a in range(24) for b in range(a + 1, 25)
                   if all(p[a] and all(p[h] == p[a] for h in range(a, b)) for p in periods)]
@@ -56,23 +63,27 @@ def comparable_stations(a, b):
     return common
 
 
-def read_month(month, start, end, weekend):
+def read_month(month, start, end, weekend, *, workday=False):
     with open_month(month) as db:
         info = metadata(db)
-        rows = db.execute('SELECT origin,destination,SUM(trips)::bigint FROM flows WHERE hour >= %s AND hour < %s AND weekend = %s GROUP BY origin,destination',
-                          (start, end, int(weekend))).fetchall()
-    if not all(k in info for k in ('origins', 'destinations', 'hours')):
-        raise ValueError(f'{month}: reimport to record station roles and available hours')
-    candidate_dates = {d for d in info['dates'] if (date.fromisoformat(d).weekday() >= 5) == bool(weekend)}
-    if 'hourDates' in info:
-        observed = [set(info['hourDates'].get(str(h), [])) & candidate_dates for h in range(start, end)]
-        if not observed or not observed[0] or any(days != observed[0] for days in observed):
-            raise HoursMismatch(f'{month}: selected hours do not cover the same dates; cannot safely compare aggregated totals')
-        days = len(observed[0])
-    else:
-        if not set(range(start, end)).issubset(info['hours']):
-            raise HoursMismatch(f'{month}: selected hours are not present in this dataset')
-        days = len(candidate_dates)
+        if not all(k in info for k in ('origins', 'destinations', 'hours')):
+            raise ValueError(f'{month}: reimport to record station roles and available hours')
+        workdays = _workdays(month) if workday else None
+        candidate = selected_dates(info, weekend, workdays)
+        observed = hour_dates(info, weekend, workdays)[start:end]
+        if workday and (start, end) == (0, 24):
+            days = len(set.union(*observed))
+        else:
+            if not observed[0] or any(dates != observed[0] for dates in observed):
+                raise HoursMismatch(message=f'{month}: selected hours do not cover the same dates')
+            days = len(observed[0])
+        if not days:
+            raise HoursMismatch(message=f'{month}: no selected days')
+        if workday:
+            rows, _ = _load_workday_totals(db, info, candidate, start, end)
+        else:
+            rows = db.execute('SELECT origin,destination,SUM(trips)::bigint FROM flows WHERE hour >= %s AND hour < %s AND weekend = %s GROUP BY origin,destination',
+                              (start, end, int(weekend))).fetchall()
     return info, days, {(o, d): n for o, d, n in rows}
 
 
@@ -107,44 +118,51 @@ def compare(baseline, current, days_a, days_b, stations, minimum=20, only=None):
     return sorted(results, key=lambda r: (-r['score'], r['origin'], r['destination']))
 
 
-def hourly_profile(month, origin, dest, weekend):
+def hourly_profile(month, origin, dest, weekend, *, workday=False):
     """Average daily trips per entry hour, both directions; None marks an hour the month did not record."""
     with open_month(month) as db:
         info = metadata(db)
-        rows = db.execute('SELECT hour,origin,SUM(trips)::bigint FROM flows WHERE weekend = %s AND ((origin = %s AND destination = %s) OR (origin = %s AND destination = %s)) GROUP BY hour,origin',
-                          (int(weekend), origin, dest, dest, origin)).fetchall()
-    candidate = {d for d in info['dates'] if (date.fromisoformat(d).weekday() >= 5) == bool(weekend)}
-    def days(h):
-        if 'hourDates' in info:
-            return len(set(info['hourDates'].get(str(h), [])) & candidate)
-        return len(candidate) if h in info['hours'] else 0
+        workdays = _workdays(month) if workday else None
+        if workday:
+            candidate = selected_dates(info, weekend, workdays)
+            rows = db.execute(
+                'SELECT t.hour,a.name,SUM(t.trips)::bigint FROM trips t '
+                'JOIN stations a ON a.id=t.origin JOIN stations b ON b.id=t.destination '
+                'WHERE t.day=ANY(%s) AND ((a.name=%s AND b.name=%s) OR (a.name=%s AND b.name=%s)) '
+                'GROUP BY t.hour,a.name',
+                (sorted(int(day[8:]) for day in candidate), origin, dest, dest, origin),
+            ).fetchall()
+        else:
+            rows = db.execute('SELECT hour,origin,SUM(trips)::bigint FROM flows WHERE weekend = %s AND ((origin = %s AND destination = %s) OR (origin = %s AND destination = %s)) GROUP BY hour,origin',
+                              (int(weekend), origin, dest, dest, origin)).fetchall()
     trips = {(h, o): n for h, o, n in rows}
     out = {'forward': [], 'reverse': []}
-    for h in range(24):
-        n = days(h)
+    for h, dates in enumerate(hour_dates(info, weekend, workdays)):
+        n = len(dates)
         out['forward'].append(round(trips.get((h, origin), 0) / n, 1) if n else None)
         out['reverse'].append(round(trips.get((h, dest), 0) / n, 1) if n else None)
     return out
 
 
-def get_pair(baseline, current, origin, destination, weekend=False):
+def get_pair(baseline, current, origin, destination, weekend=False, *, workday=False):
     return dict(
         origin=origin,
         destination=destination,
         weekend=weekend,
-        baseline=hourly_profile(baseline, origin, destination, weekend),
-        current=hourly_profile(current, origin, destination, weekend),
+        baseline=hourly_profile(baseline, origin, destination, weekend, workday=workday),
+        current=hourly_profile(current, origin, destination, weekend, workday=workday),
+        **({'daysType': 'workday'} if workday else {}),
     )
 
 
-def get_radar(baseline, current, start=7, end=10, weekend=False, minimum=20, change_type='all', limit=10, direct=None):
+def get_radar(baseline, current, start=7, end=10, weekend=False, minimum=20, change_type='all', limit=10, direct=None, *, workday=False):
     if not 0 <= start < end <= 24 or minimum < 0 or not 1 <= limit <= 500 or change_type not in CHANGE_TYPES:
         raise UncomparableError('Invalid hours or minimum')
     try:
-        a, da, fa = read_month(baseline, start, end, weekend)
-        b, db, fb = read_month(current, start, end, weekend)
+        a, da, fa = read_month(baseline, start, end, weekend, workday=workday)
+        b, db, fb = read_month(current, start, end, weekend, workday=workday)
     except _BaseHoursMismatch:
-        raise HoursMismatch(hours_mismatch(baseline, current, start, end, weekend))
+        raise HoursMismatch(hours_mismatch(baseline, current, start, end, weekend, workday=workday))
     common = comparable_stations(a, b)
     if direct:
         pair = tuple('大橋頭站' if name == '大橋頭' and '大橋頭' not in common else name for name in direct)
@@ -169,6 +187,7 @@ def get_radar(baseline, current, start=7, end=10, weekend=False, minimum=20, cha
         baseline=baseline, current=current, days=[da, db], hours=[start, end],
         weekend=weekend, minimum=minimum, type=change_type, commonStations=len(common),
         excluded=excluded, total=len(results), results=results[:limit],
+        **({'daysType': 'workday'} if workday else {}),
     )
 
 
@@ -178,7 +197,9 @@ def main(argv=None):
     parser.add_argument('current')
     parser.add_argument('--start', type=int, default=7)
     parser.add_argument('--end', type=int, default=10)
-    parser.add_argument('--weekend', action='store_true')
+    day_type = parser.add_mutually_exclusive_group()
+    day_type.add_argument('--weekend', action='store_true')
+    day_type.add_argument('--workday', action='store_true')
     parser.add_argument('--minimum', type=float, default=20)
     parser.add_argument('--type', choices=CHANGE_TYPES, default='all')
     parser.add_argument('--limit', type=int, default=10)
@@ -186,12 +207,13 @@ def main(argv=None):
     parser.add_argument('--direct', nargs=2, metavar=('ORIGIN', 'DESTINATION'))
     args = parser.parse_args(argv)
     if args.pair:
-        print(json.dumps(get_pair(args.baseline, args.current, args.pair[0], args.pair[1], args.weekend), ensure_ascii=False))
+        print(json.dumps(get_pair(args.baseline, args.current, *args.pair, args.weekend, workday=args.workday), ensure_ascii=False))
         return
     if not 0 <= args.start < args.end <= 24 or args.minimum < 0 or not 1 <= args.limit <= 500:
         parser.error('Invalid hours or minimum')
     try:
-        out = get_radar(args.baseline, args.current, args.start, args.end, args.weekend, args.minimum, args.type, args.limit, args.direct)
+        out = get_radar(args.baseline, args.current, args.start, args.end, args.weekend, args.minimum, args.type, args.limit,
+                        args.direct, workday=args.workday)
     except HoursMismatch as error:
         print(json.dumps(error.payload, ensure_ascii=False))
         sys.exit(5)

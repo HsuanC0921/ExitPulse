@@ -16,7 +16,8 @@
 
 @media (max-width: 720px) {
   .first-query {
-    padding: 13px;
+    gap: 6px;
+    padding: 12px;
     border: 1px solid var(--rule, #dfe3e2);
     border-radius: var(--r-l);
     background: var(--panel, #fff);
@@ -89,10 +90,10 @@
 .first-query-matches button:hover { background: var(--panel-2, #f0f2f1); }
 .first-query-matches button:hover svg { transform: translateX(3px); }
 .first-query-matches button:active, .first-query-place:active, .first-query-compare:active { transform: scale(.985); }
-.first-query-station-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.first-query-station-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: break-word; }
 .first-query-lines { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 .first-query-line { min-width: 30px; padding: 2px 5px; border-radius: var(--r-s); background: var(--line-color, #46505a); color: #fff; text-align: center; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
-.first-query-line:is([data-line='BR'], [data-line='O'], [data-line='Y']) { color: #171a1c; }
+.first-query-line:is([data-line='O'], [data-line='Y']) { color: #171a1c; }
 .first-query-matches svg { flex: 0 0 16px; width: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; transition: transform .18s cubic-bezier(.22, 1, .36, 1); }
 .first-query-empty { margin: 0; color: var(--ink-2, #5d666c); font-size: var(--fs-s); }
 
@@ -103,17 +104,18 @@
   gap: var(--sp-2);
   min-height: 44px;
   padding: 7px 10px;
-  border: 0;
+  border: 1px solid var(--rule, #dfe3e2);
   border-radius: var(--r-m);
-  background: var(--ink, #202427);
-  color: var(--panel, #fff);
+  background: var(--panel, #fff);
+  color: var(--ink, #202427);
   font: inherit;
   font-size: var(--fs-s);
   font-weight: 700;
   cursor: pointer;
 }
 
-.first-query-place:hover { opacity: .88; }
+/* 站名輸入是主路徑，找地點是替代路徑，所以用有框次要樣式 */
+.first-query-place:hover { border-color: var(--ink-2, #5d666c); background: var(--panel-2, #f0f2f1); }
 .first-query-place svg { flex: 0 0 18px; width: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 
 .first-query-compare {
@@ -159,8 +161,8 @@
   overflow: hidden;
   transition: border-color .15s, background-color .15s, transform .14s cubic-bezier(.22, 1, .36, 1);
 }
-.first-query-preset-list button strong { font-size: var(--fs-xs); line-height: 1.3; overflow-wrap: anywhere; text-wrap: balance; }
-.first-query-preset-list button span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink-2, #5d666c); font-size: .7rem; line-height: 1.35; overflow-wrap: anywhere; word-break: keep-all; text-wrap: balance; }
+.first-query-preset-list button strong { font-size: var(--fs-xs); line-height: 1.3; overflow-wrap: break-word; text-wrap: balance; }
+.first-query-preset-list button span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink-2, #5d666c); font-size: var(--fs-xs, 12px); line-height: 1.4; overflow-wrap: break-word; word-break: keep-all; text-wrap: balance; }
 .first-query-preset-list button:hover { border-color: var(--ink-2, #5d666c); background: var(--panel, #fff); }
 .first-query-preset-list button:active { transform: scale(.985); }
 

@@ -34,5 +34,5 @@ app-od-matrix { display: block; }
 .group-flow-result { display: grid; gap: 8px; margin: 12px 0 0; }
 .group-flow-result > div { padding: 8px; border: 1px solid var(--rule); border-radius: var(--r-m); }
 .group-flow-result dt { color: var(--ink-2); font-size: var(--fs-xs); }
-.group-flow-result dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.group-flow-result dd { margin: 4px 0 0; overflow-wrap: break-word; }
 .group-flow-result dd:first-of-type { font-weight: 700; font-variant-numeric: tabular-nums; }

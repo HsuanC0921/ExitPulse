@@ -34,7 +34,7 @@ uvicorn main:app --app-dir apps/api --host 127.0.0.1 --port 5011
 - `period` 必填，`compare`、`days`（`weekday`、`workday`、`weekend`、`all`）、`start`、`end`、`limit`（1 至 20，預設 10）可省略。
 - 回傳 `busiestStations`（站、每日進站、每日出站）與 `busiestPairs`（起、迄、每日人次，不含同站進出）。
 - 有 `compare` 時另有 `risingStations` 與 `fallingStations`（站、對照期、本期、增減、成長百分比）。只列兩期都同時有進站與出站紀錄、對照期每日進站量至少 200、且不是站名口徑未確認的轉乘站，規則與站對比較一致。
-- `workday` 與 `weekday` 的差別：`weekday` 是週一至週五，不扣國定假日。`workday` 依行事曆排除國定假日，並把補班日算進來。站對比較（`/od/radar`）沿用 `weekday`，不提供 `workday`。
+- `workday` 與 `weekday` 的差別：`weekday` 是週一至週五，不扣國定假日。`workday` 依行事曆排除國定假日，並把補班日算進來。兩站比較（`/od/radar`、`/od/pair`）同樣支援 `days=workday`（不可與 `weekend=true` 同時傳入），回應會帶 `daysType: "workday"`。
 - 工作日月查詢以週一至週五的既有彙總為底，扣掉放假日並加上補班日。例外日過多時直接加總選定日期。每個分析行程依資料來源雜湊與有效工作日快取最多 24 組彙總，供單站、全網與榜單共用。使用 `python tools/stress_api.py --mode workday` 可測這三種查詢的混合負載。
 
 ## 出站資料涵蓋
@@ -140,6 +140,6 @@ API 用相同的單日站點、全網跨日對照、雙站逐時和月工作日�
 
 ### 尚未處理
 
-- 開始執行後，分析會占用一個名額直到完成。資料庫單一敘述有逾時上限，Python 計算和整個分析另有回應等待上限。API 目前處理等待任務取消，瀏覽器提前關閉連線時仍待在 ASGI 層明確接收斷線事件。
-- 目錄類 API 沒有加 `Cache-Control` 或 `ETag`，瀏覽器每次仍會請求。
+- 開始執行後，分析會占用一個名額直到完成（排隊中若用戶端提前斷線已會在 ASGI 層取消，單一 SQL 敘述則受 `statement_timeout` 限制）。
+- 目錄類端點已加上 `ETag` 與 `Cache-Control` 條件式快取（支援 `If-None-Match` 回傳 `304`）。
 - 單一 uvicorn 程序處理所有連線，CPU 密集的工作都在分析行程裡，目前不是瓶頸。流量變大時可加 `--workers`，但快取會各自獨立。
