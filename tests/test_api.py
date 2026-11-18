@@ -40,6 +40,26 @@ class Contract(unittest.TestCase):
     def test_health(self):
         self.assertEqual(self.client.get('/health').json(), {'status': 'ok'})
 
+    def test_directory_etags_validate_only_successful_current_representations(self):
+        for endpoint in ('months', 'availability', 'catalog'):
+            path = f'/api/v1/od/{endpoint}'
+            stub()
+            first = self.client.get(path)
+            self.assertEqual(first.headers['cache-control'], 'public, max-age=5')
+            etag = first.headers['etag']
+            unchanged = self.client.get(path, headers={'If-None-Match': '"other", ' + etag[2:]})
+            self.assertEqual((unchanged.status_code, unchanged.content), (304, b''))
+            self.assertEqual(unchanged.headers['etag'], etag)
+            stub({'exitCode': 0, 'output': '{"ok":false}', 'error': ''})
+            updated = self.client.get(path, headers={'If-None-Match': etag})
+            self.assertEqual(updated.status_code, 200)
+            self.assertNotEqual(updated.headers['etag'], etag)
+            stub(error=runner_module.Busy())
+            failure = self.client.get(path, headers={'If-None-Match': '*'})
+            self.assertEqual(failure.status_code, 429)
+            self.assertNotIn('etag', failure.headers)
+
+
     def test_ready_reads_the_month_catalog(self):
         calls = stub()
         self.assertEqual(self.client.get('/ready').json(), {'status': 'ready'})
@@ -164,6 +184,33 @@ class Runner(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(r['output'] == '1' for r in replies))
         await self.runner.run('query_od.py', ['x'])
         self.assertEqual(self.runs, 1)
+
+    async def test_od_disconnect_removes_last_waiter_from_the_analysis_queue(self):
+        queue = asyncio.Queue()
+        connected = asyncio.Event()
+        await queue.put({'type': 'http.request', 'body': b'', 'more_body': False})
+        slots = self.runner.worker_slots
+        for _ in range(runner_module.WORKERS):
+            await slots.acquire()
+
+        async def handler(_scope, _receive, _send):
+            connected.set()
+            await self.runner.run('query_od.py', ['abandoned'])
+
+        async def send(_message):
+            self.fail('disconnected client received a response')
+
+        middleware = main.CancelDisconnectedOdQuery(handler)
+        request = asyncio.create_task(middleware(
+            {'type': 'http', 'method': 'GET', 'path': '/api/v1/od/network'}, queue.get, send,
+        ))
+        await asyncio.wait_for(connected.wait(), timeout=1)
+        self.assertEqual(self.runner.admitted, 1)
+        await queue.put({'type': 'http.disconnect'})
+        await asyncio.wait_for(request, timeout=1)
+        self.assertEqual(self.runner.admitted, 0)
+        self.assertEqual(self.runner.inflight, {})
+        self.assertEqual(self.runs, 0)
 
     async def test_callers_beyond_workers_plus_queue_get_busy(self):
         limit = runner_module.WORKERS + runner_module.QUEUE

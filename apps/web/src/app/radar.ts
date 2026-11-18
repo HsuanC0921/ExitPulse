@@ -1,5 +1,6 @@
 // 兩站比較主元件：地圖、排行、站對詳情與單站、全線三種檢視的狀態都在這裡
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, OnDestroy, ViewEncapsulation, afterNextRender, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
+import { autoRetry } from './auto-retry';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -22,9 +23,9 @@ import { daylightAt } from './daylight';
 import { change, type NetworkAnswer } from './explore-model';
 import type { ElevatedFlow } from './radar-3d';
 import { COLLECTION_LIMIT, cleanItem, decodeLink, encodeLink, loadCollection, mergeItems, newItem, parseExport, saveCollection, serializeExport, today, type CollectionItem, type CollectionKind, type StorageLike } from './collection';
-import { FLOW_SAMPLES, SORTS, arrowCount, filterResults, formatDailyTrips, glue, lineWidth, readState, sortResults, sortValue, csvTable, writeState, type Result, type SortKey, type ViewState } from './radar-model';
+import { FLOW_SAMPLES, SORTS, arrowCount, filterResults, formatDailyTrips, glue, lineWidth, readState, sortResults, sortValue, csvTable, writeState, type PairDayType, type Result, type SortKey, type ViewState } from './radar-model';
 
-type Dataset = { baseline: string; current: string; days: number[]; hours: number[]; weekend: boolean; minimum?: number; type?: string; commonStations: number; total?: number; truncated?: boolean; results: Result[] };
+type Dataset = { baseline: string; current: string; days: number[]; hours: number[]; weekend: boolean; daysType?: PairDayType; minimum?: number; type?: string; commonStations: number; total?: number; truncated?: boolean; results: Result[] };
 type Profile = { forward: (number | null)[]; reverse: (number | null)[] };
 type PairProfile = { origin: string; destination: string; baseline: Profile; current: Profile };
 type Stop = { properties: { name: string; lines: string; colors: string }; geometry: { coordinates: [number, number] } };
@@ -38,7 +39,7 @@ type StationInfo = { retrieved: string; facilities: { label: string; area: strin
   opening?: { date: string; source: string }; lines?: StationHistoryLine[]; addresses?: string[];
   story?: { summary: string; source: string; sourceLabel?: string } | null; nearby?: { name: string; distance: number; summary: string; lng?: number; lat?: number }[];
   youbike?: { name: string; distance: number; capacity: number; address?: string; lng?: number; lat?: number }[];
-  hubs?: { name: string; kind: string; distance: number; lng?: number; lat?: number; source?: string; sourceLabel?: string }[];
+  hubs?: { name: string; officialName?: string; kind: string; distance: number; lng?: number; lat?: number; source?: string; sourceLabel?: string }[];
   districtPop?: { district: string; period: string; population: number; yoyPct?: number | null } | null;
   catchmentPop?: { districts: string[]; period: string; population: number; yoyPct?: number | null } | null;
   latestStats?: { month: string; period?: string; isDate?: boolean; dailyEntries: number; dailyExits: number; rank: number; totalStations: number; yoyPct?: number | null } };
@@ -127,12 +128,14 @@ export class Radar implements OnDestroy {
   readonly baseline = signal('2022-09');
   readonly current = signal('2026-09');
   readonly hours = signal('7-10');
-  readonly weekend = signal(false);
+  readonly dayType = signal<PairDayType>('weekday');
+  readonly weekend = computed(() => this.dayType() === 'weekend');
   readonly changeType = signal<keyof typeof TYPES>('all');
   readonly minimum = signal(20);
   readonly sortKey = signal<SortKey>('share');
   readonly sortReverse = signal(false);
   readonly query = signal('');
+  readonly toolsOpen = signal(false);
   readonly lineFilter = signal('');
   readonly shown = signal(PAGE);
   readonly explore = viewChild(Explore);
@@ -207,6 +210,31 @@ export class Radar implements OnDestroy {
   readonly towerPeak = signal<number | null>(null);
   private elevatedFlow?: ElevatedFlow;
   readonly showScale = signal(false);
+  readonly showRoads = signal(true);
+  readonly showNature = signal(true);
+  readonly fullscreenSupported = typeof document !== 'undefined' && !!document.fullscreenEnabled && typeof document.documentElement?.requestFullscreen === 'function';
+  readonly isFullscreen = signal(false);
+  readonly mapFullscreen = signal(false);
+  readonly rotateTipClosed = signal(false);
+  readonly toolsCollapsed = signal(((): boolean => { try { return localStorage.getItem('exitpulse.tools') === 'closed'; } catch { return false; } })());
+  toggleTools() {
+    const next = !this.toolsCollapsed();
+    this.toolsCollapsed.set(next);
+    try { localStorage.setItem('exitpulse.tools', next ? 'closed' : 'open'); } catch { /* 不能存就只在這次有效 */ }
+  }
+  readonly isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone);
+  readonly isIosSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !/CriOS|FxiOS/.test(navigator.userAgent);
+  readonly installPrompt = signal<{ prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null>(null);
+  private readonly onFullscreenChange = () => {
+    const active = !!document.fullscreenElement;
+    this.isFullscreen.set(active);
+    if (!active && this.fullscreenSupported) this.mapFullscreen.set(false);
+  };
+  private readonly onBeforeInstall = (e: Event) => {
+    e.preventDefault();
+    this.installPrompt.set(e as unknown as { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> });
+  };
+  private readonly onAppInstalled = () => this.installPrompt.set(null);
   readonly placeQuery = signal('');
   readonly places = signal<Place[]>([]);
   readonly placeBusy = signal(false);
@@ -235,6 +263,15 @@ export class Radar implements OnDestroy {
       return !(history?.closed && history.reopened && period > at(history.closed) && period < at(history.reopened))
         && !(period.length === 10 && history?.closed && period === history.closed);
     });
+  });
+  readonly hubSources = computed(() => {
+    const seen = new Map<string, string>();
+    for (const hub of this.stationInfo()?.hubs ?? []) {
+      const label = hub.sourceLabel?.trim();
+      const url = hub.source?.trim();
+      if (label && !seen.has(label)) seen.set(label, url || '');
+    }
+    return [...seen.entries()].map(([label, url]) => ({ label, url }));
   });
   private stationInfoRequest = 0;
   /** 使用者正在看的月份或日期，車站資訊卡要對應這個期間。 */
@@ -283,7 +320,7 @@ export class Radar implements OnDestroy {
     if (!this.tower3d() || this.view() !== 'pairs' || !this.selected() || !data) return undefined;
     const params: Record<string, string> = {
       period: data.current,
-      days: data.weekend ? 'weekend' : 'weekday',
+      days: this.datasetDayType(data),
       start: String(data.hours[0]),
       end: String(data.hours[1]),
     };
@@ -298,8 +335,16 @@ export class Radar implements OnDestroy {
   readonly streams = signal<Stream[]>([]);
   readonly profile = signal<PairProfile | null>(null);
 
+  private datasetDayType(d: Dataset): PairDayType { return d.daysType ?? (d.weekend ? 'weekend' : 'weekday'); }
+  private dayTypeLabel(dt: PairDayType, long = false) {
+    return dt === 'workday' ? '純工作日' : dt === 'weekend' ? '週末' : (long ? '週一至週五' : '平日');
+  }
+  private dayTypeParams(dt: PairDayType): Record<string, string | boolean> {
+    return dt === 'workday' ? { days: 'workday' } : { weekend: dt === 'weekend' };
+  }
+
   readonly summary = computed(() => [
-    `${this.baseline()} → ${this.current()}`, `${this.weekend() ? '週末' : '平日'}${BANDS[this.hours()]}`, TYPES[this.changeType()], `每日${NB}${this.minimum()}${NB}人次以上`,
+    `${this.baseline()} → ${this.current()}`, `${this.dayTypeLabel(this.dayType())}${BANDS[this.hours()]}`, TYPES[this.changeType()], `每日${NB}${this.minimum()}${NB}人次以上`,
   ]);
   readonly results = computed(() => {
     const list = sortResults(filterResults(this.data()?.results ?? [], this.query(), this.lineFilter(), s => this.linesOf(s)), this.sortKey());
@@ -335,7 +380,7 @@ export class Radar implements OnDestroy {
       from: r.origin, to: r.destination, caption: `每日 ${formatDailyTrips(r.baselineDaily)} → ${formatDailyTrips(r.currentDaily)} 人次`,
       action: '看兩站分析', actionKind: 'detail', disabled: false, canEdit: false,
     } : {
-      from: this.baseline(), to: this.current(), caption: `${this.weekend() ? '週末' : '週一至週五'} · ${BANDS[this.hours()]}`,
+      from: this.baseline(), to: this.current(), caption: `${this.dayTypeLabel(this.dayType(), true)} · ${BANDS[this.hours()]}`,
       action: this.loading() ? '正在比較…' : this.showResults() ? `查看 ${this.results().length} 組兩站` : '找出往來變化',
       actionKind: this.showResults() ? 'list' : 'find', disabled: this.loading() || !this.data(), canEdit: true,
     };
@@ -344,7 +389,7 @@ export class Radar implements OnDestroy {
   readonly story = computed(() => {
     const r = this.selected(), d = this.data();
     if (!r || !d) return null;
-    const day = d.weekend ? '週末' : '平日';
+    const day = this.dayTypeLabel(this.datasetDayType(d));
     const band = BANDS[`${d.hours[0]}-${d.hours[1]}`] ?? `${d.hours[0]} 到 ${d.hours[1]} 點`;
     const fmt = (n: number) => n.toLocaleString('zh-TW');
     const ratio = r.baselineDaily > 0 ? r.currentDaily / r.baselineDaily : null;
@@ -355,6 +400,11 @@ export class Radar implements OnDestroy {
     else if (ratio <= 0.95) change = `每日人次減少約 ${Math.round((1 - ratio) * 100)}%`;
     else change = '每日人次大致持平';
     const shareA = r.baselineTrips / r.baselineOriginTotal * 100, shareB = r.currentTrips / r.currentOriginTotal * 100;
+    // 大標先回答「為什麼排在這裡」，用的量和左側排行的排序依據相同
+    const key = this.sortKey();
+    if (key === 'share') change = `出發占比 ${shareA.toFixed(1)}% → ${shareB.toFixed(1)}%`;
+    else if (key === 'daily') { const diff = r.currentDaily - r.baselineDaily; change = Math.abs(diff) < 0.5 ? '每日人次大致持平' : `每天${diff > 0 ? '多' : '少'} ${formatDailyTrips(Math.abs(diff))} 人次`; }
+    else if (key === 'volume') change = `現在每天約 ${formatDailyTrips(r.currentDaily)} 人次`;
     const originA = r.baselineOriginTotal / d.days[0], originB = r.currentOriginTotal / d.days[1];
     const originChange = originB / originA - 1;
     const flow = (index: number | null) => (index ?? 0) > 0 ? `${r.origin}往${r.destination}` : `${r.destination}往${r.origin}`;
@@ -363,6 +413,7 @@ export class Radar implements OnDestroy {
       headline: glue(change),
       origin: glue(`${r.origin}出發的總人次每天 ${fmt(Math.round(originA))} → ${fmt(Math.round(originB))} 人，${Math.abs(originChange) < .05 ? '大致持平' : `${originChange > 0 ? '多了' : '少了'} ${Math.round(Math.abs(originChange) * 100)}%`}。`),
       shareA, shareB, scale: Math.max(shareA, shareB) * 1.15 || 1,
+      tile: key === 'share' ? { a: `${shareA.toFixed(1)}%`, b: `${shareB.toFixed(1)}%`, unit: `占${r.origin}出發量` } : null,
       reversal: r.reversal ? glue(`兩站之間的主要方向反過來了。${d.baseline} 是${flow(r.directionBaseline)}的人比較多，${d.current} 變成${flow(r.directionCurrent)}比較多。`) : '',
     };
   });
@@ -394,14 +445,14 @@ export class Radar implements OnDestroy {
       origin, destination, other: row.station, outbound,
       daily: row.daily ?? 0, share: row.share ?? 0,
       compareDaily: row.compareDaily, diff, growthPct,
-      period: ex.period(), weekend: ex.days() === 'weekend', hours: ex.band(),
+      period: ex.period(), days: ex.days() === 'workday' ? 'workday' as PairDayType : ex.days() === 'weekend' ? 'weekend' as PairDayType : 'weekday' as PairDayType, weekend: ex.days() === 'weekend', hours: ex.band(),
       hasCompare: ex.isComparing(),
     };
   });
 
   private readonly viewState = computed<ViewState>(() => {
     const r = this.selected();
-    return { baseline: this.baseline(), current: this.current(), hours: this.hours(), weekend: this.weekend(), type: this.changeType(), minimum: this.minimum(),
+    return { baseline: this.baseline(), current: this.current(), hours: this.hours(), weekend: this.weekend(), days: this.dayType(), type: this.changeType(), minimum: this.minimum(),
       sort: this.sortKey(), q: this.query(), line: this.lineFilter(), pair: r ? `${r.origin}>${r.destination}` : '' };
   });
 
@@ -498,6 +549,8 @@ export class Radar implements OnDestroy {
   readonly reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   constructor() {
+    autoRetry(() => this.error(), () => this.retryInitialLoad());
+    autoRetry(() => this.profileError(), () => this.retryProfile());
     // 收藏連結讀進 pendingImport 後就把 # 拿掉，重新整理不會再問一次
     if (location.hash.startsWith('#collection=')) history.replaceState(null, '', location.pathname + location.search);
     afterNextRender(() => {
@@ -535,6 +588,9 @@ export class Radar implements OnDestroy {
       this.applyMapLighting(shade, playing);
     });
     addEventListener('keydown', this.onKey);
+    document.addEventListener('fullscreenchange', this.onFullscreenChange);
+    addEventListener('beforeinstallprompt', this.onBeforeInstall);
+    addEventListener('appinstalled', this.onAppInstalled);
   }
 
   private readonly onKey = (e: KeyboardEvent) => {
@@ -547,7 +603,7 @@ export class Radar implements OnDestroy {
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '[' && !this.phone.matches) { e.preventDefault(); this.panelOpen.set(!this.panelOpen()); return; }
     if (this.view() !== 'pairs') return;
-    if (e.key === '/' && this.searchInput()) { e.preventDefault(); this.panelOpen.set(true); this.searchInput()!.nativeElement.focus(); return; }
+    if (e.key === '/' && this.view() === 'pairs' && this.showResults()) { e.preventDefault(); this.panelOpen.set(true); this.toolsOpen.set(true); setTimeout(() => this.searchInput()?.nativeElement.focus()); return; }
     if ((e.key === 'j' || e.key === 'k') && this.results().length) {
       const list = this.results(), at = list.indexOf(this.selected()!);
       const next = list[Math.min(list.length - 1, Math.max(0, at + (e.key === 'j' ? 1 : -1)))];
@@ -563,14 +619,16 @@ export class Radar implements OnDestroy {
 
   exportCsv() {
     const d = this.data()!;
+    const dt = this.datasetDayType(d);
+    const dayDesc = dt === 'workday' ? '純工作日（依行事曆排除國定假日並納入補班日）' : dt === 'weekend' ? '週末' : '平日（週一至週五，不扣國定假日）';
     const meta: Array<[string, string | number]> = [
       ...exportBasis(),
-      ['功能', '兩站比較'], ['基準期間', d.baseline], ['比較期間', d.current], ['日型', this.weekend() ? '週末' : '平日（週一至週五，不扣國定假日）'],
+      ['功能', '兩站比較'], ['基準期間', d.baseline], ['比較期間', d.current], ['日型', dayDesc],
       ['進站時段', `${d.hours[0]}–${d.hours[1]} 時`], ['基準有效天數', d.days[0]], ['比較有效天數', d.days[1]],
       ['變化類型', TYPES[this.changeType()]], ['每日至少人次', this.minimum()], ['納入比較的站數', d.commonStations],
       ['統計說明', '占比為起站出發的可比較旅次中前往該站的比例，比例變化以百分點表示'], ['查詢連結', location.href],
     ];
-    downloadCsv(`exitpulse-${d.baseline}-${d.current}-${this.weekend() ? 'weekend' : 'weekday'}-${this.hours()}.csv`, (({ head, rows }) => buildCsv(meta, head, rows))(csvTable(this.results())));
+    downloadCsv(`exitpulse-${d.baseline}-${d.current}-${dt}-${this.hours()}.csv`, (({ head, rows }) => buildCsv(meta, head, rows))(csvTable(this.results())));
   }
 
   /** 把目前選取的兩站畫成一張 1200×630 的結論卡並下載，方便貼到訊息或簡報。 */
@@ -645,7 +703,8 @@ export class Radar implements OnDestroy {
     const s = readState(location.search, this.viewState());
     // 沒有 API 時只有內建的預設比較，連結帶來的條件無法套用
     if (this.apiAvailable() && this.months().includes(s.baseline) && this.months().includes(s.current)) {
-      this.baseline.set(s.baseline); this.current.set(s.current); this.hours.set(s.hours); this.weekend.set(s.weekend);
+      this.baseline.set(s.baseline); this.current.set(s.current); this.hours.set(s.hours);
+      this.dayType.set(s.days ?? (s.weekend ? 'weekend' : 'weekday'));
       this.changeType.set(s.type as keyof typeof TYPES); this.minimum.set(s.minimum);
     } else if (this.apiAvailable() && (s.baseline || s.current)) {
       this.notice.set(`連結指定的月份已無資料，改顯示 ${this.baseline()} 與 ${this.current()}`);
@@ -1298,8 +1357,8 @@ export class Radar implements OnDestroy {
     this.elevatedFlow?.update(this.tower3d() ? this.displayedStreams : [], this.lighting() >= .5);
   }
 
-  toggleMapOption(option: 'places' | 'legend' | 'metro' | 'scale') {
-    const setting = { places: this.showPlaces, legend: this.showLegend, metro: this.showMetro, scale: this.showScale }[option];
+  toggleMapOption(option: 'places' | 'legend' | 'metro' | 'scale' | 'roads' | 'nature') {
+    const setting = { places: this.showPlaces, legend: this.showLegend, metro: this.showMetro, scale: this.showScale, roads: this.showRoads, nature: this.showNature }[option];
     setting.update(enabled => !enabled);
     this.applyMapOptions();
   }
@@ -1414,7 +1473,8 @@ export class Radar implements OnDestroy {
       { type: 'Feature', properties: { color: '#7251ab' }, geometry: { type: 'Point', coordinates: origin } },
       { type: 'Feature', properties: { color: lineColor }, geometry: { type: 'Point', coordinates: top.point } },
     ] });
-    map.fitBounds(new ml.LngLatBounds(origin, top.point), { padding: this.padding(), maxZoom: 15, bearing: map.getBearing(), duration: this.reducedMotion ? 0 : 650 });
+    const bounds = new ml.LngLatBounds(origin, origin).extend(top.point);
+    map.fitBounds(bounds, { padding: this.padding(), maxZoom: 15, bearing: map.getBearing(), duration: this.reducedMotion ? 0 : 650 });
   }
 
   usePlaceAs(role: 'origin' | 'destination', station: string) {
@@ -1649,7 +1709,7 @@ export class Radar implements OnDestroy {
     if (!map || !this.layersReady) return;
     if (map.getLayer('extra-places')) map.setLayoutProperty('extra-places', 'visibility', this.showPlaces() ? 'visible' : 'none');
     if (this.showScale() && !this.scaleControl && this.ml) {
-      const ctrl = new this.ml.ScaleControl({ maxWidth: 72, unit: 'metric' });
+      const ctrl = new this.ml.ScaleControl({ maxWidth: 120, unit: 'metric' });
       this.scaleControl = ctrl;
       map.addControl(ctrl, 'bottom-right');
     } else if (!this.showScale() && this.scaleControl) {
@@ -1658,6 +1718,18 @@ export class Radar implements OnDestroy {
     }
     for (const layer of ['metro-network-casing', 'metro-network', 'metro-network-core', 'metro-stops', 'metro-hit']) {
       map.setLayoutProperty(layer, 'visibility', this.showMetro() ? 'visible' : 'none');
+    }
+    const style = map.getStyle();
+    if (style?.layers) {
+      for (const layer of style.layers) {
+        if (layer.id === 'buildings-3d' || layer.id === 'extra-places') continue;
+        const src = 'source-layer' in layer ? String(layer['source-layer'] ?? '') : '';
+        if (src === 'transportation' || src === 'transportation_name' || src === 'building') {
+          map.setLayoutProperty(layer.id, 'visibility', this.showRoads() ? 'visible' : 'none');
+        } else if (src === 'water' || src === 'waterway' || src === 'park' || src === 'landcover' || src === 'landuse') {
+          map.setLayoutProperty(layer.id, 'visibility', this.showNature() ? 'visible' : 'none');
+        }
+      }
     }
   }
 
@@ -1734,7 +1806,7 @@ export class Radar implements OnDestroy {
   readonly conditionsChanged = computed(() => {
     const d = this.data();
     return !!d && (d.baseline !== this.baseline() || d.current !== this.current() || d.hours.join('-') !== this.hours()
-      || d.weekend !== this.weekend() || (d.minimum ?? 20) !== this.minimum() || (d.type ?? 'all') !== this.changeType());
+      || this.datasetDayType(d) !== this.dayType() || (d.minimum ?? 20) !== this.minimum() || (d.type ?? 'all') !== this.changeType());
   });
 
   filtersChanged() { this.queryError.set(''); if (this.selected()) this.closeDetail(); }
@@ -1752,7 +1824,7 @@ export class Radar implements OnDestroy {
     this.loading.set(true);
     const [start, end] = this.hours().split('-');
     try {
-      const params = { baseline: this.baseline(), current: this.current(), start, end, weekend: this.weekend(), minimum: this.minimum(), type: this.changeType() };
+      const params = { baseline: this.baseline(), current: this.current(), start, end, ...this.dayTypeParams(this.dayType()), minimum: this.minimum(), type: this.changeType() };
       this.data.set(await this.getRadar(params));
       this.showResults.set(true);
       if (this.view() === 'pairs') {
@@ -1772,7 +1844,7 @@ export class Radar implements OnDestroy {
   /** 首屏的一鍵範例：套用條件、跑比較，有指定站對時直接打開該站對。 */
   async applyPreset(p: FirstQueryPreset) {
     this.baseline.set(p.baseline); this.current.set(p.current); this.hours.set(`${p.start}-${p.end}`);
-    this.weekend.set(p.weekend); this.changeType.set(p.type);
+    this.dayType.set(p.weekend ? 'weekend' : 'weekday'); this.changeType.set(p.type);
     await this.find();
     if (p.origin && p.destination) await this.findPair(p.origin, p.destination);
   }
@@ -1804,7 +1876,7 @@ export class Radar implements OnDestroy {
         this.manualError.set('請先確認上方月份與條件可正常查詢。');
         return;
       }
-      const params = { baseline: d.baseline, current: d.current, start: d.hours[0], end: d.hours[1], weekend: d.weekend,
+      const params = { baseline: d.baseline, current: d.current, start: d.hours[0], end: d.hours[1], ...this.dayTypeParams(this.datasetDayType(d)),
         minimum: this.minimum(), origin, destination };
       const direct = await this.getRadar(params);
       if (this.data() !== d || this.view() !== 'pairs') return;
@@ -1837,7 +1909,7 @@ export class Radar implements OnDestroy {
     this.profileError.set(false);
     if (!this.apiAvailable()) return;
     try {
-      const params = { baseline: d.baseline, current: d.current, origin: result.origin, destination: result.destination, weekend: d.weekend };
+      const params = { baseline: d.baseline, current: d.current, origin: result.origin, destination: result.destination, ...this.dayTypeParams(this.datasetDayType(d)) };
       const profile = await firstValueFrom(this.http.get<PairProfile>('/api/v1/od/pair', { params }));
       if (request === this.profileRequest) this.profile.set(profile);
     } catch {
@@ -1853,6 +1925,8 @@ export class Radar implements OnDestroy {
   togglePanelWide() {
     this.panelOpen.set(true);
     this.panelWide.update(v => !v);
+    // 左右兩個放大檢視互斥，避免兩張大面板疊在地圖上
+    if (this.panelWide()) this.detailWide.set(false);
   }
 
   toggleFavPair() {
@@ -2095,7 +2169,7 @@ export class Radar implements OnDestroy {
   }
 
   /** 從矩陣的一格進入該站對的兩期比較。 */
-  openPair(origin: string, destination: string, ctx?: { period?: string; weekend?: boolean; hours?: string }) {
+  openPair(origin: string, destination: string, ctx?: { period?: string; days?: PairDayType; weekend?: boolean; hours?: string }) {
     this.setView('pairs');
     // 帶著矩陣當下的條件，讓站對頁回答被點的那一格，而不是站對頁殘留的預設值
     if (ctx?.period) {
@@ -2103,7 +2177,8 @@ export class Radar implements OnDestroy {
       this.current.set(month);
       if (this.baseline() === month) this.baseline.set(`${+month.slice(0, 4) - 1}${month.slice(4)}`);
     }
-    if (ctx?.weekend != null) this.weekend.set(ctx.weekend);
+    if (ctx?.days) this.dayType.set(ctx.days);
+    else if (ctx?.weekend != null) this.dayType.set(ctx.weekend ? 'weekend' : 'weekday');
     if (ctx?.hours && ctx.hours in BANDS) this.hours.set(ctx.hours);
     this.manualOrigin.set(origin); this.manualDestination.set(destination);
     queueMicrotask(() => void this.findPair(origin, destination));
@@ -2418,5 +2493,25 @@ export class Radar implements OnDestroy {
     this.frame = requestAnimationFrame(loop);
   }
 
-  ngOnDestroy() { removeEventListener('keydown', this.onKey); clearInterval(this.mapGuard); this.stop(); if (this.tweenFrame != null) cancelAnimationFrame(this.tweenFrame); this.map?.remove(); }
+  async toggleMapFullscreen() {
+    const next = !this.mapFullscreen();
+    this.mapFullscreen.set(next);
+    if (this.fullscreenSupported) {
+      try {
+        if (next && !document.fullscreenElement) await document.documentElement.requestFullscreen();
+        else if (!next && document.fullscreenElement) await document.exitFullscreen();
+      } catch { /* fallback to CSS fullscreen */ }
+    }
+    setTimeout(() => this.map?.resize(), 60);
+  }
+
+  async installApp() {
+    const ev = this.installPrompt();
+    if (!ev) return;
+    await ev.prompt();
+    const res = await ev.userChoice.catch(() => ({ outcome: 'dismissed' }));
+    if (res.outcome === 'accepted') this.installPrompt.set(null);
+  }
+
+  ngOnDestroy() { removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); if (this.tweenFrame != null) cancelAnimationFrame(this.tweenFrame); this.map?.remove(); }
 }

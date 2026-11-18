@@ -73,18 +73,23 @@ export function csvTable(results: readonly Result[]): { head: string[]; rows: Ar
   return { head, rows };
 }
 
-export type ViewState = { baseline: string; current: string; hours: string; weekend: boolean; type: string; minimum: number; sort: SortKey; q: string; line: string; pair: string };
+export type PairDayType = 'weekday' | 'workday' | 'weekend';
+export type ViewState = { baseline: string; current: string; hours: string; weekend: boolean; days?: PairDayType; type: string; minimum: number; sort: SortKey; q: string; line: string; pair: string };
 const HOURS = ['7-10', '10-16', '16-19', '19-24'], TYPE_KEYS = ['all', 'increase', 'decrease', 'reversal'], MINIMUMS = [10, 20, 50, 100];
 
 /** 只讀取介面真的能顯示的值，其他一律退回預設值。 */
 export function readState(search: string, defaults: ViewState): ViewState {
   const p = new URLSearchParams(search), month = /^\d{4}-\d{2}$/;
   const pick = <T>(value: T | null, ok: (v: T) => boolean, fallback: T) => value != null && ok(value) ? value : fallback;
+  const workday = p.get('d') === 'workday';
+  const weekend = workday ? false : (p.has('w') ? p.get('w') === '1' : defaults.weekend);
+  const days: PairDayType = workday ? 'workday' : (p.has('w') ? (weekend ? 'weekend' : 'weekday') : (defaults.days ?? (defaults.weekend ? 'weekend' : 'weekday')));
   return {
     baseline: pick(p.get('b'), v => month.test(v), defaults.baseline),
     current: pick(p.get('c'), v => month.test(v), defaults.current),
     hours: pick(p.get('h'), v => HOURS.includes(v), defaults.hours),
-    weekend: p.has('w') ? p.get('w') === '1' : defaults.weekend,
+    weekend,
+    ...(defaults.days !== undefined || workday ? { days } : {}),
     type: pick(p.get('t'), v => TYPE_KEYS.includes(v), defaults.type),
     minimum: pick(Number(p.get('m')), v => MINIMUMS.includes(v), defaults.minimum),
     sort: pick(p.get('s') as SortKey | null, v => v in SORTS, defaults.sort),
@@ -96,7 +101,9 @@ export function readState(search: string, defaults: ViewState): ViewState {
 }
 
 export function writeState(s: ViewState): string {
-  const p = new URLSearchParams({ b: s.baseline, c: s.current, h: s.hours, w: s.weekend ? '1' : '0', t: s.type, m: String(s.minimum), s: s.sort });
+  const isWorkday = s.days === 'workday';
+  const p = new URLSearchParams({ b: s.baseline, c: s.current, h: s.hours, w: !isWorkday && s.weekend ? '1' : '0', t: s.type, m: String(s.minimum), s: s.sort });
+  if (isWorkday) p.set('d', 'workday');
   if (s.q) p.set('q', s.q);
   if (s.line) p.set('l', s.line);
   if (s.pair) p.set('p', s.pair);

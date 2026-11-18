@@ -74,4 +74,8 @@ test('url state round-trips and rejects values the UI cannot show', () => {
   assert.deepEqual(readState('?h=3-4&m=7&s=bogus&l=Z&b=x', defaults), defaults);
   for (const p of ['a>b>c', '>b', 'a>', 'a>a', '>', '台'.repeat(21) + '>b']) assert.equal(readState('?p=' + encodeURIComponent(p), defaults).pair, defaults.pair, p);
   assert.equal(readState('?p=' + encodeURIComponent('台北車站>西門'), defaults).pair, '台北車站>西門');
+  const wdDefaults: ViewState = { ...defaults, days: 'weekday' };
+  const wdState: ViewState = { ...wdDefaults, days: 'workday', weekend: false };
+  assert.deepEqual(readState(writeState(wdState), wdDefaults), wdState);
+  assert.equal(readState('?w=1', wdDefaults).days, 'weekend');
 });

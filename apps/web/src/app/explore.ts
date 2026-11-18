@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { autoRetry } from './auto-retry';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom, switchMap, timer, type Subscription } from 'rxjs';
+import { firstValueFrom, shareReplay, switchMap, timer, type Observable, type Subscription } from 'rxjs';
 import {
   DAY_LABELS, NETWORK_EVENTS, maskUncoveredExits, amount, baselineIndex2017, distanceBands, stationRole, unusualDays, change, classifyStationPersonality, computeStationMetrics, dayName, diff, exploreErrorMessage, growth, hourlySvgPoints, periodLabel, radialClockPoints, resolveAvailablePeriod, signed, sortNetwork, sortNetworkTable, sortRelationTable, sortRelations, stationRadius, summarizeByLine,
   type CalendarAnswer, type CatalogAnswer, type DayType, type LeadersAnswer, type MatrixAnswer, type NetworkAnswer, type NetworkSort, type NetworkTableColumn,
   type Relation, type RelationSort, type RelationTableColumn, type StationAnswer, type TableSortDir, type TrendAnswer,
 } from './explore-model';
-import { formatDailyTrips, lineWidth } from './radar-model';
+import { formatDailyTrips, lineWidth, glue } from './radar-model';
 import { buildCsv, downloadCsv, exportBasis, type CsvCell } from './csv-export';
 import { Hint, type HintEntry } from './hint';
 import { MonthCalendar } from './month-calendar';
@@ -16,6 +17,8 @@ import { OdMatrix } from './od-matrix';
 export type ExploreMode = 'station' | 'network';
 export type StationLine = { code: string; name: string; color: string };
 export type StationAvailability = Record<string, { months: string[]; firstDate: string | null }>;
+type ExploreRequest = { url: string; params: Record<string, string> };
+type ExploreAnswer = StationAnswer | NetworkAnswer;
 /** 探索檢視目前要請地圖繪製的圖層狀態；由地圖模組負責將站名對應為座標。 */
 export type ExploreLayer = {
   /** dashed = fewer trips than the comparison period. Colour is chosen by the map, never by the line. */
@@ -105,7 +108,7 @@ export class Explore implements OnDestroy {
   readonly direction = signal<'outbound' | 'inbound'>('outbound');
   readonly hints: Record<string, readonly HintEntry[]> = {
     personality: [{ label: '尖峰通勤傾向', value: '平日早晚尖峰（07–10、16–19）進站占全天比例，越高越偏向通勤站。' }],
-    networkShare: [{ label: '占全線進站', value: '這座車站進站量在整個臺北捷運占的比例，用來看出它在路網的重量。' }],
+    networkShare: [{ label: '計算方式', value: '這座車站進站人次占全臺北捷運當期總進站的比例，能看出它在整張路網中的規模占比。' }],
     recoveryIndex: [{ label: '基準指數', value: '以 2017 至 2019 年同月平均為 100，高於 100 代表已超越疫情前同期。' }],
     radialClock: [{ label: '環形指紋', value: '用 24 小時時鐘看作息，實線進站、虛線出站，內圈是 0、斷線無紀錄。' }],
     leaders: [{ label: '全線榜單', value: '依目前期間與時段排前 10 名，增減排行只看基準至少 200 人次／日的站。' }],
@@ -121,6 +124,10 @@ export class Explore implements OnDestroy {
   readonly trendView = signal<'bars' | 'sameMonth' | 'line'>('bars');
   readonly relationSort = signal<RelationSort>('daily');
   readonly networkSort = signal<NetworkSort>('entries');
+  readonly relationSortReverse = signal(false);
+  readonly networkSortReverse = signal(false);
+  readonly listCollapsed = signal(false);
+  readonly focusOnly = signal(false);
   readonly listStyle = signal<'cards' | 'table' | 'lines'>('cards');
   readonly relTableCol = signal<RelationTableColumn>('daily');
   readonly netTableCol = signal<NetworkTableColumn>('entries');
@@ -174,6 +181,8 @@ export class Explore implements OnDestroy {
   readonly peerLoading = signal(false);
   readonly loading = signal(false);
   readonly failure = signal('');
+  /** 失敗原因是網路或伺服器暫時性問題（可自動重試），不是查詢條件本身有誤 */
+  private readonly failureRetryable = signal(false);
   readonly calendarLoading = signal(false);
   readonly calendarFailure = signal(false);
   readonly trendLoading = signal(false);
@@ -309,7 +318,7 @@ export class Explore implements OnDestroy {
     const rawCmp = 'station' in a && a.compare && a.compareEntries != null ? ` · 對照原始進站約 ${Math.round(a.compareEntries * a.compare.days).toLocaleString('zh-TW')} 人次` : '';
     const cmp = a.compare ? ` · 對照 ${a.compare.days} 天` : '';
     const rec = a.period.recordedHours?.length ? ` · 紀錄時段 ${hourRangesText(a.period.recordedHours)}` : '';
-    const off = a.events?.offDays?.length ? ` · 含國定假日 ${a.events.offDays.length} 天（${a.events.offDays.map(d => d.note).slice(0, 2).join('、')}）` : '';
+    const off = a.events?.offDays?.length ? ` · 含國定假日 ${a.events.offDays.length} 天（${a.events.offDays.map(d => d.note?.split('/').pop()).slice(0, 2).join('、')}）` : '';
     const mk = a.events?.makeupDays?.length ? ` · 含補班日 ${a.events.makeupDays.length} 天` : '';
     return `有效 ${a.period.days} 天${cmp}${rawNow}${rawCmp}${rec}${off}${mk} · 單位為人次／日（人次不等於人數）`;
   });
@@ -354,7 +363,7 @@ export class Explore implements OnDestroy {
     const ev = (this.stationAnswer() ?? this.networkAnswer())?.events;
     if (!ev) return '';
     const tags: string[] = [];
-    if (ev.offDays.length) tags.push(`含國定假日 ${ev.offDays.length} 天（${ev.offDays.map(d => `${+d.date.slice(5, 7)}/${+d.date.slice(8)} ${d.note}`).slice(0, 3).join('、')}${ev.offDays.length > 3 ? '等' : ''}）`);
+    if (ev.offDays.length) tags.push(`含國定假日 ${ev.offDays.length} 天（${ev.offDays.map(d => `${+d.date.slice(5, 7)}/${+d.date.slice(8)} ${d.note?.split('/').pop() ?? ''}`).slice(0, 3).join('、')}${ev.offDays.length > 3 ? '等' : ''}）`);
     if (ev.makeupDays.length) tags.push(`含補班日 ${ev.makeupDays.length} 天（${ev.makeupDays.map(d => `${+d.date.slice(5, 7)}/${+d.date.slice(8)}`).slice(0, 2).join('、')}）`);
     return tags.join('、');
   });
@@ -363,10 +372,11 @@ export class Explore implements OnDestroy {
     const ev = (this.stationAnswer() ?? this.networkAnswer())?.events;
     if (!ev) return [];
     const note = (lead: string, items: string[], more = '') => {
-      const parts = items.map((item, i) => (i === 0 ? '（' : '') + item + (i === items.length - 1 ? more + '）' : '、'));
-      return { lead, items: parts };
+      const parts = items.map((item, i) => item + (i === items.length - 1 ? more : '、'));
+      return { lead: lead + '：', items: parts };
     };
-    const day = (d: { date: string; note?: string }, withNote: boolean) => `${+d.date.slice(5, 7)}/${+d.date.slice(8)}${withNote && d.note ? ' ' + d.note : ''}`;
+    // 「孔子誕辰紀念日/教師節」這類並列名稱只取通稱，避免斜線斷行
+    const day = (d: { date: string; note?: string }, withNote: boolean) => `${+d.date.slice(5, 7)}/${+d.date.slice(8)}${withNote && d.note ? ' ' + d.note.split('/').pop() : ''}`;
     const out: { lead: string; items: string[] }[] = [];
     if (ev.offDays.length) out.push(note(`含國定假日 ${ev.offDays.length} 天`, ev.offDays.slice(0, 3).map(d => day(d, true)), ev.offDays.length > 3 ? '等' : ''));
     if (ev.makeupDays.length) out.push(note(`含補班日 ${ev.makeupDays.length} 天`, ev.makeupDays.slice(0, 2).map(d => day(d, false))));
@@ -446,13 +456,23 @@ export class Explore implements OnDestroy {
     return { url: '/api/v1/od/network', params };
   });
   private activeRequest?: Subscription;
+  private prefetched?: { key: string; query: Observable<ExploreAnswer>; subscription: Subscription };
 
   readonly relations = computed(() => {
     const a = this.stationAnswer();
     if (!a) return [];
     const rows = this.direction() === 'outbound' ? a.outbound : a.inbound;
     const q = this.query().trim().replace(/臺/g, '台'), line = this.lineFilter(), linesOf = this.linesOf();
-    return sortRelations(rows.filter(r => (!q || r.station.includes(q)) && (!line || linesOf(r.station).some(l => l.code === line))), this.relationSort());
+    const sorted = sortRelations(rows.filter(r => (!q || r.station.includes(q)) && (!line || linesOf(r.station).some(l => l.code === line))), this.relationSort());
+    return this.relationSortReverse() ? [...sorted].reverse() : sorted;
+  });
+  readonly visibleRelations = computed(() => {
+    const rows = this.relations(), focused = this.focusedRelation();
+    if (this.focusOnly() && focused) {
+      const hit = rows.filter(r => r.station === focused);
+      if (hit.length) return hit;
+    }
+    return rows.slice(0, this.shown());
   });
   readonly relationSwing = computed(() => Math.max(1, ...this.relations().map(r => Math.abs(change(r.daily, r.compareDaily) ?? 0))));
   readonly relationScale = computed(() => Math.max(1, ...this.relations().map(r => Math.max(r.daily ?? 0, r.compareDaily ?? 0))));
@@ -461,7 +481,8 @@ export class Explore implements OnDestroy {
     const a = this.networkAnswer();
     if (!a) return [];
     const q = this.query().trim().replace(/臺/g, '台'), line = this.lineFilter(), linesOf = this.linesOf();
-    return sortNetwork(a.stations.filter(r => (!q || r.station.includes(q)) && (!line || linesOf(r.station).some(l => l.code === line))), this.networkSort());
+    const sorted = sortNetwork(a.stations.filter(r => (!q || r.station.includes(q)) && (!line || linesOf(r.station).some(l => l.code === line))), this.networkSort());
+    return this.networkSortReverse() ? [...sorted].reverse() : sorted;
   });
   readonly networkSwing = computed(() => Math.max(1, ...this.networkRows().map(r => Math.abs(change(r.entries, r.compareEntries) ?? 0))));
   readonly networkScale = computed(() => Math.max(1, ...this.networkRows().map(r => Math.max(r.entries ?? 0, r.compareEntries ?? 0))));
@@ -600,22 +621,24 @@ export class Explore implements OnDestroy {
   });
   readonly abs = Math.abs;
 
-  readonly headline = computed(() => {
-    const p = this.periodText(), c = this.compareText();
+  readonly glue = glue;
+  readonly headline = computed(() => glue(this.rawHeadline()));
+  private readonly rawHeadline = computed(() => {
+    const c = this.compareText();
     const frequency = this.unit() === 'date' ? '當天' : '平均每天';
     if (this.mode() === 'network') {
       const a = this.networkAnswer();
       if (!a) return '';
       const g = growth(a.total, a.compareTotal);
-      return `${p}，全線${frequency}約 ${Math.round(a.total).toLocaleString('zh-TW')} 人次進站` + (c && g != null ? `，比${c}${g >= 0 ? '多' : '少'} ${Math.abs(g).toFixed(1)}%。` : '。');
+      return `全線${frequency}約 ${Math.round(a.total).toLocaleString('zh-TW')} 人次進站` + (c && g != null ? `，比${c}${g >= 0 ? '多' : '少'} ${Math.abs(g).toFixed(1)}%。` : '。');
     }
     const a = this.stationAnswer();
     if (!a) return '';
-    if (!a.present) return `${p} 還查不到${a.station}的旅次，這站當時可能還沒通車。`;
+    if (!a.present) return `還查不到${a.station}這段期間的旅次，這站當時可能還沒通車。`;
     const g = growth(a.entries, a.compareEntries);
     const partial = this.unit() === 'month' && this.firstDate().slice(0, 7) === a.period.spec && this.firstDate().slice(8) > '01'
       ? `（通車當月，僅含 ${+this.firstDate().slice(8)} 日起部分天數）` : '';
-    const head = `${p}，${a.station}${frequency}約 ${Math.round(a.entries ?? 0).toLocaleString('zh-TW')} 人進站、${Math.round(a.exits ?? 0).toLocaleString('zh-TW')} 人出站${partial}`;
+    const head = `${a.station}${frequency}約 ${Math.round(a.entries ?? 0).toLocaleString('zh-TW')} 人進站、${Math.round(a.exits ?? 0).toLocaleString('zh-TW')} 人出站${partial}`;
     if (!c) return head + '。';
     if (a.comparePresent === false) return `${head}。${c} 這站還沒有旅次紀錄。`;
     return `${head}，進站比${c}${(g ?? 0) >= 0 ? '多' : '少'} ${Math.abs(g ?? 0).toFixed(1)}%。`;
@@ -624,6 +647,12 @@ export class Explore implements OnDestroy {
   private readonly http = inject(HttpClient);
 
   constructor() {
+    autoRetry(() => !!this.failure() && this.failureRetryable() && !this.loading(), () => this.retry());
+    autoRetry(() => this.calendarFailure(), () => this.retryCalendar());
+    autoRetry(() => this.trendFailure(), () => this.retryTrend());
+    autoRetry(() => this.matrixFailure(), () => this.retryMatrix());
+    autoRetry(() => this.leadersFailure(), () => this.retryLeaders());
+    autoRetry(() => this.catalogFailure(), () => this.retryCatalog());
     this.restore();
     // 只供距離分布與車站角色使用，載入失敗時這兩塊不顯示
     fetch('metro/stations.geojson').then(r => r.json()).then((g: { features: { properties: { name: string; lines: string }; geometry: { coordinates: [number, number] } }[] }) => {
@@ -688,7 +717,10 @@ export class Explore implements OnDestroy {
             && (r.params['compare'].length !== 10 || r.params['compare'] >= this.firstDate())))) {
         untracked(() => this.load(r));
         onCleanup(() => this.activeRequest?.unsubscribe());
-      } else this.loading.set(false);
+      } else {
+        this.clearPrefetch();
+        this.loading.set(false);
+      }
     });
     effect(() => {
       if (this.activeSection() !== 'days' && this.unit() !== 'date' && this.mode() !== 'station') return;
@@ -738,18 +770,46 @@ export class Explore implements OnDestroy {
   }
 
   // ----- Query plumbing -----
-  private load(r: { url: string; params: Record<string, string> }, retried = false) {
+  private requestKey(r: ExploreRequest) {
+    return r.url + '?' + new URLSearchParams(r.params).toString();
+  }
+
+  private clearPrefetch() {
+    this.prefetched?.subscription.unsubscribe();
+    this.prefetched = undefined;
+  }
+
+  private prefetchNext(r: ExploreRequest) {
+    if (!this.playing() || document.hidden || this.requestKey(r) !== this.requestKey(this.request())) return;
+    const start = Number(r.params['end']);
+    if (r.params['period'].length !== 10 || start >= 24 || start - Number(r.params['start']) !== 1) return;
+    const next = { url: r.url, params: { ...r.params, start: String(start), end: String(start + 1) } };
+    this.clearPrefetch();
+    const query = this.http.get<ExploreAnswer>(next.url, { params: next.params }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+    const key = this.requestKey(next);
+    let failed = false;
+    const subscription = query.subscribe({ error: () => {
+      failed = true;
+      if (this.prefetched?.query === query) this.clearPrefetch();
+    } });
+    if (!failed) this.prefetched = { key, query, subscription };
+  }
+
+  private load(r: ExploreRequest, retried = false) {
     this.activeRequest?.unsubscribe();
     ++this.benchSerial;
     this.networkBench.set(null);
-    this.loading.set(true); this.failure.set(''); this.unrecorded.set(false); this.shown.set(PAGE);
-    const query = this.http.get<StationAnswer | NetworkAnswer>(r.url, { params: r.params });
+    this.loading.set(true); this.failure.set(''); this.failureRetryable.set(false); this.unrecorded.set(false); this.shown.set(PAGE);
+    const prefetched = this.prefetched?.key === this.requestKey(r) ? this.prefetched : undefined;
+    if (prefetched) this.prefetched = undefined;
+    else this.clearPrefetch();
+    const query = prefetched?.query ?? this.http.get<ExploreAnswer>(r.url, { params: r.params });
     const hourly = Number(r.params['end']) - Number(r.params['start']) === 1;
     const previous = this.stationAnswer() ?? this.networkAnswer();
     if (previous && ('station' in previous) !== r.url.endsWith('station')) {
       this.stationAnswer.set(null); this.networkAnswer.set(null);
     }
-    this.activeRequest = (hourly ? timer(90).pipe(switchMap(() => query)) : query).subscribe({
+    this.activeRequest = (hourly && !prefetched ? timer(90).pipe(switchMap(() => query)) : query).subscribe({
       next: answer => {
         this.stationAnswer.set('station' in answer ? answer : null);
         this.networkAnswer.set('stations' in answer ? { ...answer, stations: maskUncoveredExits(answer.stations) } : null);
@@ -758,8 +818,12 @@ export class Explore implements OnDestroy {
             : answer.hourly ? { key: answer.period.spec, entries: answer.hourly } : null;
           if (profile) this.profile.set(profile);
         }
-        if ('station' in answer && answer.present) void this.loadNetworkBench(r.params);
-        else if ('stations' in answer) this.networkBench.set({ total: answer.total, compareTotal: answer.compareTotal });
+        if ('station' in answer && answer.present) {
+          void this.loadNetworkBench(r.params).then(() => this.prefetchNext(r));
+        } else {
+          if ('stations' in answer) this.networkBench.set({ total: answer.total, compareTotal: answer.compareTotal });
+          this.prefetchNext(r);
+        }
         this.loading.set(false);
       },
       error: (error: unknown) => {
@@ -773,12 +837,15 @@ export class Explore implements OnDestroy {
           this.activeRequest = timer(isRate ? 2000 : 3000).subscribe(() => this.load(r, true));
           return;
         } else {
-          this.failure.set(error instanceof HttpErrorResponse ? exploreErrorMessage(error.status, error.error?.error) : '旅次查詢失敗');
+          const retryable = !(error instanceof HttpErrorResponse) || error.status === 0 || error.status === 429 || error.status >= 500;
+          this.failureRetryable.set(retryable);
+          this.failure.set(retryable ? '資料服務暫時連不上，網頁會自動重試，也可以直接按重新查詢' : exploreErrorMessage((error as HttpErrorResponse).status, (error as HttpErrorResponse).error?.error));
           this.stationAnswer.set(null); this.networkAnswer.set(null);
         }
         this.loading.set(false);
       },
     });
+    prefetched?.subscription.unsubscribe();
   }
 
   private benchSerial = 0;
@@ -1011,7 +1078,7 @@ export class Explore implements OnDestroy {
       this.band.set(`${hour + 1}-${hour + 2}`);
     }, 1600);
   }
-  stopPlayback() { if (this.playback != null) clearInterval(this.playback); this.playback = undefined; this.playing.set(false); }
+  stopPlayback() { if (this.playback != null) clearInterval(this.playback); this.playback = undefined; this.playing.set(false); this.clearPrefetch(); }
   ngOnDestroy() { this.stopPlayback(); this.activeRequest?.unsubscribe(); }
   /** Swap the two periods so the earlier one is the baseline, or simply look from the other side. */
   swap() {

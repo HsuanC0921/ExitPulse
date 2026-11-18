@@ -42,6 +42,9 @@
 .sample-arrows { display: flex; color: var(--flow); }
 .sample-arrows svg { width: 8px; height: 10px; }
 .layer-source { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; color: var(--ink); text-underline-offset: .2em; }
+.pwa-install-btn { width: 100%; min-height: 44px; margin-top: 6px; padding: 0 12px; border: 0; border-radius: var(--r-m); background: var(--action); color: var(--on-action); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.pwa-install-btn:hover { background: var(--action-hover); }
+.pwa-tip { margin: 6px 0 0; color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.5; }
 .layer-options .pause { float: right; margin-top: 4px; }
 .map-metric.segmented { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 8px; background: var(--panel-2); }
 .map-metric button { min-height: 36px; padding-inline: 0; }
@@ -63,8 +66,11 @@
 .place-results span, .nearest span { color: var(--ink-2); font-size: var(--type-label); }
 .place-results button:hover { background: var(--panel-2); }
 .nearest { display: grid; gap: var(--sp-1); padding-top: 10px; }
-.nearest-actions { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: 4px; }
-.nearest-actions button:first-child { background: var(--panel-2); color: var(--ink); }
+.nearest-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-1); margin-top: 6px; }
+.nearest-actions button { width: 100%; border: 1px solid var(--rule); background: var(--panel-2); color: var(--ink); }
+.nearest-actions button:hover:not(:disabled) { background: var(--panel); }
+.nearest-actions .nearest-primary { border-color: transparent; background: var(--action); color: var(--on-action); }
+.nearest-actions .nearest-primary:hover:not(:disabled) { background: var(--action-hover); }
 .station-preview { position: absolute; z-index: 3; top: 68px; right: 16px; display: grid; gap: var(--sp-2); width: min(308px, calc(100vw - 24px)); max-height: min(32rem, 66dvh); padding: 10px 14px 12px; border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); overflow: auto; overscroll-behavior: contain; animation: chip-in .22s cubic-bezier(.22, 1, .36, 1); }
 .station-preview-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .station-preview-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); min-width: 0; }
@@ -137,7 +143,7 @@
 .flowbar .segmented { box-shadow: none; background: var(--panel-2); }
 .pause { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); }
 .pause:hover { background: var(--rule); }
-.pause svg { width: 14px; height: 14px; fill: currentColor; stroke-width: 2; }
+.pause svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .flow-help { grid-column: 3; grid-row: 1; justify-self: end; }
 .legend { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px var(--sp-3); margin: 0; padding: 0 6px 4px; list-style: none; font-size: var(--fs-xs); white-space: nowrap; }
 .legend li { display: flex; align-items: center; gap: var(--sp-1); }
@@ -162,7 +168,8 @@
 .station-facts svg { flex: none; width: 14px; height: 14px; color: var(--ink-2); }
 .nearby-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-top: 4px; color: var(--ink-2); font-size: var(--fs-xs); }
 .station-nearby { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.station-hub > .source-pill { margin-inline-start: 6px; min-height: 24px; }
+.nearby-sources { margin: 2px 6px 4px; color: var(--ink-2); font-size: 11px; line-height: 1.5; }
+.nearby-sources a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .station-nearby li button { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); width: 100%; min-height: 36px; padding: 4px 6px; border: 0; border-radius: var(--r-s); background: none; color: var(--ink); font-size: var(--fs-xs); line-height: 1.5; text-align: left; cursor: pointer; transition: background-color .15s; }
 .station-nearby strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .station-nearby li button:hover { background: var(--panel-2); }
@@ -198,3 +205,26 @@
 .collection-import { display: grid; gap: 6px; margin-bottom: 10px; padding: 10px; border-radius: var(--r-m); background: var(--panel-2); }
 .collection-import div { display: flex; gap: var(--sp-1); }
 .collection-import .primary { flex: 1; }
+
+/* 收合：只留最右邊的箭頭鈕，箭頭翻面表示可展開 */
+.tools-toggle svg { transition: transform .18s cubic-bezier(.22, 1, .36, 1); }
+.map-tools.collapsed .tools-toggle svg { transform: rotate(180deg); }
+@media (min-width: 721px) { .map-tools.collapsed > :not(.tools-toggle):not(app-about) { display: none; } }
+@media (max-width: 720px) { .tools-toggle { display: none; } }
+@media (prefers-reduced-motion: reduce) { .tools-toggle svg { transition: none; } }
+
+/* 版面窄到只剩圖示時，滑鼠移上去、鍵盤聚焦或手指按下，都在工具下方顯示說明 */
+.map-tools [data-tip] { position: relative; }
+.map-tools [data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 8px); right: 0; z-index: 8; width: max-content; max-width: 220px; padding: 6px 10px; border-radius: var(--r-s); background: var(--ink); color: var(--panel); font-size: var(--fs-xs); font-weight: 600; line-height: 1.5; text-align: left; white-space: normal; word-break: keep-all; overflow-wrap: break-word; pointer-events: none; opacity: 0; transform: translateY(-2px); transition: opacity .12s, transform .12s; }
+@media (max-width: 960px) {
+  .map-tools [data-tip]:is(:hover, :focus-visible, :active)::after { opacity: 1; transform: none; }
+}
+@media (max-width: 960px) and (prefers-reduced-motion: reduce) { .map-tools [data-tip]::after { transition: none; } }
+@media (max-width: 720px) {
+  .map-tools [data-tip] { position: static; }
+  .map-tools [data-tip]::after { left: 0; right: 0; width: auto; max-width: none; text-align: center; }
+}
+
+/* 暫停後整顆反白，除了圖示換成播放，狀態從遠處也看得出來 */
+.pause.is-paused { background: var(--ink); color: var(--panel); }
+.pause.is-paused:hover { background: var(--ink-2); }
