@@ -1,0 +1,99 @@
+<!-- 時間軸：24 小時人次分布與時段選擇 -->
+<section class="time-player" [class.compact]="compact() && !expanded()" aria-label="單日人流時間軸">
+  @if (compact() && !expanded()) {
+    <button type="button" class="compact-time" aria-expanded="false" aria-label="展開時間軸" (click)="expanded.set(true)">
+      <span><strong>{{ station() || '全網人次' }}</strong><span>{{ failure() ? '查詢未完成' : unrecorded() ? '這個時段無紀錄' : daily() ? range() : '人流時間軸' }}</span></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+  } @else if (!daily()) {
+    <div class="player-heading"><h2>人流時間軸</h2><button type="button" class="date-link" (click)="edit.emit()">選日期</button>
+      @if (compact()) { <button type="button" class="icon" aria-label="收合時間軸" (click)="expanded.set(false)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button> }
+    </div>
+    <button type="button" class="start" (click)="start.emit()">逐時播放 <time [attr.datetime]="date()">{{ date() }}</time><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+  } @else {
+    @if (station()) {
+      <div class="station-line">
+        <h2 class="player-station">{{ station() }}<span>逐時人次</span></h2>
+        <button type="button" class="station-info-link" (click)="stationInfo.emit()">車站資訊</button>
+      </div>
+    }
+    <div class="date-stepper">
+      <button type="button" class="icon" aria-label="前一天" [disabled]="!previous()" (click)="step.emit(-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button type="button" class="date-link" [attr.aria-label]="date() + ' 選日期'" (click)="edit.emit()"><time [attr.datetime]="date()">{{ date() }}</time><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button type="button" class="icon" aria-label="後一天" [disabled]="!next()" (click)="step.emit(1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+      <app-hint label="單日時間軸" [alignToPanel]="true" [entries]="guide()" />
+      <button type="button" class="fold" [attr.aria-expanded]="compact() || !folded()" [attr.aria-label]="compact() || !folded() ? '收合時間軸' : '展開時間軸'" (click)="compact() ? expanded.set(false) : folded.update(value => !value)"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="!compact() && folded() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg></button>
+    </div>
+    <div class="playback">
+      <div class="time-readout">
+        <div class="time-annotation">
+        @if (daylight(); as light) {
+          <span class="day-phase"><svg viewBox="0 0 24 24" aria-hidden="true">
+            @switch (light.icon) {
+              @case ('moon') { <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/> }
+              @case ('sun') { <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/> }
+              @case ('horizon') { <path d="M12 2v8"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/> }
+            }
+          </svg>{{ light.label }}</span>
+        }
+        @if (!counterpart() && trips() != null) { <span class="trip-count">{{ measure() }} <b>{{ trips() | number }}</b> 人次</span> }
+        </div>
+        <strong class="hour">{{ range() }}</strong>
+      </div>
+      <div class="playback-actions">
+        <button type="button" class="play" [attr.aria-label]="playing() ? '暫停逐時播放' : '播放單日人流'" (click)="play.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="playing() ? 'M6 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z' : 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z'"/></svg>{{ playing() ? '暫停' : '播放' }}</button>
+        <button type="button" class="all-day" [attr.aria-pressed]="band() === '0-24'" (click)="wholeDay.emit()">全天</button>
+      </div>
+    </div>
+    @if (compact() || !folded()) {
+    @if (counterpart(); as other) {
+      <div class="relation-readout">
+        <div class="relation-directions">
+          <div><i></i><span>{{ station() }} → {{ other }}</span><b>{{ !relationProfile.hasValue() ? '—' : relationCounts()?.forward == null ? '無紀錄' : (relationCounts()?.forward | number) + ' 人次' }}</b></div>
+          <div><i></i><span>{{ other }} → {{ station() }}</span><b>{{ !relationProfile.hasValue() ? '—' : relationCounts()?.reverse == null ? '無紀錄' : (relationCounts()?.reverse | number) + ' 人次' }}</b></div>
+        </div>
+        <button type="button" class="relation-clear" aria-label="取消選取往來站" (click)="clearRelation.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      @if (relationProfile.isLoading()) { <p class="relation-status" role="status">讀取兩站逐時人次…</p> }
+      @if (relationProfile.error()) { <p class="relation-status" role="status">暫時讀不到兩站逐時人次 <button type="button" (click)="relationProfile.reload()">重試</button></p> }
+    } @else if (busiest(); as top) {
+      <button type="button" class="peak-hour" [attr.aria-pressed]="hour() === top.hour" (click)="hourChange.emit(top.hour)">
+        <span>{{ measure() }}{{ top.tied ? '並列最高' : '最高' }}</span><strong>{{ top.range }}</strong>
+        <span>{{ top.count | number }} 人次</span>
+      </button>
+    }
+    <div class="time-track" [class.has-profile]="counterpart() ? relationHours().length : profile().length">
+      @if (relationHours().length) {
+        <div class="hour-profile pair-profile" aria-hidden="true">
+          @for (row of relationHours(); track row.hour) {
+            <div [class.current]="row.hour === hour()" [class.missing]="row.forward == null && row.reverse == null">
+              <span [style.--height.%]="(row.forward ?? 0) / relationPeak() * 100"></span>
+              <span [style.--height.%]="(row.reverse ?? 0) / relationPeak() * 100"></span>
+            </div>
+          }
+        </div>
+      } @else if (!counterpart() && profile().length) {
+        <div class="hour-profile" aria-hidden="true">
+          @for (value of profile(); track $index) {
+            <span [class.current]="$index === hour()" [class.missing]="value == null"
+              [style.--height.%]="value == null ? 100 : value / peak() * 100"></span>
+          }
+        </div>
+      }
+      <input class="scrubber" type="range" min="0" max="23" step="1" [value]="hour() ?? 0"
+        aria-label="進站小時" [attr.aria-valuetext]="spokenTime()"
+        (input)="hourChange.emit(+$any($event.target).value)" (keydown.home)="selectFromOverview(0)"
+        (pointerup)="selectFromOverview(+$any($event.target).value)">
+    </div>
+    }
+    @if (compact() || !folded() || failure() || unrecorded()) {
+    <div class="player-foot">
+      <div class="hour-ticks" [class.covered]="busy() || unrecorded()" [class.failed]="failure()" aria-hidden="true"><span>0 時</span><span>6 時</span><span>12 時</span><span>18 時</span><span>23 時</span></div>
+      <div class="player-state" [class.failed]="failure()">
+        <span role="status">{{ busy() ? '讀取時段…' : unrecorded() ? '這個時段沒有旅次紀錄' : failure() }}</span>
+        @if (failure()) { <button type="button" class="retry-hour" (click)="retry.emit()">重新查詢</button> }
+      </div>
+    </div>
+    }
+  }
+</section>

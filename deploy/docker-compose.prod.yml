@@ -1,0 +1,48 @@
+name: exitpulse
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-exitpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?請於 .env 設定強密碼}
+      POSTGRES_DB: ${POSTGRES_DB:-exitpulse}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    volumes:
+      - exitpulse-pg18:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-exitpulse} -d ${POSTGRES_DB:-exitpulse}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-exitpulse}
+      PGDATABASE: ${POSTGRES_DB:-exitpulse}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      EXITPULSE_WORKERS: ${EXITPULSE_WORKERS:-2}
+      EXITPULSE_PLACES_ENDPOINT: ${EXITPULSE_PLACES_ENDPOINT:-https://photon.komoot.io/api/}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${EXITPULSE_WEB_PORT:-5080}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${EXITPULSE_WEB_RELEASES:-/srv/exitpulse/releases}:/srv/web:ro
+
+volumes:
+  exitpulse-pg18:

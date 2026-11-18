@@ -1,0 +1,36 @@
+# 本機資料與備份：資料庫、下載快取、備份、憑證都不進版本庫
+data/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.bundle
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node 與 Angular
+node_modules/
+apps/web/dist/
+apps/web/.angular/
+
+# 編輯器、作業系統與工具產生的暫存
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+.playwright-mcp/
+.playwright-cli/
+output/
+artifacts/
+
+# 個人與 AI 工具設定
+.claude/
+.agent/
+.collab/
+.impeccable/

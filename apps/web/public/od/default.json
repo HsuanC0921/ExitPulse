@@ -1,0 +1,274 @@
+{
+  "baseline": "2022-09",
+  "current": "2026-09",
+  "days": [
+    22,
+    22
+  ],
+  "hours": [
+    7,
+    10
+  ],
+  "weekend": false,
+  "commonStations": 104,
+  "excluded": [
+    {
+      "station": "BL板橋",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "G大坪林",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "O景安",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "O頭前庄",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "Y板橋",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "中原",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "中和",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "十四張",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "大坪林",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "幸福",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "廣慈/奉天宮",
+      "reason": "absent_in_baseline"
+    },
+    {
+      "station": "新北產業園區",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "新埔民生",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "景安",
+      "reason": "interchange_scope_unverified"
+    },
+    {
+      "station": "景平",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "板新",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "橋和",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "秀朗橋",
+      "reason": "not_present_in_both_station_roles"
+    },
+    {
+      "station": "頭前庄",
+      "reason": "interchange_scope_unverified"
+    }
+  ],
+  "results": [
+    {
+      "origin": "南港",
+      "destination": "南港展覽館",
+      "baselineTrips": 16956,
+      "currentTrips": 35077,
+      "baselineOriginTotal": 118278,
+      "currentOriginTotal": 171077,
+      "baselineDaily": 770.7272727272727,
+      "currentDaily": 1594.409090909091,
+      "deltaSharePp": 6.167915320275022,
+      "growth": 1.0687072422741215,
+      "reverseBaseline": 2091,
+      "reverseCurrent": 4140,
+      "directionBaseline": 0.7804378642305875,
+      "directionCurrent": 0.788867072953056,
+      "reversal": false,
+      "score": 13.791877935597338
+    },
+    {
+      "origin": "西門",
+      "destination": "台北車站",
+      "baselineTrips": 6482,
+      "currentTrips": 14998,
+      "baselineOriginTotal": 164189,
+      "currentOriginTotal": 212129,
+      "baselineDaily": 294.6363636363636,
+      "currentDaily": 681.7272727272727,
+      "deltaSharePp": 3.1223368133124687,
+      "growth": 1.3137920394939835,
+      "reverseBaseline": 9347,
+      "reverseCurrent": 14677,
+      "directionBaseline": -0.1809969044159454,
+      "directionCurrent": 0.010817186183656277,
+      "reversal": false,
+      "score": 6.981757363216751
+    },
+    {
+      "origin": "雙連",
+      "destination": "台北車站",
+      "baselineTrips": 4511,
+      "currentTrips": 7344,
+      "baselineOriginTotal": 47200,
+      "currentOriginTotal": 57573,
+      "baselineDaily": 205.04545454545453,
+      "currentDaily": 333.8181818181818,
+      "deltaSharePp": 3.1987759754969884,
+      "growth": 0.6280203945909999,
+      "reverseBaseline": 12567,
+      "reverseCurrent": 18466,
+      "directionBaseline": -0.47171799976578055,
+      "directionCurrent": -0.43091824874079815,
+      "reversal": false,
+      "score": 5.844385024532845
+    },
+    {
+      "origin": "中山國中",
+      "destination": "西湖",
+      "baselineTrips": 6696,
+      "currentTrips": 5671,
+      "baselineOriginTotal": 64766,
+      "currentOriginTotal": 73752,
+      "baselineDaily": 304.3636363636364,
+      "currentDaily": 257.77272727272725,
+      "deltaSharePp": -2.6494749878087074,
+      "growth": -0.15307646356033466,
+      "reverseBaseline": 1703,
+      "reverseCurrent": 1412,
+      "directionBaseline": 0.594475532801524,
+      "directionCurrent": 0.6012988846533954,
+      "reversal": false,
+      "score": 4.622279533707878
+    },
+    {
+      "origin": "松山",
+      "destination": "台北小巨蛋",
+      "baselineTrips": 17508,
+      "currentTrips": 25573,
+      "baselineOriginTotal": 122345,
+      "currentOriginTotal": 157078,
+      "baselineDaily": 795.8181818181819,
+      "currentDaily": 1162.409090909091,
+      "deltaSharePp": 1.970094783275328,
+      "growth": 0.4606465615718529,
+      "reverseBaseline": 3007,
+      "reverseCurrent": 4117,
+      "directionBaseline": 0.7068486473312211,
+      "directionCurrent": 0.7226675648366453,
+      "reversal": false,
+      "score": 4.405265857521349
+    },
+    {
+      "origin": "忠孝新生",
+      "destination": "台北車站",
+      "baselineTrips": 4499,
+      "currentTrips": 7306,
+      "baselineOriginTotal": 61809,
+      "currentOriginTotal": 75769,
+      "baselineDaily": 204.5,
+      "currentDaily": 332.09090909090907,
+      "deltaSharePp": 2.3635906714343817,
+      "growth": 0.6239164258724159,
+      "reverseBaseline": 13614,
+      "reverseCurrent": 19035,
+      "directionBaseline": -0.50322972450726,
+      "directionCurrent": -0.4452754261417562,
+      "reversal": false,
+      "score": 4.30725675503992
+    },
+    {
+      "origin": "後山埤",
+      "destination": "南港",
+      "baselineTrips": 5676,
+      "currentTrips": 8379,
+      "baselineOriginTotal": 97857,
+      "currentOriginTotal": 105405,
+      "baselineDaily": 258.0,
+      "currentDaily": 380.8636363636364,
+      "deltaSharePp": 2.1490378282908393,
+      "growth": 0.4762156448202961,
+      "reverseBaseline": 3401,
+      "reverseCurrent": 5784,
+      "directionBaseline": 0.2506334692078881,
+      "directionCurrent": 0.18322389324295701,
+      "reversal": false,
+      "score": 4.194003755310785
+    },
+    {
+      "origin": "北門",
+      "destination": "松江南京",
+      "baselineTrips": 4071,
+      "currentTrips": 9269,
+      "baselineOriginTotal": 50622,
+      "currentOriginTotal": 94021,
+      "baselineDaily": 185.04545454545453,
+      "currentDaily": 421.3181818181818,
+      "deltaSharePp": 1.8164778393876146,
+      "growth": 1.2768361581920904,
+      "reverseBaseline": 661,
+      "reverseCurrent": 1633,
+      "directionBaseline": 0.720625528317836,
+      "directionCurrent": 0.70042194092827,
+      "reversal": false,
+      "score": 3.72850907609816
+    },
+    {
+      "origin": "民權西路",
+      "destination": "台北車站",
+      "baselineTrips": 5100,
+      "currentTrips": 7812,
+      "baselineOriginTotal": 62043,
+      "currentOriginTotal": 76652,
+      "baselineDaily": 231.8181818181818,
+      "currentDaily": 355.09090909090907,
+      "deltaSharePp": 1.9714094877388204,
+      "growth": 0.5317647058823529,
+      "reverseBaseline": 10666,
+      "reverseCurrent": 14663,
+      "directionBaseline": -0.35303818343270327,
+      "directionCurrent": -0.30482758620689654,
+      "reversal": false,
+      "score": 3.714895651142104
+    },
+    {
+      "origin": "中山",
+      "destination": "台北車站",
+      "baselineTrips": 2492,
+      "currentTrips": 4987,
+      "baselineOriginTotal": 57854,
+      "currentOriginTotal": 73677,
+      "baselineDaily": 113.27272727272727,
+      "currentDaily": 226.6818181818182,
+      "deltaSharePp": 2.4613393217723143,
+      "growth": 1.001203852327448,
+      "reverseBaseline": 7626,
+      "reverseCurrent": 14220,
+      "directionBaseline": -0.5074125321209725,
+      "directionCurrent": -0.48071015775498516,
+      "reversal": false,
+      "score": 3.705781711067012
+    }
+  ]
+}

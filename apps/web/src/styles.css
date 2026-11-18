@@ -1,0 +1,46 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #f2f4f3;
+  color: #1d2125;
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { scrollbar-width: thin; scrollbar-color: #a9b3b9 transparent; box-sizing: border-box; }
+button, select, input { font: inherit; color: inherit; }
+select { -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important; background-image: none !important; }
+select::picker-icon { display: none; }
+select::-ms-expand { display: none; }
+details:not([open]) > :not(summary) { display: none !important; }
+.sr-only, .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; text-overflow: ellipsis; }
+
+.maplibregl-ctrl-group { border: 0 !important; border-radius: 8px !important; box-shadow: 0 1px 2px rgb(29 33 37 / .08), 0 12px 32px -10px rgb(29 33 37 / .28) !important; overflow: hidden; }
+app-root[data-theme='dark'] .maplibregl-ctrl-group { background: var(--panel, #1e2327); }
+app-root[data-theme='dark'] .maplibregl-ctrl-group button + button { border-top-color: var(--rule, #343c42); }
+app-root[data-theme='dark'] .maplibregl-ctrl-group .maplibregl-ctrl-icon { filter: invert(1) brightness(1.1); }
+app-root[data-theme='dark'] .maplibregl-ctrl-group button:hover { background: var(--panel-2, #272d32); }
+@media (max-width: 720px) {
+  .maplibregl-ctrl-group { display: none; }
+}
+
+app-root {
+  --fs-xs: .75rem;
+  --fs-s: .875rem;
+  --fs-m: 1rem;
+  --fs-l: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.625rem;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --type-body: var(--fs-m);
+  --type-ui: var(--fs-s);
+  --type-label: var(--fs-xs);
+}
+
+/* Lucide 圖示：線寬以螢幕像素計，14–22px 的圖示看起來一樣粗 */
+svg[viewBox="0 0 24 24"] { stroke-linecap: round; stroke-linejoin: round; }
+svg[viewBox="0 0 24 24"] :is(path, circle, rect, line) { vector-effect: non-scaling-stroke; }

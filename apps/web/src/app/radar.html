@@ -1,0 +1,611 @@
+<!-- 兩站比較主畫面：條件、排行、站對詳情、地圖與三種檢視的切換 -->
+<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()">
+  <div #map class="map" role="application" aria-label="臺北捷運旅次地圖"></div>
+  @if (basemap() !== 'ready') {
+    <div class="map-veil" [class.failed]="basemap() === 'failed'" [attr.role]="basemap() === 'failed' ? 'alert' : 'status'">
+      @if (basemap() === 'failed') {
+        <p>底圖暫時無法載入，會自動重試</p>
+        <button type="button" (click)="retryBasemap()">立即重試</button>
+      } @else { <p><i class="pulse-dot" aria-hidden="true"></i>正在載入底圖…</p> }
+    </div>
+  } @else if (basemapBusy()) { <p class="map-busy" role="status">底圖載入中…</p> }
+
+  <app-mobile-shell [page]="mobilePage()" [view]="view()" [summary]="mobileSummary()" [hideOverview]="view() !== 'pairs' || showFirstQuery()"
+    [focusedStation]="lowAngle() ? pairStreetStation() : null" (stationFocus)="focusPairStreetStation($event)"
+    (action)="mobileAction($event)" (viewChange)="setView($event)" />
+
+  <div class="map-tools" role="group" aria-label="地圖設定">
+    <details #placeMenu class="place-menu" (toggle)="placeMenu.open && (layerMenu.open = collectionMenu.open = false)" (keydown.escape)="placeMenu.open = false; $event.stopPropagation()">
+      <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><span>找地點</span></summary>
+      <div class="layer-options place-options">
+        <form (submit)="$event.preventDefault(); searchPlaces()">
+          <input #placeInput type="search" aria-label="輸入地點或地址" placeholder="地名、地標或地址" maxlength="80" [value]="placeQuery()" (input)="placeQuery.set(placeInput.value)">
+          <button type="submit" [disabled]="placeBusy() || placeQuery().trim().length < 2">搜尋</button>
+        </form>
+        <p class="place-tip">可輸入店名、公園、學校或直接點地圖空白處。</p>
+        @if (placeMessage() || placeBusy()) { <p class="status" role="status">{{ placeBusy() ? '搜尋中…' : placeMessage() }}</p> }
+        @if (nearestPlace(); as match) {
+          <div class="nearest" role="status">
+            <div class="nearest-head">
+              <strong>{{ match.place.name }}</strong>
+              @if (match.place.category) { <span class="place-cat">{{ match.place.category }}</span> }
+            </div>
+            @if (match.place.address || match.place.area) { <span class="place-addr">{{ match.place.address || match.place.area }}</span> }
+            <strong>最近是{{ match.station }}</strong>
+            <span>直線約 {{ match.distance | number }} 公尺（未計繞行）</span>
+            <div class="station-badges">
+              @for (l of linesOfStation(match.station); track l.code) { <b class="badge" [attr.data-code]="l.code" [style.--line]="l.color">{{ stationCode(l.code, match.station) }}</b> }
+            </div>
+            @if (match.nearby.length > 1) {
+              <div class="nearby-stations" aria-label="附近其他捷運站">
+                @for (nb of match.nearby.slice(1); track nb.station) {
+                  <button type="button" (click)="openStation(nb.station, { hourly: true }); placeMenu.open = false">{{ nb.station }} · {{ nb.distance | number }}m</button>
+                }
+              </div>
+            }
+            <div class="nearest-actions">
+              <button type="button" (click)="clearPlace()">回到結果</button>
+              <button type="button" [disabled]="!availability()?.[match.station]?.months?.length" (click)="openStation(match.station, { hourly: true }); placeMenu.open = false">看逐時人次</button>
+              <button type="button" [disabled]="!availability()?.[match.station]?.months?.length" (click)="usePlaceAs('origin', match.station); placeMenu.open = false">設為起站</button>
+              <button type="button" [disabled]="!availability()?.[match.station]?.months?.length" (click)="usePlaceAs('destination', match.station); placeMenu.open = false">設為迄站</button>
+            </div>
+          </div>
+        } @else if (places().length) {
+          <ul class="place-results">
+            @for (place of places(); track place.lng + ',' + place.lat + place.name) {
+              <li><button type="button" (click)="locatePlace(place)"><strong>{{ place.name }}@if (place.category) { <span class="place-cat">{{ place.category }}</span> }</strong>@if (place.address || place.area) { <span>{{ place.address || place.area }}</span> }</button></li>
+            }
+          </ul>
+        }
+      </div>
+    </details>
+    <details #collectionMenu class="collection-menu" [open]="openCollectionOnLoad" (toggle)="collectionMenu.open && (placeMenu.open = layerMenu.open = false); collectionMenu.open || collectionNotice.set('')" (keydown.escape)="collectionMenu.open = false; $event.stopPropagation()">
+      <summary title="收藏常用的條件，不用註冊"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.fill]="collection().length ? 'currentColor' : 'none'" d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg><span>收藏</span></summary>
+      <div class="layer-options collection-options">
+        @if (pendingImport().length) {
+          <div class="collection-import" role="alert">
+            <strong>連結裡有 {{ pendingImport().length }} 筆收藏</strong>
+            <div><button type="button" class="primary" (click)="importItems(pendingImport())">匯入 {{ pendingImport().length }} 筆</button><button type="button" (click)="pendingImport.set([])">不用了</button></div>
+          </div>
+        }
+        <form class="collection-add" (submit)="$event.preventDefault(); addToCollection()">
+          <input type="text" maxlength="60" aria-label="收藏名稱" placeholder="幫這組取個名字（不寫也行）" [value]="collectionName()" (input)="collectionName.set($any($event.target).value)">
+          <button type="submit" class="primary">加入收藏</button>
+        </form>
+        <h3>已收藏（{{ collection().length }}）</h3>
+        @if (collection().length) {
+          <ul class="collection-list">
+            @for (item of collection(); track item.id) {
+              <li>
+                <button type="button" class="collection-open" [title]="'打開「' + item.name + '」'" (click)="openCollectionItem(item)"><small>{{ item.kind === 'pair' ? '站對' : item.kind === 'station' ? '單站' : '全網' }}</small>{{ item.name }}</button>
+                <button type="button" class="icon-button" [attr.aria-label]="'改名 ' + item.name" title="改名" (click)="startRename(item.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
+                <button type="button" class="icon-button" [attr.aria-label]="'刪除 ' + item.name" title="刪除" (click)="removeFromCollection(item.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                @if (renaming() === item.id) {
+                  <input #rename class="collection-rename" type="text" maxlength="60" aria-label="新名稱" [value]="item.name" (keydown.enter)="renameCollectionItem(item.id, rename.value); renaming.set(null)" (keydown.escape)="renaming.set(null); $event.stopPropagation()" (blur)="renaming() === item.id && renameCollectionItem(item.id, rename.value); renaming.set(null)">
+                }
+              </li>
+            }
+          </ul>
+        } @else { <p class="place-tip">還沒有收藏，常用的條件可以存在這。</p> }
+        <div class="collection-io">
+          <button type="button" [disabled]="!collection().length" (click)="exportCollection()">存成檔案</button>
+          <button type="button" (click)="collectionFile.click()">從檔案讀入</button>
+          <button type="button" [disabled]="!collection().length" (click)="copyCollectionLinks()">複製連結清單</button>
+          <input #collectionFile type="file" accept="application/json,.json" hidden (change)="importCollectionFile($event)">
+        </div>
+        <p class="place-tip" role="status">{{ collectionNotice() || '收藏只存在這個瀏覽器，換電腦時用檔案或連結帶過去。' }}</p>
+      </div>
+    </details>
+    <button type="button" class="map-reset" title="定位我的位置並找最近捷運站" [disabled]="geoBusy()" (click)="locateMe()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg><span>定位</span>
+    </button>
+    <button type="button" class="map-reset" title="回到全線視角" (click)="resetMap()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg><span>全圖</span>
+    </button>
+    <button type="button" class="map-reset tower-switch" aria-label="立體" [title]="tower3d() ? '切回平面' : '立體地圖與人流'" [attr.aria-pressed]="tower3d()" (click)="toggleTower3d()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg><span>立體</span>
+    </button>
+    <button type="button" class="theme-switch" [attr.aria-pressed]="theme() === 'dark'"
+      [title]="theme() === 'dark' ? '切換淺色模式' : '切換深色模式'" (click)="setTheme(theme() === 'dark' ? 'light' : 'dark')">
+      <span class="theme-track">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        @if (theme() === 'dark') {
+          <path d="M18 5h4M20 3v4M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>
+        } @else {
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        }
+      </svg>
+      </span>
+      <span>{{ theme() === 'dark' ? '深色' : '淺色' }}</span>
+    </button>
+    <details #layerMenu class="layer-menu" (toggle)="layerMenu.open && (placeMenu.open = collectionMenu.open = false)" (keydown.escape)="layerMenu.open = false; $event.stopPropagation()">
+      <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83zM2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span>圖層</span></summary>
+      <div class="layer-options">
+        <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
+        <label>捷運路網<input type="checkbox" role="switch" [checked]="showMetro()" (change)="toggleMapOption('metro')"></label>
+        <label>人流圖例<input type="checkbox" role="switch" [checked]="showLegend()" (change)="toggleMapOption('legend')"></label>
+        <label>比例尺<input type="checkbox" role="switch" [checked]="showScale()" (change)="toggleMapOption('scale')"></label>
+        @if (view() === 'station' && explore()?.isComparing()) {
+          <div class="map-metric segmented" role="group" aria-label="人流呈現方式">
+            <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'volume'" (click)="explore()?.mapMetric?.set('volume')">人次</button>
+            <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'change'" (click)="explore()?.mapMetric?.set('change')">人次增減</button>
+          </div>
+        }
+        @if (showLegend()) {
+          <div class="layer-key">
+            @if (tower3d()) {
+              <p>{{ view() === 'pairs' || view() === 'network' ? '站塔越高，進站人次越多。' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
+              @if (view() !== 'network') { <p>弧線越寬，這兩站之間的人次越多。箭頭朝向目的站。</p> }
+            } @else if (view() === 'network') {
+              <p><i class="sw dot"></i>圓越大，進站人次越多</p>
+              @if (explore()?.isComparing()) { <p><i class="sw ring"></i>比對照期少</p> }
+            } @else {
+              <p>{{ view() === 'station' && explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '線寬代表增減幅度（人次）' : '線寬對照（人次）' }}</p>
+              <div class="scale-samples">@for (sample of scaleSamples; track sample.trips) {
+                <span><i [style.height.px]="sample.width"></i><span class="sample-arrows"><svg viewBox="0 0 8 10" aria-hidden="true"><path d="M2 2l3 3-3 3"/></svg>×{{ sample.arrows.length }}<span class="visually-hidden">個箭頭</span></span>{{ sample.trips | number }}</span>
+              }</div>
+              <p>人次越多，線越粗、箭頭越多。弧線是起訖站之間的示意，不是實際行車路線。</p>
+              @if (view() === 'station' && explore()?.isComparing()) { <p><i class="sw flow dashed"></i>比對照期少</p> }
+            }
+          </div>
+        }
+        @if (view() === 'station') { <ng-container *ngTemplateOutlet="flowPause" /> }
+        <a class="layer-source" href="https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d" target="_blank" rel="noopener">資料來源<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+      </div>
+    </details>
+    <button type="button" class="map-reset map-about" title="資料來源、授權與免責聲明" (click)="about.open()">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>關於</span>
+    </button>
+    <app-about #about />
+  </div>
+  @if (tower3d()) {
+    <div class="tower-key" [class.tower-key-pair]="view() === 'pairs' && selected()">
+      @if (showLegend() && !selectedMapStation()) {
+        <svg viewBox="0 0 25 20" aria-hidden="true"><path d="M1 18l3-6 3 6M9 18l3.5-12 3.5 12M18 18l3.5-16 3.5 16"/></svg>
+        <span class="tower-key-caption">
+          <strong>{{ view() !== 'station' ? '進站人次' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站間人次增減' : '站間人次' }}</strong>
+          @if (towerPeak(); as peak) { <span>最高 {{ peak | number }}</span> }
+        </span>
+      }
+      <button type="button" class="map-angle" [attr.aria-pressed]="lowAngle()" (click)="toggleLowAngle()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.194 13.707 3.814 1.86-1.86 3.814"/><path d="M16.47214 7.52786 A 5 10 0 1 0 13 21.79796"/><path d="M21.79796 11 A 10 5 0 1 0 19 15.57071"/></svg>低視角
+      </button>
+    </div>
+  }
+  @if (view() === 'station' && rankedStations().length && !selectedMapStation()) {
+    <div class="map-rank-focus" role="group" aria-label="地圖人流線數量">
+      <button type="button" [attr.aria-pressed]="stationArcLimit() === 5" title="只顯示前 5 名往來路線並對焦" (click)="setStationArcLimit(5)">前 5</button>
+      <button type="button" [attr.aria-pressed]="stationArcLimit() === 10" title="只顯示前 10 名往來路線並對焦" (click)="setStationArcLimit(10)">前 10</button>
+      <button type="button" [attr.aria-pressed]="stationArcLimit() === 0" title="顯示全部往來路線" (click)="setStationArcLimit(0)">全部</button>
+    </div>
+  }
+  @if (selectedMapStation(); as station) {
+    <section class="station-preview" aria-label="地圖所選車站" [class.preview-compact]="lowAngle() && phone.matches && !lowPreviewExpanded()">
+      <div class="station-preview-head">
+        <div class="station-preview-title">
+          <h2>{{ station }}</h2>
+          <div class="station-badges">
+            @for (l of linesOfStation(station); track l.code) { <b class="badge" [attr.data-code]="l.code" [style.--line]="l.color" [title]="l.name">{{ stationCode(l.code, station) }}</b> }
+          </div>
+        </div>
+        @if (lowAngle() && phone.matches) {
+          <button type="button" class="preview-toggle" [attr.aria-expanded]="lowPreviewExpanded()" (click)="lowPreviewExpanded.update(expanded => !expanded)">
+            {{ lowPreviewExpanded() ? '收合資訊' : '車站資訊' }}
+          </button>
+        }
+        <button type="button" class="icon-button" aria-label="關閉車站資訊" title="關閉（也可按 Esc、再點一次車站或點地圖空白處）" (click)="selectMapStation(null)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      @if (stationInfo(); as info) {
+        <app-station-history [opening]="info.opening ?? null" [lines]="info.lines ?? []" [entrances]="info.entrances"
+          [selectedPeriod]="entranceCurrent()" [availableMonths]="availability()?.[station]?.months ?? []"
+          (periodChange)="openStationHistory(station, $event)" />
+        @if (stationSnapshot(); as snap) {
+          <div class="preview-kpis" aria-label="當期旅次快照">
+            <div class="preview-kpis-head">
+              <span>{{ snap.periodLabel }}</span>
+              @if (snap.diffPct != null) {
+                <b class="kpi-diff" [class.down]="snap.diffPct < 0"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="snap.diffPct >= 0 ? 'M5 12l7-7 7 7M12 19V5' : 'M12 5v14M19 12l-7 7-7-7'"/></svg>{{ snap.diffPct >= 0 ? '+' : '−' }}{{ (snap.diffPct < 0 ? -snap.diffPct : snap.diffPct) | number:'1.1-1' }}% <small>{{ snap.diffLabel }}</small></b>
+              }
+            </div>
+            <div class="preview-kpis-grid">
+              <div><small>進站</small><strong>{{ snap.entries | number }}</strong></div>
+              <div><small>出站</small><strong>{{ snap.exits != null ? (snap.exits | number) : '資料不足' }}</strong></div>
+              @if (snap.rank) {
+                <div><small>全線排名</small><strong>第 {{ snap.rank }} 名<small> / {{ snap.totalStations }}</small></strong></div>
+              }
+            </div>
+          </div>
+        }
+        @if (stationCleanNote() || info.nearby?.length || info.hubs?.length || info.youbike?.length || info.districtPop || info.catchmentPop || info.addresses?.length) {
+          <section class="station-intro" aria-label="站區介紹">
+            @if (stationCleanNote(); as note) {
+              <p class="station-lead">{{ note }} @if (info.story?.source; as src) { <a class="ext-link" [href]="src" target="_blank" rel="noopener">{{ info.story?.sourceLabel || '來源' }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a> }</p>
+            }
+            @if (info.addresses?.length) {
+              <p class="station-facts">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>{{ info.addresses![0] }}</span>
+              </p>
+            }
+            @if (info.districtPop; as dp) {
+              <p class="station-facts">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg>
+                <span>{{ dp.district }} {{ dp.population | number }} 人@if (dp.yoyPct != null) {（較前一年 {{ dp.yoyPct >= 0 ? '+' : '−' }}{{ (dp.yoyPct < 0 ? -dp.yoyPct : dp.yoyPct) | number:'1.1-1' }}%）}</span>
+              </p>
+            }
+            @if (info.catchmentPop; as cp) {
+              <p class="station-facts">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                <span>周邊 6 公里生活圈（{{ cp.districts.join('、') }}）約 {{ cp.population | number }} 人@if (cp.yoyPct != null) {（{{ cp.yoyPct >= 0 ? '+' : '−' }}{{ (cp.yoyPct < 0 ? -cp.yoyPct : cp.yoyPct) | number:'1.1-1' }}%）}</span>
+              </p>
+            }
+            @if (!info.hubs?.length && !info.nearby?.length && !info.youbike?.length) {
+              <p class="poi-empty">尚未收錄周邊設施、景點與 YouBike 資料</p>
+            } @else {
+              <div class="nearby-head">
+                <small>周邊重要設施</small>
+              </div>
+              @if (info.hubs?.length) {
+                <ul class="station-nearby" aria-label="周邊重要設施">
+                  @for (hub of info.hubs; track hub.name) {
+                    <li class="station-hub"><button type="button" (click)="focusStationPoi(hub.name, hub.kind, hub.lng, hub.lat)"><strong>{{ hub.name }}（{{ hub.kind }}）</strong><span>{{ hub.distance | number }} 公尺</span></button>
+                      <a class="source-pill" [href]="hub.source || 'https://www.openstreetmap.org/copyright'" target="_blank" rel="noopener">{{ hub.sourceLabel || 'OpenStreetMap' }}</a>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="poi-empty">700 公尺內暫無已收錄的設施</p>
+              }
+              <div class="nearby-head">
+                <small>周邊景點（直線距離，未計繞行）</small>
+                <a class="source-pill" href="https://data.gov.tw/dataset/7777" target="_blank" rel="noopener" title="觀光署景點資料">觀光署<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+              </div>
+              @if (info.nearby?.length) {
+                <ul class="station-nearby" aria-label="附近景點">
+                  @for (place of info.nearby; track place.name) {
+                    <li><button type="button" [title]="place.summary || ''" (click)="focusStationPoi(place.name, '景點', place.lng, place.lat)"><strong>{{ place.name }}</strong><span>{{ place.distance | number }} 公尺</span></button></li>
+                  }
+                </ul>
+              } @else {
+                <p class="poi-empty">700 公尺內未收錄觀光署景點</p>
+              }
+              <div class="nearby-head">
+                <small>周邊 YouBike 2.0 場站</small>
+                <a class="source-pill" href="https://data.taipei/" target="_blank" rel="noopener" title="雙北開放資料">雙北交通<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+              </div>
+              @if (info.youbike?.length) {
+                <ul class="station-nearby" aria-label="周邊 YouBike 2.0 場站">
+                  @for (bike of info.youbike; track bike.name) {
+                    <li><button type="button" [title]="bike.address || ''" (click)="focusStationPoi(bike.name, 'YouBike 2.0', bike.lng, bike.lat)"><strong>{{ bike.name }}@if (bike.capacity > 0) {（{{ bike.capacity }} 柱）}</strong><span>{{ bike.distance | number }} 公尺</span></button></li>
+                  }
+                </ul>
+              } @else {
+                <p class="poi-empty">450 公尺內未收錄 YouBike 2.0 場站</p>
+              }
+            }
+          </section>
+        }
+        <details class="station-info" [open]="showEntrances()" (toggle)="toggleEntrances($any($event.target).open)">
+          <summary>
+            <span>出入口與設施</span>
+            <span class="exit-summary-badges">
+              <b>{{ entrancesAtPeriod().length }} 出口</b>
+              @if (accessibleExitCount(); as acc) { <b class="acc-pill" title="無障礙出口"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="16" cy="4" r="1"/><path d="m18 19 1-7-6 1"/><path d="m5 8 3-3 5.5 3-2.36 3.5"/><path d="M4.24 14.5a5 5 0 0 0 6.88 6"/><path d="M13.76 17.5a5 5 0 0 0-6.88-6"/></svg>{{ acc }}</b> }
+            </span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="station-info-body" tabindex="0" aria-label="出入口與設施清單">
+          @if (hasEntranceHistory()) {
+            @if (entranceBaseline(); as baseline) {
+              <div class="entrance-period" role="group" aria-label="出口年代">
+                <button type="button" [attr.aria-pressed]="compareEntrances()" (click)="compareEntrances.set(true)">{{ baseline }}</button>
+                <button type="button" [attr.aria-pressed]="!compareEntrances()" (click)="compareEntrances.set(false)">{{ entranceCurrent() }}</button>
+              </div>
+            } @else { <p class="station-address">{{ entrancePeriod() }} 已啟用出口</p> }
+          }
+          @if (activeEntrance(); as exit) {
+            @if (entranceEvents(exit).length) {
+              <p class="station-address"><strong>{{ shortExitName(station, exit.name) }}</strong>
+                @for (event of entranceEvents(exit); track event.date) {
+                  <a class="ext-link" [href]="event.source" target="_blank" rel="noopener">{{ event.date }} {{ event.label }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+                }
+              </p>
+            }
+          }
+          @if (entrancesAtPeriod().length) {
+            @if (hasEntranceHistory()) { <p class="exit-key"><span><i></i>有年代紀錄</span></p> }
+            <ul class="entrances">
+              @for (exit of entrancesAtPeriod(); track $index) {
+                <li><button type="button" [attr.aria-label]="'在地圖上標出' + exit.name + (exit.accessible ? '（無障礙）' : '')" [attr.aria-pressed]="activeEntrance() === exit" (click)="locateEntrance(exit)">
+                  <span>{{ shortExitName(station, exit.name) }}</span>
+                  @if (exit.history?.opened || exit.history?.reopened; as date) { <small>{{ date }} {{ exit.history?.opened ? '啟用' : '重開' }}</small> }
+                  @else if (exit.accessible) { <small class="acc-tag">無障礙</small> }
+                </button></li>
+              }
+            </ul>
+          } @else {
+            <p class="station-address">{{ entrancePeriod() }} 無可顯示的出口</p>
+          }
+          @for (exit of info.entrances; track $index) {
+            @if (exit.history && !entrancesAtPeriod().includes(exit)) {
+              <p class="station-address"><strong>{{ shortExitName(station, exit.name) }} · 此期未開放</strong>
+                @for (event of entranceEvents(exit); track event.date) {
+                  <a class="ext-link" [href]="event.source" target="_blank" rel="noopener">{{ event.date }} {{ event.label }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+                }
+              </p>
+            }
+          }
+          @if (info.facilities.length) {
+            <dl class="facility-list">
+              @for (facility of info.facilities; track $index) {
+                <dt>
+                  <span class="fac-icon" aria-hidden="true"><svg viewBox="0 0 24 24">
+                    @if (facility.label.includes('電梯')) { <path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/> }
+                    @else if (facility.label.includes('廁')) { <path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/> }
+                    @else if (facility.label.includes('乳')) { <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M15 12h.01"/><path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/><path d="M9 12h.01"/> }
+                    @else { <circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/> }
+                  </svg></span>
+                  {{ facility.label }}@if (facility.area) { <span>（{{ facility.area }}）</span> }
+                </dt>
+                @for (line of facilityLines(facility.value); track $index) {
+                  <dd>{{ line }}</dd>
+                }
+              }
+            </dl>
+          }
+          <div class="source-row">
+            <a class="source-pill" href="https://data.gov.tw/dataset/128453" target="_blank" rel="noopener">設施資料<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+            <a class="source-pill" href="https://data.taipei/dataset/detail?id=cfa4778c-62c1-497b-b704-756231de348b" target="_blank" rel="noopener">出口資料<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+          </div>
+          </div>
+        </details>
+      } @else if (stationInfoStatus() === 'loading') { <p class="preview-status" role="status">載入車站資料…</p> }
+      @else if (stationInfoStatus() === 'failed') { <p class="preview-status" role="status">暫時讀不到車站資料</p> }
+      @if (availability()?.[station]?.months?.length) {
+        <button type="button" class="view-station" (click)="openStation(station); selectMapStation(null)">看本站人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+      } @else { <p class="status">這站尚無旅次資料</p> }
+    </section>
+  }
+  @if (focusedFlow(); as flow) {
+    <section class="flow-preview" aria-label="所選路線流向資訊">
+      <div class="flow-preview-head">
+        <h2><span>{{ flow.origin }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>{{ flow.destination }}</span></h2>
+        <button type="button" class="icon-button" aria-label="關閉路線資訊" (click)="explore()?.focusRelation(null)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="flow-preview-stats">
+        <div><small>每日旅次</small><strong>{{ flow.daily | number:'1.0-0' }} 人次</strong></div>
+        <div><small>{{ flow.outbound ? '占出發比' : '占進站比' }}</small><strong>{{ flow.share | number:'1.1-1' }}%</strong></div>
+        @if (flow.hasCompare && flow.diff != null) {
+          <div><small>較對照期</small><strong>{{ flow.diff > 0 ? '+' : '' }}{{ flow.diff | number:'1.0-0' }}@if (flow.growthPct != null) { <span> ({{ flow.growthPct > 0 ? '+' : '' }}{{ flow.growthPct }}%)</span> }</strong></div>
+        }
+      </div>
+      <div class="flow-preview-actions">
+        <button type="button" class="primary-sm" (click)="openPair(flow.origin, flow.destination, { period: flow.period, weekend: flow.weekend, hours: flow.hours })">站對詳情</button>
+        <button type="button" (click)="openStation(flow.other)">改看 {{ flow.other }}</button>
+      </div>
+    </section>
+  }
+
+  <aside class="panel" [class.closed]="!panelOpen()" [class.wide]="isPanelWide()" (keydown.escape)="isPanelWide() && togglePanelWide()" aria-label="旅次變化分析">
+    <header class="sign" (click)="panelOpen() || panelOpen.set(true)">
+      <h1><app-brand [compact]="!panelOpen()" /></h1>
+      <div class="sign-actions">
+        @if (panelOpen()) {
+          <button type="button" class="icon-button panel-wide-btn" [attr.aria-pressed]="isPanelWide()" [attr.aria-label]="isPanelWide() ? '縮回側欄' : '橫向放大檢視'" [title]="isPanelWide() ? '縮回側欄' : '橫向放大檢視'" (click)="$event.stopPropagation(); togglePanelWide()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="isPanelWide() ? 'M14 10l7-7M20 10h-6V4M3 21l7-7M4 14h6v6' : 'M15 3h6v6M21 3l-7 7M3 21l7-7M9 21H3v-6'"/></svg>
+          </button>
+        }
+        <button type="button" class="icon-button" [attr.aria-expanded]="panelOpen()" aria-controls="panel-body" [attr.aria-label]="panelOpen() ? '收合面板，地圖全開' : '展開面板'" [attr.title]="panelOpen() ? '收合面板（快速鍵 [）' : '展開面板（快速鍵 [）'" (click)="$event.stopPropagation(); panelOpen.set(!panelOpen())">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="panelOpen() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="stripe" aria-hidden="true">@for (code of lineList; track code) { <i [class]="'l-' + code"></i> }</div>
+
+    <div class="panel-body" id="panel-body" [attr.inert]="panelOpen() ? null : ''">
+      <div class="segmented view-tabs" role="group" aria-label="查詢方式">
+        <button type="button" [attr.aria-pressed]="view() === 'pairs'" (click)="setView('pairs')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg><span>兩站比較</span></button>
+        <button type="button" [attr.aria-pressed]="view() === 'station'" (click)="setView('station')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg><span>單站往來</span></button>
+        <button type="button" [attr.aria-pressed]="view() === 'network'" (click)="setView('network')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span>全線人次</span></button>
+      </div>
+      @if (showFirstQuery()) {
+        <app-first-query [stations]="firstQueryStations()" (chooseStation)="openStation($event, { hourly: true })"
+          (findPlace)="openPlaceSearch($event)" (comparePairs)="find()" (choosePreset)="applyPreset($event)" />
+      }
+      @if (view() !== 'pairs') {
+        @if (lineOrder(); as order) {
+          <app-explore [mode]="$any(view())" [months]="months()" [monthsReady]="apiAvailable()" [lineOrder]="order" [linesOf]="linesOfFn" [stationCodes]="stationCodes()" [availability]="availability()" (layer)="onExploreLayer($event)" (openStation)="openStation($event)" (openPair)="openPair($event.origin, $event.destination, $any($event))" (switchMode)="setView($event)" (showMap)="showMobileMap()" />
+        } @else if (error()) {
+          <div class="initial-state"><p role="alert">車站資料載入失敗</p><button type="button" (click)="retryInitialLoad()">重新載入</button></div>
+        }
+      } @else if (!firstQueryOpen()) {
+
+      <section class="conditions" aria-labelledby="conditions-title">
+        <button type="button" class="section-toggle" [attr.aria-expanded]="conditionsOpen()" aria-controls="conditions-body" (click)="toggleConditions()">
+          <span id="conditions-title" [class.sr-only]="!conditionsOpen()">比較條件</span>
+          @if (!conditionsOpen()) { <span class="summary"><b>{{ summary()[0] }}</b><span>@for (part of summary().slice(1); track $index) { <i>{{ part }}</i> }</span></span><em>修改</em> }
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="fields" id="conditions-body" [hidden]="!conditionsOpen()">
+          <div class="period">
+            <label class="field"><span>較早月份</span><span class="select"><select [disabled]="!apiAvailable()" (change)="baseline.set($any($event.target).value); filtersChanged()">@for (m of months(); track m) { <option [value]="m" [selected]="m === baseline()">{{ m }}</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            <svg class="to" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            <label class="field"><span>較晚月份</span><span class="select"><select [disabled]="!apiAvailable()" (change)="current.set($any($event.target).value); filtersChanged()">@for (m of months(); track m) { <option [value]="m" [selected]="m === current()">{{ m }}</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+          </div>
+          <div class="grid">
+            <label class="field"><span>日期類型</span><span class="select"><select [disabled]="!apiAvailable()" (change)="weekend.set($any($event.target).value === 'true'); filtersChanged()"><option value="false" [selected]="!weekend()">週一至週五</option><option value="true" [selected]="weekend()">週六、週日</option></select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            <label class="field"><span>進站時段</span><span class="select"><select [disabled]="!apiAvailable()" (change)="hours.set($any($event.target).value); filtersChanged()"><option value="7-10" [selected]="hours() === '7-10'">07:00–10:00</option><option value="10-16" [selected]="hours() === '10-16'">10:00–16:00</option><option value="16-19" [selected]="hours() === '16-19'">16:00–19:00</option><option value="19-24" [selected]="hours() === '19-24'">19:00–24:00</option></select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            <label class="field"><span>變化類型</span><span class="select"><select [disabled]="!apiAvailable()" (change)="changeType.set($any($event.target).value); filtersChanged()"><option value="all" [selected]="changeType() === 'all'">全部</option><option value="increase" [selected]="changeType() === 'increase'">比例上升</option><option value="decrease" [selected]="changeType() === 'decrease'">比例下降</option><option value="reversal" [selected]="changeType() === 'reversal'">流向對調</option></select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+            <label class="field"><span>每日至少</span><span class="select"><select [disabled]="!apiAvailable()" (change)="minimum.set(+$any($event.target).value); filtersChanged()">@for (n of [10, 20, 50, 100]; track n) { <option [value]="n" [selected]="minimum() === n">{{ n }} 人次</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+          </div>
+        </div>
+      </section>
+
+      @if (error()) {
+        <div class="initial-state"><p role="alert">站對資料載入失敗</p><button type="button" (click)="retryInitialLoad()">重新載入</button></div>
+      } @else if (!data()) {
+        <p class="status">正在載入分析資料…</p>
+      } @else {
+        <button class="primary" type="button" [disabled]="loading()" (click)="find()">
+          <span>{{ loading() ? '正在比較…' : '找出變化最大的兩站' }}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+        <p class="radar-feedback" role="status">{{ queryError() || (showResults() && conditionsChanged() ? '條件已變更，請重新比較。' : '') }}</p>
+        @if (suggestedBand()) { <button type="button" class="link-button" (click)="useSuggestedBand()">改查{{ bandLabel(suggestedBand()) }}</button> }
+        @if (!apiAvailable()) { <p class="status">目前顯示內建的預設比較，條件無法調整。</p> }
+        @if (apiAvailable()) {
+          <details class="direct-pair">
+            <summary><span>手選兩站</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <form (submit)="$event.preventDefault(); findPair()" class="direct-fields">
+              <div class="grid">
+                <label class="field"><span>起站</span><span class="select"><input type="text" list="pair-stations" autocomplete="off" placeholder="輸入站名" aria-label="起站" [value]="manualOrigin()" (input)="manualOrigin.set($any($event.target).value.trim())"></span></label>
+                <label class="field"><span>迄站</span><span class="select"><input type="text" list="pair-stations" autocomplete="off" placeholder="輸入站名" aria-label="迄站" [value]="manualDestination()" (input)="manualDestination.set($any($event.target).value.trim())"></span></label>
+                <datalist id="pair-stations">@for (name of pairStations(); track name) { <option [value]="name"></option> }</datalist>
+              </div>
+              <button class="direct-submit" type="submit" [disabled]="!pairReady() || manualLoading() || loading()">{{ manualLoading() ? '查詢中…' : '查看這兩站' }}</button>
+              <p class="direct-feedback" role="status">{{ manualError() }}</p>
+              @if (manualSuggestedMonths(); as sug) {
+                <button type="button" class="link-button" (click)="useSuggestedPairMonths()">改查兩站共同有資料的 {{ sug.baseline }} 與 {{ sug.current }}</button>
+              }
+              @if (favPairs().length) {
+                <div class="fav-pairs" role="group" aria-label="常看兩站">
+                  @for (fav of favPairs(); track fav.origin + '>' + fav.destination) {
+                    <button type="button" class="fav-chip" (click)="manualOrigin.set(fav.origin); manualDestination.set(fav.destination); findPair(fav.origin, fav.destination)">{{ fav.origin }} → {{ fav.destination }}</button>
+                  }
+                </div>
+              }
+            </form>
+          </details>
+        }
+
+        @if (showResults()) {
+          <section class="ranking" aria-labelledby="ranking-title">
+            <div class="ranking-head">
+              <h2 id="ranking-title">變化最大的兩站</h2>
+              <span class="count" aria-live="polite">{{ results().length | number }} 組</span>
+            </div>
+            <div class="tools">
+              <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><input #search type="search" placeholder="搜尋站名" aria-label="搜尋站名" aria-keyshortcuts="/" title="按 / 搜尋站名" [value]="query()" (input)="setQuery($any($event.target).value)"></label>
+              <label class="field sort"><span class="sr-only">排序方式</span><span class="select"><select (change)="setSort($any($event.target).value)">@for (k of sortKeys; track k) { <option [value]="k" [selected]="sortKey() === k">依{{ sorts[k].label }}</option> }</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
+              <button type="button" class="sort-reverse" [attr.aria-pressed]="sortReverse()" [attr.aria-label]="sortReverse() ? '改回由高到低排序' : '倒轉排行看最後一名'" [title]="sortReverse() ? '目前：低到高（點一下回正序）' : '目前：高到低（點一下看最後一名）'" (click)="sortReverse.update(v => !v)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
+              </button>
+            </div>
+            <div class="chips" role="group" aria-label="依路線篩選">
+              @for (code of lineList; track code) {
+                <button type="button" [attr.aria-pressed]="lineFilter() === code" [style.--line]="'var(--' + code + ')'" [attr.data-code]="code" [title]="lineNames[code]" (click)="setLine(code)">{{ code }}</button>
+              }
+            </div>
+            <div class="list-actions">
+              <button type="button" (click)="exportCsv()" [disabled]="!results().length"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>匯出這 {{ results().length | number }} 組</button>
+              <button type="button" (click)="copyLink()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>複製連結</button>
+              <span class="notice" role="status">{{ notice() }}</span>
+            </div>
+            <div class="list-head" aria-hidden="true"><span>兩站</span><span>{{ sorts[sortKey()].label }}（{{ sorts[sortKey()].unit }}）</span></div>
+            <ol>
+              @for (item of visible(); track item.origin + item.destination; let i = $index) {
+                <li><button type="button" [class.selected]="selected() === item" [attr.aria-current]="selected() === item" (click)="choose(item)" (mouseenter)="hoverPair(item)" (mouseleave)="hoverPair(null)" (focus)="hoverPair(item)" (blur)="hoverPair(null)">
+                  <span class="rank">{{ sortReverse() ? results().length - i : i + 1 }}</span>
+                  <span class="pair">
+                    <span class="names">
+                      <span class="station"><span class="codes">@for (l of linesOfStation(item.origin); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, item.origin) }}</b> }</span><span class="nm">{{ item.origin }}</span></span>
+                      <span class="destination"><svg viewBox="0 0 24 24" aria-label="到" role="img"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span class="station"><span class="codes">@for (l of linesOfStation(item.destination); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, item.destination) }}</b> }</span><span class="nm">{{ item.destination }}</span></span></span>
+                    </span>
+                    <small class="row-meta"><span>每日 {{ dailyTrips(item.baselineDaily) }} → {{ dailyTrips(item.currentDaily) }} 人次</span>@if (item.reversal) {<b class="tag">流向對調</b>}</small>
+                  </span>
+                  <span class="delta" [class.down]="value(item) < 0">{{ display(item) }}</span>
+                </button></li>
+              } @empty {
+                <li class="status">{{ data()!.results.length ? '沒有符合搜尋或路線的兩站。' : '這組條件沒有符合門檻的兩站，試著降低每日人次門檻。' }}</li>
+              }
+            </ol>
+            @if (results().length > visible().length) {
+              <button type="button" class="more" (click)="shown.set(shown() + 30)">再顯示 {{ results().length - visible().length < 30 ? results().length - visible().length : 30 }} 組</button>
+            } @else if (data()?.truncated) {
+              <p class="hint">已顯示綜合分數最高的前 {{ data()!.results.length }} 組，若要看特定車站請使用上方兩站指定查詢。</p>
+            }
+          </section>
+        }
+      }
+      }
+    </div>
+  @if (view() !== 'pairs') {
+    @if (explore(); as explorer) {
+      <app-time-player [date]="explorer.date()" [daily]="explorer.unit() === 'date'" [compact]="lowAngle() && phone.matches"
+        [band]="explorer.band()" [hour]="explorer.activeHour()" [station]="view() === 'station' ? explorer.station() : ''"
+        [counterpart]="view() === 'station' ? explorer.focusedRelation() : null" (clearRelation)="explorer.focusRelation(null)"
+        (stationInfo)="selectMapStation(explorer.station())"
+        [profile]="explorer.timelineProfile()" [measure]="explorer.timelineMeasure()"
+        [playing]="explorer.playing()" [busy]="explorer.loading()" [failure]="explorer.failure()" [unrecorded]="explorer.unrecorded()"
+        [previous]="!!explorer.prevDate()" [next]="!!explorer.nextDate()"
+        (hourChange)="explorer.setHour($event)" (play)="explorer.togglePlayback()" (wholeDay)="explorer.showWholeDay()"
+        (start)="startHourly()" (edit)="editHourlyDate()" (retry)="explorer.retry()" (step)="explorer.step($event < 0 ? explorer.prevDate() : explorer.nextDate())" />
+    }
+  }
+  </aside>
+
+  @if (selected(); as item) {
+    @if (story(); as s) {
+      <app-pair-detail
+        [item]="item"
+        [data]="data()!"
+        [story]="s"
+        [verdict]="verdict()"
+        [cautions]="cautions()"
+        [counts]="counts()"
+        [detailOpen]="detailOpen()"
+        [detailWide]="detailWide()"
+        [isFavPair]="isFavPair()"
+        [mapMessage]="mapMessage()"
+        [profile]="profile()"
+        [profileError]="profileError()"
+        [chart]="chart()"
+        [hourTable]="hourTable()"
+        [siblings]="siblings()"
+        [reversePair]="reversePair()"
+        [linesOfStation]="linesOfStationFn"
+        [lineOf]="lineOfFn"
+        [stationCode]="stationCodeFn"
+        [dailyTrips]="dailyTrips"
+        (toggleFav)="toggleFavPair()"
+        (toggleWide)="detailOpen.set(true); detailWide.update(v => !v)"
+        (toggleOpen)="detailOpen.set(!detailOpen())"
+        (close)="closeDetail()"
+        (focusStation)="focusStation($event)"
+        (choose)="choose($event)"
+        (saveCard)="saveCard()"
+        (retryProfile)="retryProfile()" />
+    }
+  }
+
+    <div class="flowbar" role="group" aria-label="流動模式" [class.folded]="flowFolded()">
+      <div class="segmented">
+        <button type="button" [attr.aria-pressed]="mode() === 'volume'" (click)="setMode('volume')">兩月比較</button>
+        <button type="button" [attr.aria-pressed]="mode() === 'direction'" (click)="setMode('direction')">去程／回程</button>
+        <button type="button" [attr.aria-pressed]="mode() === 'time'" (click)="setMode('time')">月份輪播</button>
+      </div>
+      <ng-container *ngTemplateOutlet="flowPause" />
+      @if (showLegend()) { <app-hint class="flow-help" label="人流圖例" [entries]="flowHint()" /> }
+      <button type="button" class="flow-fold" [attr.aria-expanded]="!flowFolded()" [attr.aria-label]="flowFolded() ? '展開流動模式' : '收合流動模式'" (click)="flowFolded.set(!flowFolded())"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="flowFolded() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg></button>
+      @if (showLegend() && streams().length) { <ul class="legend">
+        @for (s of streams(); track s.label; let i = $index) {
+          <li>
+            @if (mode() === 'time') {
+              <button type="button" class="month-frame" [attr.aria-pressed]="(timePhase() === 'baseline') === (i === 0)" (click)="showMonth(i)">
+                <i [style.--c]="s.color"></i>{{ s.label }}<b>{{ dailyTrips(s.daily) }}</b>
+              </button>
+            } @else {
+              <i [style.--c]="s.color" [class.dashed]="s.dashed"></i>{{ s.label }}<b>{{ dailyTrips(s.daily) }}</b>
+            }
+          </li>
+        }
+      </ul> }
+    </div>
+  <ng-template #flowPause>
+    @if (!reducedMotion) {
+      <button type="button" class="pause" (click)="togglePause()" [attr.aria-label]="paused() ? '播放流動動畫' : '暫停流動動畫'">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="paused() ? 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z' : 'M6 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z'"/></svg>
+      </button>
+    }
+  </ng-template>
+</main>

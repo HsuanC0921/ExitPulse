@@ -1,0 +1,53 @@
+/* 手機版外殼與底部分頁的樣式 */
+:host { display: none; }
+@keyframes tab-line { from { transform: scaleX(0); } }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
+@media (max-width: 720px) {
+  :host { display: contents; }
+  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(3, 1fr); padding: 0 8px env(safe-area-inset-bottom); border-top: 1px solid var(--rule); background: var(--panel); }
+  .tabbar button { position: relative; display: grid; justify-items: center; align-content: center; gap: 2px; height: 56px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink-2); font-size: var(--fs-xs); }
+  .tabbar button:active { background: var(--panel-2); }
+  .tabbar svg { transition: transform .18s cubic-bezier(.22, 1, .36, 1); }
+  .tabbar button:active svg { transform: scale(.88); }
+  .tabbar button:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
+  /* 目前所在的分頁：文字加粗，並在上緣加一條線，不只靠顏色分辨 */
+  .tabbar button[aria-current='page'] { color: var(--ink); font-weight: 700; }
+  .tabbar button[aria-current='page']::before { content: ''; position: absolute; top: 2px; left: 26%; right: 26%; height: 3px; border-radius: 999px; background: var(--ink); animation: tab-line .24s cubic-bezier(.22, 1, .36, 1); }
+  .tabbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+  .tabbar button[aria-current='page'] svg { stroke-width: 2.2; }
+  .mobile-bar { position: absolute; inset: 0 0 auto; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); box-sizing: border-box; min-height: var(--mobile-top); padding: calc(8px + env(safe-area-inset-top)) 16px 12px; background: var(--band); color: var(--on-band); }
+  .mobile-stripe { position: absolute; inset: auto 0 0; display: flex; height: 4px; }
+  .mobile-stripe i { flex: 1; }
+  .mobile-bar h1 { min-width: 0; margin: 0; font-size: var(--fs-l); font-weight: 800; line-height: 1.6; }
+  .mobile-bar app-brand { --brand-word-size: 1.625rem; --brand-mark-size: 34px; }
+  .mobile-switch { flex: none; display: flex; gap: 2px; padding: 3px; border: 1px solid color-mix(in srgb, var(--on-band) 45%, var(--band)); border-radius: var(--r-m); }
+  .mobile-switch button, .mobile-back, .mobile-map-link { min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-m); background: none; color: var(--on-band); font-size: var(--fs-xs); white-space: nowrap; }
+  .mobile-switch button { min-width: 44px; padding-inline: 8px; }
+  .mobile-switch button[aria-pressed='true'] { background: var(--on-band); color: var(--band); font-weight: 700; }
+  .mobile-back, .mobile-map-link { display: inline-flex; align-items: center; gap: var(--sp-1); }
+  .mobile-back { padding-left: 0; font-size: var(--fs-s); }
+  .mobile-map-link { padding-right: 0; font-size: var(--fs-s); font-weight: 700; }
+  .mobile-back svg, .mobile-map-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .mobile-bar :focus-visible { outline-color: var(--on-band); outline-offset: 1px; }
+  .mobile-overview { position: absolute; bottom: calc(var(--tabbar) + 12px); left: 12px; right: 12px; display: grid; padding: 16px; border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: card-in .3s cubic-bezier(.22, 1, .36, 1); }
+  .mobile-overview h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); margin: 0; font-size: var(--fs-l); font-weight: 800; line-height: 1.6; }
+  .overview-destination { display: inline-flex; align-items: center; gap: var(--sp-2); }
+  .overview-stations { display: grid; grid-template-columns: minmax(44px, auto) 12px minmax(44px, auto); align-items: center; gap: var(--sp-1); justify-content: start; }
+  .overview-stations svg { width: 12px; height: 12px; color: var(--ink-2); }
+  .overview-stations button { min-height: 44px; padding: 4px 6px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); font-weight: 700; line-height: 1.25; line-break: strict; text-wrap: balance; }
+  .overview-stations button[aria-pressed='true'] { border-color: var(--ink); background: var(--panel-2); }
+  .overview-stations button:focus-visible { outline-offset: -3px; }
+  .mobile-overview p { margin: 2px 0 12px; font-size: var(--fs-xs); color: var(--ink-2); }
+  .mobile-overview-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-2); }
+  .mobile-action { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 44px; padding: 10px 12px; border: 0; border-radius: var(--r-m); background: var(--action); color: var(--on-action); font-size: var(--fs-s); font-weight: 700; }
+  .mobile-action:disabled { opacity: .6; cursor: progress; }
+  .mobile-secondary { min-height: 44px; padding: 8px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
+  .mobile-secondary:hover { background: var(--panel-2); }
+  .mobile-overview-actions.single { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 360px) {
+  .mobile-bar { padding-inline: 10px; gap: var(--sp-1); }
+  .mobile-bar app-brand { --brand-word-size: 1.25rem; --brand-mark-size: 28px; }
+  .mobile-switch button { min-width: 44px; padding-inline: 6px; font-size: var(--fs-xs); }
+}
+@media (prefers-reduced-motion: reduce) { .tabbar *, .tabbar button::before, .mobile-overview { animation: none; transition: none; } }

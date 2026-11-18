@@ -1,0 +1,16 @@
+@let c = chart();
+<h2>每日進站 <span class="section-period">{{ month() }}</span></h2>
+<div class="calendar-weekdays" aria-hidden="true">@for (day of ['一', '二', '三', '四', '五', '六', '日']; track day) { <span>{{ day }}</span> }</div>
+<div class="calendar" role="group" aria-label="選擇日期">
+  @for (d of c.dates; track d.date) {
+    <button type="button" class="day" [style.grid-column]="d.column" [class.weekend]="d.off" [class.holiday]="d.holiday" [class.makeup]="d.note && !d.off && d.weekend" [class.low]="d.low && d.date >= firstDate()" [class.surge]="d.surge && d.date >= firstDate()" [attr.aria-pressed]="selected() === d.date"
+      [title]="d.date + '（' + dayName(d.date) + '）' + (d.note ? ' ' + d.note : '') + (d.date < firstDate() || d.entries == null ? ' 無本站旅次紀錄' : ' 進站 ' + (d.entries | number) + ' 人次') + (d.surge ? '，比同類型日多很多' : d.low ? '，比同類型日少' : '')"
+      [disabled]="d.date < firstDate() || d.entries == null" [attr.aria-label]="d.day + '，' + d.date + '（' + dayName(d.date) + '）' + (d.date < firstDate() || d.entries == null ? '無本站旅次紀錄' : (d.note ? d.note + '，' : '') + '進站 ' + (d.entries | number) + ' 人次')" (click)="pick.emit(d.date)">
+      @if (d.height != null && d.date >= firstDate()) { <b [style.transform]="'scaleY(' + d.height + ')'"></b> }
+      <span class="day-head"><span>{{ d.day }}</span>@if (wideView() && d.entries != null && d.date >= firstDate()) { <small class="day-val">{{ d.entries | number:'1.0-0' }}</small> }</span>
+    </button>
+  }
+</div>
+<ul class="key"><li><i class="weekday"></i>平日</li><li><i class="weekend"></i>週末、國定假日</li><li><i class="surge"></i>人次爆量</li><li><i class="low"></i>人次偏少</li></ul>
+@if (c.notes) { <p class="hint">當月節日與補班：{{ c.notes }}</p> }
+<details class="chart-note"><summary>怎麼判斷爆量和偏少？</summary><p>平日跟當月平日比，週末與國定假日跟當月週末與國定假日比，各取進站人次的中位數。到中位數 1.45 倍以上算爆量，少於八成算偏少。同類型日不到 4 天就不判斷，補班日不參與。</p></details>

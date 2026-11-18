@@ -1,0 +1,72 @@
+@let m = matrix();
+@if (missingOrigins().size || missingDestinations().size) {
+  <p class="matrix-coverage">「—」表示起站或訖站資料涵蓋不足。</p>
+}
+<div class="matrix-wrap" tabindex="0" role="region" aria-label="熱門車站互搭表">
+  <table class="matrix-table">
+    <thead><tr><th scope="col">起＼迄</th>@for (d of m.stations; track d) { <th scope="col" [title]="d"><span class="v-name">{{ d }}</span></th> }</tr></thead>
+    <tbody>
+      @for (o of m.stations; track o; let ri = $index) {
+        <tr>
+          <th scope="row" [title]="o"><button type="button" (click)="station.emit(o)">{{ o }}</button></th>
+          @for (val of m.cells[ri]; track $index; let ci = $index) {
+            @if (missingOrigins().has(o) || missingDestinations().has(m.stations[ci])) {
+              <td class="matrix-gap"><span aria-label="資料不足" title="資料不足">—</span></td>
+            } @else {
+              <td [class.diag]="o === m.stations[ci]" [style.--alpha]="o === m.stations[ci] ? 0 : 0.04 + (val / max()) * 0.28">
+              <button type="button" class="m-cell" [title]="o === m.stations[ci] ? '起迄同站的旅次（' + o + '）：' + (val | number:'1.0-0') + ' 人次／日（點選查看該站）' : o + ' → ' + m.stations[ci] + '：' + (val | number:'1.0-0') + ' 人次／日'" (click)="o === m.stations[ci] ? station.emit(o) : pair.emit({ origin: o, destination: m.stations[ci] })">
+                {{ val > 0 && val < 1 ? (val | number:'1.1-1') : (val | number:'1.0-0') }}
+              </button>
+              </td>
+            }
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<section class="group-flow">
+  <button type="button" class="group-flow-toggle" [attr.aria-expanded]="groupOpen()" aria-controls="group-flow-body" (click)="groupOpen.update(open => !open)">
+    比較兩組車站 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+  </button>
+  <div id="group-flow-body" [hidden]="!groupOpen()">
+  <div class="group-flow-options">
+    <fieldset>
+      <legend>從哪些站出發</legend>
+      <div>
+        @for (name of m.stations; track name) {
+          <button type="button" class="group-station" [attr.aria-pressed]="origins().includes(name)" (click)="setIncluded('origins', name, !origins().includes(name))">{{ name }}</button>
+        }
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>到哪些站</legend>
+      <div>
+        @for (name of m.stations; track name) {
+          <button type="button" class="group-station" [attr.aria-pressed]="destinations().includes(name)" (click)="setIncluded('destinations', name, !destinations().includes(name))">{{ name }}</button>
+        }
+      </div>
+    </fieldset>
+  </div>
+  <button type="button" class="group-flow-submit" [disabled]="!origins().length || !destinations().length || group.isLoading()" (click)="queryGroup()">
+    {{ group.isLoading() ? '正在查詢…' : '查站群人次' }}
+  </button>
+  @if (group.error()) {
+    <p role="alert">站群人次暫時查不到，請再試一次。</p>
+  } @else if (group.hasValue()) {
+    <dl class="group-flow-result" aria-live="polite">
+      @for (answer of [group.value().current, group.value().compare]; track $index) {
+        @if (answer) {
+          <div>
+            <dt>{{ answer.period.spec }}</dt>
+            <dd>{{ answer.daily == null ? '資料不足' : (answer.daily | number:'1.0-3') + ' 人次／日' }}</dd>
+            @if (answer.missingOrigins.length) { <dd>缺少起站紀錄：{{ answer.missingOrigins.join('、') }}</dd> }
+            @if (answer.missingDestinations.length) { <dd>缺少訖站紀錄：{{ answer.missingDestinations.join('、') }}</dd> }
+          </div>
+        }
+      }
+    </dl>
+  }
+  </div>
+</section>
