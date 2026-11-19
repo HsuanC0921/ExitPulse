@@ -27,7 +27,7 @@
   .mobile-back, .mobile-map-link { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: transparent; color: var(--on-band); font-size: var(--fs-s); font-weight: 700; }
   .mobile-back svg, .mobile-map-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .mobile-bar :focus-visible { outline-color: var(--on-band); outline-offset: 1px; }
-  .mobile-overview { position: absolute; bottom: calc(var(--tabbar) + 8px); left: max(8px, var(--safe-left)); right: max(8px, var(--safe-right)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px; padding: 8px 8px 8px 16px; border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: card-in .3s cubic-bezier(.22, 1, .36, 1); }
+  .mobile-overview { position: absolute; bottom: calc(var(--tabbar) + 8px); left: max(8px, var(--safe-left)); right: max(8px, var(--safe-right)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px; padding: 22px 8px 10px 16px; border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: card-in .3s cubic-bezier(.22, 1, .36, 1); }
   .mobile-overview h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); grid-column: 1; margin: 0; font-size: var(--fs-m); font-weight: 800; line-height: 1.4; }
   .overview-destination { display: inline-flex; align-items: center; gap: var(--sp-2); }
   .overview-stations { display: grid; grid-template-columns: minmax(44px, auto) 12px minmax(44px, auto); align-items: center; gap: var(--sp-1); justify-content: start; }
@@ -44,10 +44,12 @@
   .mobile-secondary { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
   .mobile-secondary:hover { background: var(--panel-2); }
   .mobile-overview { transition: opacity .25s ease; }
-  .card-fold { position: absolute; top: -22px; left: 50%; translate: -50% 0; display: grid; place-items: center; width: 96px; height: 24px; padding: 0; border: 0; border-radius: 12px 12px 0 0; background: var(--panel); color: var(--ink-2); box-shadow: 0 -2px 6px -2px rgb(0 0 0 / .12); }
-  .card-fold::before { content: ''; position: absolute; inset: -20px 0 0; }
-  .card-fold svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .mobile-overview.min { min-height: 44px; padding-block: 0; }
+  .card-fold { position: absolute; top: 2px; left: 50%; translate: -50% 0; display: grid; place-items: center; width: 72px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--ink-2); }
+  .card-fold::before { content: ''; position: absolute; inset: -10px -12px -6px; }
+  .card-fold svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .mobile-overview.min { min-height: 48px; padding: 10px 56px 10px 16px; }
+  .mobile-overview.min .card-fold { top: 50%; left: auto; right: 6px; translate: 0 -50%; width: 44px; height: 44px; }
+  .mobile-overview.min .card-fold::before { inset: 0; }
   .mobile-overview.min :is(p, .mobile-overview-actions) { display: none; }
   .mobile-overview.min h2 { font-size: var(--fs-m); }
 @media (max-width: 360px) {

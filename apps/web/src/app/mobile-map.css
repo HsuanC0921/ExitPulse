@@ -3,8 +3,6 @@
   .workspace { --map-edge: max(12px, var(--safe-right)); --map-tools-y: calc(var(--tools-top) + 2px); }
   .place-options .place-locate { display: block; }
   .layer-options label.mobile-only-row { display: flex; }
-  .tools-toggle svg { transform: rotate(-90deg); }
-  .map-tools.collapsed .tools-toggle svg { transform: rotate(90deg); }
   .sheet-scrim { position: absolute; inset: 0; z-index: 5; display: block; background: none; }
   .layer-options { position: fixed; top: calc(var(--tools-end) + 6px); left: max(8px, var(--safe-left)); right: max(8px, var(--safe-right)); width: auto; max-height: calc(100dvh - var(--tools-end) - var(--safe-bottom) - 14px); overflow-y: auto; overscroll-behavior: contain; padding-top: 4px; }
   .place-options { width: auto; max-height: calc(100dvh - var(--tools-end) - var(--safe-bottom) - 14px); }
@@ -45,7 +43,7 @@
   .map-tools > details > summary, .map-tools > button { width: 100%; min-width: 0; }
   .map-tools :is(.map-locate-btn, .tower-switch, .theme-switch) { display: none; }
   .map-tools :is(.map-fit-btn, .map-about) { display: none; }
-  .layer-mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .layer-mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
   .flowbar { top: calc(var(--tools-end) + 12px); bottom: auto; left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); max-width: none; translate: none; }
   .tower-key-pair ~ .flowbar { top: calc(var(--tools-end) + 60px); }
   .flowbar .segmented { flex-wrap: wrap; }
