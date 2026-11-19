@@ -222,3 +222,8 @@ app-root[data-hover='false'] { .map-tools [data-tip]::after, .map-tools [data-ti
 /* 地圖角落的縮放與署名也避開安全區，橫放或平板的桌機版面同樣適用 */
 .maplibregl-ctrl-bottom-right { bottom: var(--safe-bottom); right: var(--safe-right); }
 .maplibregl-ctrl-bottom-left { bottom: var(--safe-bottom); left: var(--safe-left); }
+
+.spike-scale { display: flex; align-items: flex-end; gap: 16px; margin: 6px 0 2px; color: var(--ink-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.spike-scale > span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.spike-scale .spike-scale-title { align-self: flex-end; flex-direction: row; }
+.spike-scale i { display: block; width: 8px; background: var(--ink-2); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
