@@ -28,7 +28,7 @@ export type ExploreLayer = {
   /** dashed = fewer trips than the comparison period. Colour is chosen by the map, never by the line. */
   arcs: { from: string; to: string; daily: number; dashed: boolean; emphasis: number }[];
   /** color = the station's line. hollow = fewer trips than the comparison period. */
-  circles: { station: string; radius: number; color: string; label: string; count?: string; rank?: number; hollow: boolean }[];
+  circles: { station: string; radius: number; innerRadius?: number; color: string; label: string; count?: string; rank?: number; hollow: boolean }[];
   focus: string | null;
   /** Counterpart selected in the single-station view. */
   focusedRelation?: string | null;
@@ -1301,7 +1301,7 @@ export class Explore implements OnDestroy {
     const cmp = !!a.compare, top = new Set(sortNetwork(rows, this.networkSort()).slice(0, 10).map(r => r.station)), focus = this.focusedStation();
     return {
       arcs: [],
-      circles: rows.map(r => ({ station: r.station, radius: stationRadius(r.entries, largest),
+      circles: rows.map(r => ({ station: r.station, radius: stationRadius(r.entries, largest), innerRadius: cmp ? stationRadius(r.compareEntries ?? null, largest) : 0,
         color: focus === r.station ? color(r.station) : '#6f7b85', label: top.has(r.station) || focus === r.station ? (r.entries ? `${r.station}
 ${formatDailyTrips(r.entries)}` : r.station) : '',
         hollow: cmp && (change(r.entries, r.compareEntries) ?? 0) < 0 })),

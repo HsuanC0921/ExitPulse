@@ -551,7 +551,7 @@
     <p class="explore-legend map-key" aria-hidden="true">
       <span><i class="swatch dot"></i>地圖上圓點越大，進站越多</span>
       @if (sizeRef(); as ref) { <span><i class="swatch ref" [style.width.px]="ref.size" [style.height.px]="ref.size"></i>約每日 {{ ref.value }} 人次</span> }
-      @if (a.compare) { <span><i class="swatch hollow"></i>空心表示比對照期少</span> }
+      @if (a.compare) { <span><i class="swatch hollow"></i>外環為本期，實心為對照期</span> }
     </p>
     @if (!listCollapsed()) {
     @if (listStyle() !== 'lines' && rankChart(); as chart) {
