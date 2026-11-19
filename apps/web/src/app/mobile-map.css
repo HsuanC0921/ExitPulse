@@ -1,5 +1,7 @@
 /* Compact layout for controls and overlays on the map. */
 :where(app-root[data-layout='compact']) {
+  .workspace { --map-edge: max(12px, var(--safe-right)); --map-tools-y: calc(var(--tools-top) + 2px); }
+  .place-options .place-locate { display: block; }
   .layer-options label.mobile-only-row { display: flex; }
   .tools-toggle svg { transform: rotate(-90deg); }
   .map-tools.collapsed .tools-toggle svg { transform: rotate(90deg); }
@@ -38,13 +40,12 @@
   .tower-key + .station-preview { top: calc(var(--tools-end) + 60px); }
   .tower-key, .tower-key:has(+ .map-rank-focus) { top: calc(var(--tools-end) + 8px); left: max(12px, var(--safe-left)); right: auto; }
   .tower-key + .map-rank-focus { top: calc(var(--tools-end) + 60px); }
-  .map-tools { top: var(--tools-top); left: auto; right: max(12px, var(--safe-right)); display: flex; gap: 0; padding: 2px; }
-  .map-tools > :is(button, details) { flex: 0 0 46px; }
+  .map-tools { top: var(--tools-top); left: auto; display: flex; gap: 0; padding: 2px; }
+  .map-tools > :is(button, details) { flex: 0 0 44px; }
   .map-tools > details > summary, .map-tools > button { width: 100%; min-width: 0; }
-  .map-tools :is(.map-fullscreen-btn, .tower-switch, .theme-switch) { display: none; }
+  .map-tools :is(.map-locate-btn, .tower-switch, .theme-switch) { display: none; }
   .map-tools :is(.map-fit-btn, .map-about) { display: none; }
   .layer-mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .layer-mobile-actions button { min-height: 40px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); font-size: var(--fs-xs); font-weight: 700; }
   .flowbar { top: calc(var(--tools-end) + 12px); bottom: auto; left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); max-width: none; translate: none; }
   .tower-key-pair ~ .flowbar { top: calc(var(--tools-end) + 60px); }
   .flowbar .segmented { flex-wrap: wrap; }
@@ -70,6 +71,14 @@
   }
   .workspace:has(.map-tools > details[open], .mobile-view-menu) :is(.map-veil, .map-busy, .station-preview, app-time-player) {
     visibility: hidden;
+  }
+}
+
+@media (max-width: 389px) {
+  :where(app-root[data-layout='compact']) {
+    .workspace { --map-only-width: 56px; }
+    .map-only-toggle { padding-inline: 0; font-size: var(--fs-xs); }
+    .map-only-toggle svg { display: none; }
   }
 }
 

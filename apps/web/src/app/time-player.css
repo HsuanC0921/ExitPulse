@@ -107,9 +107,6 @@ button:disabled { opacity: .45; cursor: default; }
   .date-stepper .icon { width: 44px; }
   .time-track { height: 44px; }
   .hour-step { width: 32px; height: 44px; }
-  .player-foot, .player-state { min-height: 28px; }
-  .player-foot:has(.retry-hour), .player-foot:has(.retry-hour) .player-state { min-height: 44px; }
-  .player-state .retry-hour { min-height: 44px; }
   .date-stepper { grid-template-columns: 44px minmax(0, 1fr) 44px auto auto; }
   .fold { display: grid; place-items: center; width: 44px; }
   .fold svg { width: 16px; height: 16px; }
@@ -132,4 +129,7 @@ button:disabled { opacity: .45; cursor: default; }
   .date-stepper { grid-template-columns: 44px minmax(0, 1fr) 44px auto auto; }
   .date-stepper .icon, .fold { display: grid; place-items: center; width: 44px; min-height: 44px; }
   .date-link, .time-track { min-height: 44px; height: 44px; }
+  .player-foot, .player-state, .player-state .retry-hour { min-height: 44px; }
 }
+.compact-time, .date-stepper { animation: timeline-controls-in .14s ease-out; }
+@keyframes timeline-controls-in { from { opacity: 0; } }

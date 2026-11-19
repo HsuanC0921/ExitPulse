@@ -1,10 +1,10 @@
-dialog.crowd { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--panel-2); color: var(--ink); overflow: hidden; }
+dialog.crowd { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); box-sizing: border-box; border: 0; background: var(--panel-2); color: var(--ink); overflow: hidden; }
 dialog.crowd[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; animation: crowd-in .3s cubic-bezier(.22, 1, .36, 1); }
 @keyframes crowd-in { from { opacity: 0; scale: .98; } }
-header { display: flex; align-items: center; gap: 8px 24px; flex-wrap: wrap; padding: 14px 12px 14px 24px; }
+header { display: flex; align-items: center; gap: 8px 24px; flex-wrap: wrap; padding: 14px 64px 14px 24px; }
 h2 { margin: 0; font-size: var(--fs-xl); font-weight: 800; line-height: 1.4; }
 .unit { flex: 1; margin: 0; color: var(--ink-2); font-size: var(--fs-s); }
-.close { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-m, 8px); background: none; color: inherit; cursor: pointer; }
+.close { position: absolute; top: calc(var(--safe-top) + 12px); right: calc(var(--safe-right) + 12px); display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-m, 8px); background: none; color: inherit; cursor: pointer; }
 .close:hover { background: var(--rule); }
 .close:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
@@ -23,7 +23,7 @@ h2 { margin: 0; font-size: var(--fs-xl); font-weight: 800; line-height: 1.4; }
   .caption { left: 16px; top: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { dialog.crowd[open] { animation: none; } }
-.scopes { display: flex; gap: 4px; }
+.scopes { display: flex; flex-wrap: wrap; gap: 4px; }
 .scopes button { min-height: 44px; padding: 0 14px; border: 1px solid var(--rule); border-radius: var(--r-m, 8px); background: none; color: var(--ink-2); font: inherit; font-size: var(--fs-s); font-weight: 700; cursor: pointer; }
 .scopes button[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--panel-2); }
 .scopes button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
