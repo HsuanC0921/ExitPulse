@@ -101,7 +101,7 @@ const store = (key: string, value: string) => { try { localStorage.setItem(key, 
 
 @Component({
   selector: 'app-root', imports: [DecimalPipe, NgTemplateOutlet, Explore, MobileShell, TimePlayer, Hint, Brand, FirstQuery, StationHistory, About, PairDetail],
-  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './mobile-map.css', './radar.css'],
+  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './station-preview.css', './mobile-map.css', './radar.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, host: {
     '[attr.data-theme]': 'theme()',
     '[attr.data-inset]': 'device().inset',
@@ -759,8 +759,12 @@ export class Radar implements OnDestroy {
   async saveCard() {
     const r = this.selected(), d = this.data(), s = this.story();
     if (!r || !d || !s) return;
-    const font = '"Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif';
-    try { await Promise.all([800, 700, 400].map(weight => document.fonts.load(`${weight} 40px "Noto Sans TC"`))); } catch { /* 字型載入失敗時用系統字型 */ }
+    const font = getComputedStyle(document.body).getPropertyValue('--ui-font').trim();
+    await Promise.allSettled([
+      document.fonts.load(`800 40px ${font}`, `ExitPulse　捷運旅次變化雷達 ${r.origin} → ${r.destination} 0123456789,.−+`),
+      document.fonts.load(`700 40px ${font}`, s.headline),
+      document.fonts.load(`400 40px ${font}`, `${s.when} · 納入比較 0123456789 站 · 兩期各有效天數與每日人次 資料：臺北市資料大平臺 臺北捷運每日分時各站 OD 流量統計`),
+    ]);
     const scale = 2, W = 1200, H = 630, canvas = document.createElement('canvas');
     canvas.width = W * scale; canvas.height = H * scale;
     const g = canvas.getContext('2d');

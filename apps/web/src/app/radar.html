@@ -39,12 +39,12 @@
     </div>
   } @else if (basemapBusy()) { <p class="map-busy" role="status">底圖載入中…</p> }
 
-  <app-mobile-shell [page]="mobilePage()" [view]="view()" [summary]="mobileSummary()" [hideOverview]="view() !== 'pairs' || showFirstQuery()"
+  <app-mobile-shell [attr.inert]="mapOnly() ? '' : null" [page]="mobilePage()" [view]="view()" [summary]="mobileSummary()" [hideOverview]="view() !== 'pairs' || showFirstQuery()"
     [focusedStation]="lowAngle() ? pairStreetStation() : null" (stationFocus)="focusPairStreetStation($event)"
     (action)="mobileAction($event)" (viewChange)="setView($event)" [barHidden]="barHidden()" (barToggle)="toggleBar()" (viewMenuOpened)="closeMenus()" />
 
   @if (openMenu()) { <div class="sheet-scrim" (click)="closeMenus()"></div> }
-  <div class="map-tools" [class.collapsed]="toolsCollapsed()" role="group" aria-label="地圖設定">
+  <div class="map-tools" [attr.inert]="mapOnly() ? '' : null" [class.collapsed]="toolsCollapsed()" role="group" aria-label="地圖設定">
     <details #placeMenu class="place-menu" (toggle)="placeMenu.open && (layerMenu.open = collectionMenu.open = false); setMenu('place', placeMenu.open)" (keydown.escape)="closeMenus(true); $event.stopPropagation()">
       <summary data-tip="找地點、地址或店名"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><span>找地點</span></summary>
       <div class="layer-options place-options">
@@ -218,7 +218,7 @@
     </button>
   </div>
   @if (tower3d()) {
-    <div class="tower-key" [class.tower-key-pair]="view() === 'pairs' && selected()">
+    <div class="tower-key" [attr.inert]="mapOnly() ? '' : null" [class.tower-key-pair]="view() === 'pairs' && selected()">
       @if (!panelFolded('tower')) {
       @if (showLegend() && !selectedMapStation()) {
         <svg viewBox="0 0 25 20" aria-hidden="true"><path d="M1 18l3-6 3 6M9 18l3.5-12 3.5 12M18 18l3.5-16 3.5 16"/></svg>
@@ -235,7 +235,7 @@
     </div>
   }
   @if (view() === 'station' && rankedStations().length && !selectedMapStation()) {
-    <div class="map-rank-focus" role="group" aria-label="地圖人流線數量">
+    <div class="map-rank-focus" [attr.inert]="mapOnly() ? '' : null" role="group" aria-label="地圖人流線數量">
       @if (!panelFolded('rank', phone())) {
       <button type="button" [attr.aria-pressed]="stationArcLimit() === 5" title="只顯示前 5 名往來路線並對焦" (click)="setStationArcLimit(5)">前 5</button>
       <button type="button" [attr.aria-pressed]="stationArcLimit() === 10" title="只顯示前 10 名往來路線並對焦" (click)="setStationArcLimit(10)">前 10</button>
@@ -245,7 +245,7 @@
     </div>
   }
   @if (selectedMapStation(); as station) {
-    <section class="station-preview" aria-label="地圖所選車站" [class.preview-compact]="stationPreviewFolded()">
+    <section class="station-preview" [attr.inert]="mapOnly() ? '' : null" aria-label="地圖所選車站" [class.preview-compact]="stationPreviewFolded()">
       <div class="station-preview-head">
         <div class="station-preview-title">
           <h2>{{ station }}</h2>
@@ -430,7 +430,7 @@
   }
   @if (focusedFlow(); as flow) {
     @let routeFolded = panelFolded('route', phone() && explore()?.unit() === 'date');
-    <section class="flow-preview" aria-label="所選路線流向資訊" [class.preview-compact]="routeFolded">
+    <section class="flow-preview" [attr.inert]="mapOnly() ? '' : null" aria-label="所選路線流向資訊" [class.preview-compact]="routeFolded">
       <div class="flow-preview-head">
         <h2><span>{{ flow.origin }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>{{ flow.destination }}</span></h2>
         <ng-container *ngTemplateOutlet="mapPanelToggle; context: {panel: 'route', label: '流向資訊', folded: routeFolded}" />
@@ -450,7 +450,7 @@
     </section>
   }
 
-  <aside class="panel" [class.closed]="!panelOpen()" [class.wide]="isPanelWide()" (keydown.escape)="isPanelWide() && togglePanelWide()" aria-label="旅次變化分析">
+  <aside class="panel" [attr.inert]="mapOnly() ? '' : null" [class.closed]="!panelOpen()" [class.wide]="isPanelWide()" (keydown.escape)="isPanelWide() && togglePanelWide()" aria-label="旅次變化分析">
     <header class="sign" (click)="panelOpen() || togglePanelOpen()">
       <h1><app-brand [compact]="!panelOpen()" /></h1>
       <div class="sign-actions">
@@ -571,7 +571,7 @@
             </div>
             </div>
             }
-            <div class="list-head"><span>兩站</span><button type="button" class="list-sort-head" [class.asc]="sortReverse()" [attr.aria-label]="'排序：' + (sortReverse() ? '由小到大' : '由大到小') + '，點一下反轉'" [title]="sortReverse() ? '由小到大，點一下改回由大到小' : '由大到小，點一下改為由小到大'" (click)="sortReverse.update(v => !v)">{{ sorts[sortKey()].label }}（{{ sorts[sortKey()].unit }}）<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg></button></div>
+            <div class="list-head"><span>兩站</span><button type="button" class="list-sort-head" [class.asc]="sortReverse()" [attr.aria-label]="sorts[sortKey()].label + '（' + sorts[sortKey()].unit + '），' + (sortReverse() ? '由小到大' : '由大到小') + '，點一下反轉'" [title]="sortReverse() ? '由小到大，點一下改回由大到小' : '由大到小，點一下改為由小到大'" (click)="sortReverse.update(v => !v)">{{ sorts[sortKey()].label }}（{{ sorts[sortKey()].unit }}）<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg></button></div>
             <ol>
               @for (item of visible(); track item.origin + item.destination; let i = $index) {
                 <li><button type="button" [class.selected]="selected() === item" [attr.aria-current]="selected() === item" (click)="choose(item)" (mouseenter)="hoverPair(item)" (mouseleave)="hoverPair(null)" (focus)="hoverPair(item)" (blur)="hoverPair(null)">
@@ -616,7 +616,7 @@
 
   @if (selected(); as item) {
     @if (story(); as s) {
-      <app-pair-detail
+      <app-pair-detail [attr.inert]="mapOnly() ? '' : null"
         [item]="item"
         [data]="data()!"
         [story]="s"
@@ -649,7 +649,7 @@
   }
 
     @if (streams().length) {
-    <div class="flowbar" role="group" aria-label="流動模式" [class.folded]="flowFolded()">
+    <div class="flowbar" [attr.inert]="mapOnly() ? '' : null" role="group" aria-label="流動模式" [class.folded]="flowFolded()">
       <div class="segmented">
         <button type="button" [attr.aria-pressed]="mode() === 'volume'" (click)="setMode('volume')">兩月比較</button>
         <button type="button" [attr.aria-pressed]="mode() === 'direction'" (click)="setMode('direction')">去程／回程</button>
@@ -657,7 +657,7 @@
       </div>
       <ng-container *ngTemplateOutlet="flowPause" />
       @if (showLegend()) { <app-hint class="flow-help" label="人流圖例" [entries]="flowHint()" /> }
-      <button type="button" class="overlay-fold flow-fold" [attr.aria-expanded]="!flowFolded()" [attr.aria-label]="flowFolded() ? '展開流動模式' : '收合流動模式'" (click)="toggleFlowFold()">@if (flowFolded()) { <span>人流</span> }<svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="flowFolded() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg></button>
+      <button type="button" class="overlay-fold flow-fold" [attr.aria-expanded]="!flowFolded()" [attr.aria-label]="flowFolded() ? '人流，展開流動模式' : '收合流動模式'" (click)="toggleFlowFold()">@if (flowFolded()) { <span>人流</span> }<svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="flowFolded() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg></button>
       @if (showLegend() && streams().length) { <ul class="legend">
         @for (s of streams(); track s.label; let i = $index) {
           <li>

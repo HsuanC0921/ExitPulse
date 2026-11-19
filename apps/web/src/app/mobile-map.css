@@ -1,6 +1,7 @@
 /* Compact layout for controls and overlays on the map. */
 :where(app-root[data-layout='compact']) {
-  .workspace { --map-edge: max(12px, var(--safe-right)); --map-tools-y: calc(var(--tools-top) + 2px); }
+  .workspace { --map-edge: max(12px, var(--safe-right)); --map-tools-y: calc(var(--tools-top) + 2px); --map-only-width: 92px; }
+  .map-only-toggle { padding-inline: 6px; gap: var(--sp-1); }
   .place-options .place-locate { display: block; }
   .layer-options label.mobile-only-row { display: flex; }
   .sheet-scrim { position: absolute; inset: 0; z-index: 5; display: block; background: none; }
@@ -14,7 +15,7 @@
   .install-banner p { margin: 0; }
   .install-banner.later { grid-template-columns: 1fr; padding-block: 12px; }
   .install-banner button { min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-s); background: none; color: inherit; font-size: var(--fs-xs); }
-  .install-banner .primary { background: var(--panel); color: var(--ink); font-weight: 700; }
+  .install-banner .primary { background: var(--panel); color: var(--ink); font-weight: var(--weight-action); }
 
   .workspace.low-angle .station-preview { top: auto; bottom: calc(var(--tabbar) + 12px); left: max(12px, var(--safe-left)); width: auto; }
   .low-angle .station-preview.preview-compact { padding-block: 2px; }
@@ -48,7 +49,8 @@
   .map-tools > details > summary, .map-tools > button { width: 100%; min-width: 0; }
   .map-tools :is(.map-locate-btn, .tower-switch, .theme-switch) { display: none; }
   .map-tools :is(.map-fit-btn, .map-about) { display: none; }
-  .layer-mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
+  .layer-mobile-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); margin: var(--sp-2) 0; }
+  .collection-options button { min-height: 44px; }
   .flowbar { top: calc(var(--tools-end) + 12px); bottom: auto; left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); max-width: none; translate: none; }
   .tower-key-pair ~ .flowbar { top: calc(var(--tools-end) + 60px); }
   .flowbar .segmented { flex-wrap: wrap; }

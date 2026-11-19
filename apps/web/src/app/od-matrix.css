@@ -3,12 +3,12 @@ app-od-matrix { display: block; }
 .matrix-wrap { max-height: 380px; margin-top: 8px; }
 .matrix-table { font-size: var(--fs-xs); }
 .matrix-table th, .matrix-table td { padding: 4px; border: 1px solid var(--rule); text-align: center; white-space: nowrap; }
-.matrix-table th { background: var(--panel-2); color: var(--ink-2); font-weight: 700; }
+.matrix-table th { background: var(--panel-2); color: var(--ink-2); font-weight: var(--weight-action); }
 .matrix-table thead th { position: sticky; top: 0; z-index: 2; vertical-align: bottom; padding: 6px 4px; }
 .matrix-table thead th:first-child { left: 0; z-index: 3; vertical-align: middle; }
 .matrix-table .v-name { display: inline-block; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: .04em; line-height: 1.2; }
 .matrix-table tbody th { position: sticky; left: 0; z-index: 1; text-align: left; padding-inline: 6px; }
-.matrix-table tbody th button { color: var(--ink); font-weight: 700; }
+.matrix-table tbody th button { color: var(--ink); font-weight: var(--weight-action); }
 .matrix-table td { background: color-mix(in srgb, var(--ink) calc(var(--alpha, 0.1) * 100%), transparent); color: var(--ink); padding: 0; }
 .m-cell { display: block; width: 100%; height: 100%; padding: 4px; }
 .matrix-table td.diag { background: var(--panel-2); color: var(--ink-2); }
@@ -17,22 +17,22 @@ app-od-matrix { display: block; }
 .matrix-table td.matrix-gap { background: var(--panel-2); color: var(--ink-2); }
 .matrix-table td.matrix-gap:hover { outline: 0; }
 .group-flow { margin-top: 12px; border-top: 1px solid var(--rule); }
-.group-flow-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 4px 0; border: 0; background: transparent; color: var(--ink); font-weight: 700; cursor: pointer; }
+.group-flow-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 4px 0; border: 0; background: transparent; color: var(--ink); font-weight: var(--weight-action); cursor: pointer; }
 .group-flow-toggle svg { width: 16px; height: 16px; }
 .group-flow-toggle[aria-expanded='true'] svg { rotate: 180deg; }
 .group-flow [hidden] { display: none; }
-.group-flow-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.group-flow-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); margin-bottom: 10px; }
 .group-flow fieldset { min-width: 0; margin: 0; padding: 2px 6px 6px; border: 1px solid var(--rule); border-radius: var(--r-m); }
-.group-flow legend { padding-inline: 4px; font-weight: 700; }
+.group-flow legend { padding-inline: 4px; font-weight: var(--weight-action); }
 .group-flow fieldset > div { max-height: 13rem; overflow-y: auto; }
 .group-station { display: block; width: 100%; min-height: 44px; padding: 4px 6px; border: 0; background: transparent; color: var(--ink); text-align: start; cursor: pointer; }
 .group-station + .group-station { border-top: 1px solid var(--rule); }
 .group-station[aria-pressed='false']:hover { background: var(--panel-2); }
-.group-station[aria-pressed='true'] { background: var(--ink); color: var(--panel); font-weight: 700; }
+.group-station[aria-pressed='true'] { background: var(--ink); color: var(--panel); font-weight: var(--weight-action); }
 .group-flow-submit { min-height: 44px; padding-inline: 12px; border: 0; border-radius: var(--r-m); background: var(--action); color: var(--on-action); }
 .group-flow-submit:disabled { opacity: .5; }
-.group-flow-result { display: grid; gap: 8px; margin: 12px 0 0; }
+.group-flow-result { display: grid; gap: var(--sp-2); margin: 12px 0 0; }
 .group-flow-result > div { padding: 8px; border: 1px solid var(--rule); border-radius: var(--r-m); }
 .group-flow-result dt { color: var(--ink-2); font-size: var(--fs-xs); }
 .group-flow-result dd { margin: 4px 0 0; overflow-wrap: break-word; }
-.group-flow-result dd:first-of-type { font-weight: 700; font-variant-numeric: tabular-nums; }
+.group-flow-result dd:first-of-type { font-weight: var(--weight-action); font-variant-numeric: tabular-nums; }
