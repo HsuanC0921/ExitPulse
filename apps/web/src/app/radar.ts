@@ -1533,7 +1533,7 @@ export class Radar implements OnDestroy {
     this.elevatedFlow?.setSpikes(amounts.flatMap(([name, amount]) => {
       const at = this.stops.get(name);
       return at && amount && name !== entranceStation
-        ? [{ at, height: Math.min(1.4, Math.abs(amount) / full) * (this.r3d?.SPIKE_MAX_PX ?? 100), color: amount < 0 ? down : ink }] : [];
+        ? [{ at, height: Math.max(3, Math.min(1.4, Math.sqrt(Math.abs(amount) / full)) * (this.r3d?.SPIKE_MAX_PX ?? 100)), color: amount < 0 ? down : ink }] : [];
     }));
   }
 
