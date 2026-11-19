@@ -262,14 +262,37 @@ app-explore .relations .delta.plain { color: var(--ink); }
 }
 @media (max-width: 720px) {
   .wide-backdrop { padding: 0; }
-  .wide-sheet { width: 100%; height: 100dvh; max-height: none; border: 0; border-radius: 0; padding: 12px 14px 24px; }
-  .glance-title { display: flex; flex-wrap: wrap; position: sticky; top: -20px; z-index: 2; justify-content: space-between; align-items: center; gap: 2px var(--sp-2); margin: 0 -16px 8px; padding: 8px 16px; border-bottom: 1px solid var(--rule); background: var(--panel); white-space: normal; }
+  .wide-sheet { width: 100%; height: 100dvh; max-height: none; border: 0; border-radius: 0; padding: calc(12px + var(--safe-top)) 14px calc(24px + var(--safe-bottom)); }
+  .workspace:is([data-mobile-page='list'], [data-mobile-page='conditions']) .panel-body:has(> app-explore) {
+    scroll-padding-block: 14px max(12px, var(--safe-bottom));
+  }
+  .glance-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px var(--sp-3);
+    margin: 0 0 var(--sp-2);
+    padding: 0 0 var(--sp-1);
+    border-bottom: 1px solid var(--rule);
+    white-space: normal;
+    line-height: 1.6;
+  }
+  .glance-title strong { color: var(--ink); text-wrap: balance; }
+  .glance-period { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); font-weight: 400; }
+  .glance-period > :last-child { white-space: nowrap; }
   .headline-period { display: none; }
   .availability-banner button { min-width: 44px; }
   .segmented.small button { min-width: 44px; padding-inline: 6px; font-size: var(--fs-xs); }
   .stepper { padding-left: 0; }
   .stepper button { padding-inline: 4px; font-size: var(--fs-xs); }
-  .editor { padding: 10px; background: var(--panel-2); }
+  .editor { padding: var(--sp-3); background: var(--panel-2); }
+  .query { gap: var(--sp-2); }
+  .pill-value { flex-wrap: wrap; }
+  .pill-value .pill-main { overflow: visible; white-space: normal; line-height: 1.6; text-wrap: pretty; }
+  .editor .compare-choices { grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); }
+  app-explore .editor .done { justify-self: stretch; min-height: 44px; }
+  app-explore .data-table th button { min-height: 44px; padding-block: 0; }
   .tools { gap: var(--sp-1); }
   .relations li button { grid-template-columns: 24px minmax(0, 1fr) auto; padding-block: 14px; }
   .movers button { min-height: 64px; }

@@ -100,8 +100,8 @@ button:disabled { opacity: .45; cursor: default; }
 .time-player:has(> .start) .start { order: 1; flex: 1; min-width: 0; }
 .hour-ticks.failed { visibility: hidden; }
 .player-state .retry-hour { min-height: 32px; padding: 0 6px; font-weight: 700; text-decoration: underline; text-underline-offset: .2em; white-space: nowrap; }
-@media (max-width: 720px) {
-  :host { position: absolute; bottom: calc(var(--tabbar) + 10px); left: 12px; right: 12px; }
+@media (max-width: 720px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  :host { position: absolute; bottom: calc(var(--tabbar) + 10px); left: calc(var(--safe-left) + 12px); right: calc(var(--safe-right) + 12px); }
   .time-player { padding: 4px 12px; border-radius: var(--r-l); box-shadow: var(--shadow); }
   .date-stepper { grid-template-columns: 44px minmax(0, 1fr) 44px auto; }
   .date-stepper .icon { width: 44px; }

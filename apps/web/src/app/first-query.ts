@@ -1,4 +1,5 @@
 // 首次查詢面板：輸入站名或站碼找車站，找不到時改搜地點。
+import { readFold, writeFold } from './fold-preference';
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 
 export interface FirstQueryStation {
@@ -45,7 +46,8 @@ export class FirstQuery {
   readonly choosePreset = output<FirstQueryPreset>();
   readonly presets = DEFAULT_PRESETS;
   readonly query = signal('');
-  readonly collapsed = signal(false);
+  readonly collapsed = signal(readFold('panel.first-query'));
+  toggleCollapsed() { this.collapsed.update(value => !value); writeFold('panel.first-query', this.collapsed()); }
 
   readonly matches = computed(() => {
     const query = searchKey(this.query());

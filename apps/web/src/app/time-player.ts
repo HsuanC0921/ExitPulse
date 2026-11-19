@@ -1,4 +1,5 @@
 // 時間軸：當日 24 小時人次分布、選時段與播放控制
+import { readFold, writeFold } from './fold-preference';
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
@@ -30,8 +31,17 @@ export class TimePlayer {
   readonly profile = input<(number | null)[]>([]);
   readonly measure = input('');
   readonly compact = input(false);
-  readonly expanded = linkedSignal(() => !this.compact());
-  readonly folded = signal(false);
+  readonly expanded = linkedSignal(() => !this.compact() || !readFold('panel.timeline-compact', true));
+  readonly folded = signal(readFold('panel.timeline'));
+  setFolded(folded: boolean) {
+    if (this.compact()) {
+      this.expanded.set(!folded);
+      writeFold('panel.timeline-compact', folded);
+    } else {
+      this.folded.set(folded);
+      writeFold('panel.timeline', folded);
+    }
+  }
   readonly hourChange = output<number>();
   readonly play = output<void>();
   readonly wholeDay = output<void>();

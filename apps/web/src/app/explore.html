@@ -146,10 +146,10 @@
     </div>
   }
   @if (headline()) {
-    <p class="glance-title">
-      <span>{{ mode() === 'station' ? station() + ' · ' + (direction() === 'outbound' ? '去哪裡' : '從哪來') : '全線' }}</span>
-      <span>{{ (unit() === 'date' ? periodDate() : periodBaseText()) + ' · ' + hoursText() }}</span>
-    </p>
+    <div class="glance-title">
+      <strong>{{ mode() === 'station' ? station() + ' · ' + (direction() === 'outbound' ? '去哪裡' : '從哪來') : '全線' }}</strong>
+      <span class="glance-period"><span>{{ unit() === 'date' ? periodDate() : periodBaseText() }}</span><span>{{ hoursText() }}</span></span>
+    </div>
     <div class="headline-row">
       <p class="headline"><span class="headline-period">{{ (unit() === 'date' ? periodDate() : periodBaseText()) + ' · ' + hoursText() }}</span>{{ headline() }}</p>
     </div>

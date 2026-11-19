@@ -1,6 +1,7 @@
 // 兩站比較主元件：地圖、排行、站對詳情與單站、全線三種檢視的狀態都在這裡
-import { ChangeDetectionStrategy, Component, ElementRef, Injector, OnDestroy, ViewEncapsulation, afterNextRender, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, OnDestroy, ViewEncapsulation, afterNextRender, afterRenderEffect, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
 import { autoRetry } from './auto-retry';
+import { readFold, writeFold } from './fold-preference';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -31,6 +32,7 @@ type PairProfile = { origin: string; destination: string; baseline: Profile; cur
 type Stop = { properties: { name: string; lines: string; colors: string }; geometry: { coordinates: [number, number] } };
 type Line = { code: string; name: string; color: string };
 type Mode = 'volume' | 'direction' | 'time';
+type MapPanel = 'station' | 'route' | 'rank' | 'tower' | 'legend';
 type Stream = { key: string; label: string; daily: number; color: string; dashed: boolean; emphasis?: number; path: [number, number][] };
 type Place = { name: string; area: string; address?: string; category?: string; lng: number; lat: number };
 type Entrance = { code: string; name: string; label?: string; lng: number; lat: number; accessible: boolean;
@@ -205,7 +207,16 @@ export class Radar implements OnDestroy {
   readonly tower3d = signal(false);
   readonly lowAngle = signal(false);
   readonly pairStreetStation = linkedSignal(() => this.selected()?.origin ?? null);
-  readonly lowPreviewExpanded = signal(false);
+  private readonly mapPanelState = signal<Partial<Record<MapPanel, boolean>>>({});
+  readonly stationPreviewFolded = computed(() => this.panelFolded('station', this.lowAngle() && this.phone.matches));
+  panelFolded(panel: MapPanel, fallback = false) {
+    const saved = stored('exitpulse.panel.' + panel);
+    return this.mapPanelState()[panel] ?? (saved == null ? fallback : saved === 'closed');
+  }
+  toggleMapPanel(panel: MapPanel, folded: boolean) {
+    this.mapPanelState.update(state => ({ ...state, [panel]: folded }));
+    store('exitpulse.panel.' + panel, folded ? 'closed' : 'open');
+  }
   private beforeLowAngle?: { center: Point; zoom: number; pitch: number };
   readonly towerPeak = signal<number | null>(null);
   private elevatedFlow?: ElevatedFlow;
@@ -215,15 +226,33 @@ export class Radar implements OnDestroy {
   readonly fullscreenSupported = typeof document !== 'undefined' && !!document.fullscreenEnabled && typeof document.documentElement?.requestFullscreen === 'function';
   readonly isFullscreen = signal(false);
   readonly mapFullscreen = signal(false);
-  readonly rotateTipClosed = signal(false);
+  readonly rotateTipClosed = signal(((): boolean => { try { return localStorage.getItem('exitpulse.rotate') === 'no'; } catch { return false; } })());
+  closeRotateTip() {
+    this.rotateTipClosed.set(true);
+    try { localStorage.setItem('exitpulse.rotate', 'no'); } catch { /* 只在這次有效 */ }
+  }
   readonly toolsCollapsed = signal(((): boolean => { try { return localStorage.getItem('exitpulse.tools') === 'closed'; } catch { return false; } })());
   toggleTools() {
     const next = !this.toolsCollapsed();
     this.toolsCollapsed.set(next);
     try { localStorage.setItem('exitpulse.tools', next ? 'closed' : 'open'); } catch { /* 不能存就只在這次有效 */ }
   }
-  readonly isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone);
-  readonly isIosSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !/CriOS|FxiOS/.test(navigator.userAgent);
+  readonly barHidden = signal(((): boolean => { try { return localStorage.getItem('exitpulse.bar') === 'closed'; } catch { return false; } })());
+  toggleBar() {
+    const next = !this.barHidden();
+    this.barHidden.set(next);
+    try { localStorage.setItem('exitpulse.bar', next ? 'closed' : 'open'); } catch { /* 不能存就只在這次有效 */ }
+  }
+  readonly mapMoving = signal(false);
+  readonly openMenu = signal<'place' | 'collection' | 'layers' | null>(null);
+  setMenu(name: 'place' | 'collection' | 'layers', open: boolean) {
+    if (open) this.openMenu.set(name); else if (this.openMenu() === name) this.openMenu.set(null);
+  }
+  closeMenus() {
+    for (const el of this.placeMenu().nativeElement.closest('.map-tools')?.querySelectorAll<HTMLDetailsElement>(':scope > details[open]') ?? []) el.open = false;
+  }
+  readonly isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone);
+  readonly isIosSafari = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   readonly installPrompt = signal<{ prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null>(null);
   private readonly onFullscreenChange = () => {
     const active = !!document.fullscreenElement;
@@ -288,7 +317,7 @@ export class Radar implements OnDestroy {
   private lastFocus: string | undefined;
   /** 手機分成地圖、清單、條件與詳情四個畫面，共用同一份查詢狀態。 */
   readonly mobilePage = signal<MobilePage>('map');
-  readonly phone = matchMedia('(max-width: 720px)');
+  readonly phone = matchMedia('(max-width: 720px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px)');
   private returnFocus?: HTMLElement;
   readonly theme = signal<'light' | 'dark'>(stored('exitpulse.theme') === 'dark' ? 'dark' : 'light');
   readonly paused = signal(stored('exitpulse.paused') === '1');
@@ -297,15 +326,27 @@ export class Radar implements OnDestroy {
   /** 使用者正在拖曳或縮放地圖時為真，面板會淡出讓出視野 */
   readonly mapActive = signal(false);
   /** 手機上流動模式列預設收起，只留圖例，把畫面還給地圖 */
-  readonly flowFolded = signal(innerWidth <= 720);
+  readonly flowFolded = signal(stored('exitpulse.flow') === 'closed' || (stored('exitpulse.flow') == null && innerWidth <= 720));
+  toggleFlowFold() {
+    this.flowFolded.update(value => !value);
+    store('exitpulse.flow', this.flowFolded() ? 'closed' : 'open');
+  }
   private hero?: maplibregl.Marker;
   /** 游標停在排行某一列時，地圖上只突顯那一組兩站 */
   private hoveredKey = '';
   private hoverFrame = 0;
   readonly mode = signal<Mode>('volume');
-  readonly panelOpen = signal(true);
+  readonly panelOpen = signal(!readFold('panel.analysis'));
+  togglePanelOpen() {
+    this.panelOpen.update(open => !open);
+    writeFold('panel.analysis', !this.panelOpen());
+  }
   readonly conditionsOpen = signal(!!location.search);
-  readonly detailOpen = signal(true);
+  readonly detailOpen = signal(!readFold('panel.detail'));
+  toggleDetailOpen() {
+    this.detailOpen.update(open => !open);
+    writeFold('panel.detail', !this.detailOpen());
+  }
   readonly detailWide = signal(false);
   readonly panelWide = signal(false);
   readonly isPanelWide = this.panelWide.asReadonly();
@@ -561,6 +602,43 @@ export class Radar implements OnDestroy {
       probe.remove();
       void this.initialize();
     });
+    afterRenderEffect({ read: onCleanup => {
+      const workspace = this.mapElement().nativeElement.closest<HTMLElement>('.workspace');
+      this.view();
+      this.mobilePage();
+      this.explore();
+      this.focusedFlow();
+      this.selectedMapStation();
+      this.showFirstQuery();
+      if (!workspace) return;
+      const docks = Array.from(workspace.querySelectorAll(
+        '.mobile-overview, .panel-body app-first-query, app-time-player, .flow-preview, .station-preview',
+      ));
+      const positionControls = () => {
+        if (!this.phone.matches) return;
+        const { bottom } = workspace.getBoundingClientRect();
+        const timeline = workspace.querySelector('app-time-player')?.getBoundingClientRect();
+        const timelineLift = timeline?.height && timeline.bottom > bottom - 96 ? bottom - timeline.top : 0;
+        let lift = 0;
+        for (const dock of docks) {
+          const rect = dock.getBoundingClientRect();
+          if (!rect.height) continue;
+          if (dock.matches('.flow-preview') && timelineLift) {
+            lift = Math.max(lift, timelineLift + rect.height + 24);
+          } else if (rect.bottom > bottom - 96) {
+            lift = Math.max(lift, bottom - rect.top + 12);
+          }
+        }
+        const offset = lift ? Math.ceil(lift) + 'px' : '';
+        if (workspace.style.getPropertyValue('--nav-dock') !== offset) workspace.style.setProperty('--nav-dock', offset);
+        const timelineOffset = timelineLift ? Math.ceil(timelineLift) + 'px' : '';
+        if (workspace.style.getPropertyValue('--timeline-dock') !== timelineOffset) workspace.style.setProperty('--timeline-dock', timelineOffset);
+      };
+      const observer = new ResizeObserver(positionControls);
+      observer.observe(workspace);
+      docks.forEach(dock => observer.observe(dock));
+      onCleanup(() => observer.disconnect());
+    } });
     effect(() => {
       this.mapElement();
       untracked(() => this.ensureMapMounted());
@@ -601,7 +679,7 @@ export class Radar implements OnDestroy {
     if (e.key === 'Escape' && this.selected()) { e.preventDefault(); this.closeDetail(); return; }
     if (e.key === 'Escape' && this.phone.matches && this.mobilePage() === 'conditions') { this.showResults() ? this.showMobileList() : this.showMobileMap(); return; }
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === '[' && !this.phone.matches) { e.preventDefault(); this.panelOpen.set(!this.panelOpen()); return; }
+    if (e.key === '[' && !this.phone.matches) { e.preventDefault(); this.togglePanelOpen(); return; }
     if (this.view() !== 'pairs') return;
     if (e.key === '/' && this.view() === 'pairs' && this.showResults()) { e.preventDefault(); this.panelOpen.set(true); this.toolsOpen.set(true); setTimeout(() => this.searchInput()?.nativeElement.focus()); return; }
     if ((e.key === 'j' || e.key === 'k') && this.results().length) {
@@ -850,11 +928,16 @@ export class Radar implements OnDestroy {
       map.on('dragend', () => this.mapActive.set(false));
       map.on('zoomstart', holdRibbonWidth);
       map.on('pitchstart', holdRibbonWidth);
+      map.on('move', () => map.getContainer().toggleAttribute('data-tilted', Math.abs(map.getBearing()) > 1 || map.getPitch() > 1));
       map.on('moveend', () => {
         if (!this.ribbonMoving) return;
         this.ribbonMoving = false;
         void this.drawRibbons();
       });
+      // 手指在拖、縮放地圖時，底部的卡片先退成半透明，露出被擋住的地圖
+      let settle = 0;
+      map.on('movestart', () => { clearTimeout(settle); this.mapMoving.set(true); });
+      map.on('moveend', () => { settle = window.setTimeout(() => this.mapMoving.set(false), 450); });
       map.on('click', stationLayers, e => {
         const name = e.features?.[0]?.properties?.['name'];
         // 再點一次同一站就取消
@@ -1258,8 +1341,7 @@ export class Radar implements OnDestroy {
     }
     this.beforeLowAngle = { center: map.getCenter().toArray(), zoom: map.getZoom(), pitch: map.getPitch() };
     this.lowAngle.set(true);
-    this.lowPreviewExpanded.set(false);
-    if (this.phone.matches) this.flowFolded.set(true);
+    if (this.phone.matches && stored('exitpulse.flow') == null) this.flowFolded.set(true);
     this.focusLowAngle();
   }
 
@@ -1542,7 +1624,6 @@ export class Radar implements OnDestroy {
 
   selectMapStation(name: string | null) {
     this.selectedMapStation.set(name);
-    this.lowPreviewExpanded.set(false);
     this.showEntrances.set(false);
     this.compareEntrances.set(false);
     this.selectedEntrance.set(null);
@@ -1893,7 +1974,7 @@ export class Radar implements OnDestroy {
   choose(result: Result, moveFocus = true) {
     if (document.activeElement instanceof HTMLElement && !this.selected()) this.returnFocus = document.activeElement;
     this.particleElapsed = 0;
-    this.selected.set(result); this.detailOpen.set(true);
+    this.selected.set(result); this.detailOpen.set(moveFocus || !readFold('panel.detail'));
     this.mobilePage.set('detail');
     if (moveFocus) {
       afterNextRender(() => this.detailView()?.focusPanel(), { injector: this.injector });
@@ -2505,6 +2586,29 @@ export class Radar implements OnDestroy {
     setTimeout(() => this.map?.resize(), 60);
   }
 
+  readonly installHelp = signal(false);
+  installFromBanner() {
+    if (this.installPrompt()) { void this.installApp(); return; }
+    this.installHelp.set(true);
+    this.layerOpenHint();
+  }
+  layerOpenHint() {
+    const el = this.placeMenu().nativeElement.closest('.map-tools')?.querySelector<HTMLDetailsElement>('.layer-menu');
+    if (el) el.open = true;
+    this.dismissInstallBanner();
+  }
+  readonly installBannerClosed = signal(((): boolean => { try { return localStorage.getItem('exitpulse.install') === 'no'; } catch { return false; } })());
+  /** 按「稍後」後，提示條改成告訴使用者之後去哪裡補裝，幾秒後收掉。 */
+  readonly installLater = signal(false);
+  dismissInstallBanner(later = false) {
+    this.installBannerClosed.set(true);
+    if (later) { this.installLater.set(true); setTimeout(() => this.installLater.set(false), 6000); }
+    try { localStorage.setItem('exitpulse.install', 'no'); } catch { /* 只在這次有效 */ }
+  }
+  /** 有系統安裝視窗就直接叫出，沒有（iPhone 等）就展開手動步驟。 */
+  async installAction() {
+    if (this.installPrompt()) await this.installApp(); else this.installHelp.set(!this.installHelp());
+  }
   async installApp() {
     const ev = this.installPrompt();
     if (!ev) return;

@@ -1,5 +1,5 @@
 <!-- 兩站比較主畫面：條件、排行、站對詳情、地圖與三種檢視的切換 -->
-<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()">
+<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()" [class.bar-hidden]="barHidden()" [class.moving]="mapMoving()">
   <div #map class="map" role="application" aria-label="臺北捷運旅次地圖"></div>
   @if (mapFullscreen()) {
     <button type="button" class="exit-fullscreen" (click)="toggleMapFullscreen()">退出全螢幕</button>
@@ -7,8 +7,18 @@
       <p class="fullscreen-tip" role="note">iPhone 瀏覽器無法隱藏網址列。點下方「分享 → 加入主畫面」，從主畫面打開就是全螢幕。</p>
     }
   }
+  @if (!isStandalone && !installBannerClosed() && !openMenu() && (installPrompt() || isIosSafari)) {
+    <div class="install-banner" role="note">
+      <p>安裝成 App，沒有網址列，地圖更大。</p>
+      <button type="button" class="primary" (click)="installFromBanner()">{{ installPrompt() ? '安裝' : '怎麼裝' }}</button>
+      <button type="button" aria-label="不再提示" (click)="dismissInstallBanner(true)">稍後</button>
+    </div>
+  }
+  @if (installLater() && !isStandalone && !openMenu()) {
+    <div class="install-banner later" role="status"><p>好，想裝時點上方工具列最右的「圖層」，第一項就是安裝成 App。</p></div>
+  }
   @if (!rotateTipClosed()) {
-    <p class="rotate-tip" role="note">手機橫放時畫面偏窄，直立使用會有完整的手機版面。<button type="button" (click)="rotateTipClosed.set(true)">知道了</button></p>
+    <p class="rotate-tip" role="note">手機橫放時畫面偏窄，直立使用會有完整的手機版面。<button type="button" (click)="closeRotateTip()">知道了</button></p>
   }
   @if (basemap() !== 'ready') {
     <div class="map-veil" [class.failed]="basemap() === 'failed'" [attr.role]="basemap() === 'failed' ? 'alert' : 'status'">
@@ -21,12 +31,14 @@
 
   <app-mobile-shell [page]="mobilePage()" [view]="view()" [summary]="mobileSummary()" [hideOverview]="view() !== 'pairs' || showFirstQuery()"
     [focusedStation]="lowAngle() ? pairStreetStation() : null" (stationFocus)="focusPairStreetStation($event)"
-    (action)="mobileAction($event)" (viewChange)="setView($event)" />
+    (action)="mobileAction($event)" (viewChange)="setView($event)" [barHidden]="barHidden()" (barToggle)="toggleBar()" (viewMenuOpened)="closeMenus()" />
 
+  @if (openMenu()) { <div class="sheet-scrim" (click)="closeMenus()"></div> }
   <div class="map-tools" [class.collapsed]="toolsCollapsed()" role="group" aria-label="地圖設定">
-    <details #placeMenu class="place-menu" (toggle)="placeMenu.open && (layerMenu.open = collectionMenu.open = false)" (keydown.escape)="placeMenu.open = false; $event.stopPropagation()">
+    <details #placeMenu class="place-menu" (toggle)="placeMenu.open && (layerMenu.open = collectionMenu.open = false); setMenu('place', placeMenu.open)" (keydown.escape)="placeMenu.open = false; $event.stopPropagation()">
       <summary data-tip="找地點、地址或店名"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><span>找地點</span></summary>
       <div class="layer-options place-options">
+        <button type="button" class="sheet-close" aria-label="關閉找地點" (click)="closeMenus()"><span>找地點</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         <form (submit)="$event.preventDefault(); searchPlaces()">
           <input #placeInput type="search" aria-label="輸入地點或地址" placeholder="地名、地標或地址" maxlength="80" [value]="placeQuery()" (input)="placeQuery.set(placeInput.value)">
           <button type="submit" [disabled]="placeBusy() || placeQuery().trim().length < 2">搜尋</button>
@@ -68,9 +80,10 @@
         }
       </div>
     </details>
-    <details #collectionMenu class="collection-menu" [open]="openCollectionOnLoad" (toggle)="collectionMenu.open && (placeMenu.open = layerMenu.open = false); collectionMenu.open || collectionNotice.set('')" (keydown.escape)="collectionMenu.open = false; $event.stopPropagation()">
+    <details #collectionMenu class="collection-menu" [open]="openCollectionOnLoad" (toggle)="collectionMenu.open && (placeMenu.open = layerMenu.open = false); collectionMenu.open || collectionNotice.set(''); setMenu('collection', collectionMenu.open)" (keydown.escape)="collectionMenu.open = false; $event.stopPropagation()">
       <summary data-tip="收藏常用的條件，不用註冊"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.fill]="collection().length ? 'currentColor' : 'none'" d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg><span>收藏</span></summary>
       <div class="layer-options collection-options">
+        <button type="button" class="sheet-close" aria-label="關閉收藏" (click)="closeMenus()"><span>收藏</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         @if (pendingImport().length) {
           <div class="collection-import" role="alert">
             <strong>連結裡有 {{ pendingImport().length }} 筆收藏</strong>
@@ -130,9 +143,16 @@
       </span>
       <span>{{ theme() === 'dark' ? '深色' : '淺色' }}</span>
     </button>
-    <details #layerMenu class="layer-menu" (toggle)="layerMenu.open && (placeMenu.open = collectionMenu.open = false)" (keydown.escape)="layerMenu.open = false; $event.stopPropagation()">
+    <details #layerMenu class="layer-menu" (toggle)="layerMenu.open && (placeMenu.open = collectionMenu.open = false); setMenu('layers', layerMenu.open)" (keydown.escape)="layerMenu.open = false; $event.stopPropagation()">
       <summary data-tip="切換圖層：道路、自然、動態效果"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83zM2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span>圖層</span></summary>
       <div class="layer-options">
+        <button type="button" class="sheet-close" aria-label="關閉圖層與設定" (click)="closeMenus()"><span>圖層與設定</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        @if (!isStandalone) {
+          <button type="button" class="pwa-install-btn" (click)="installAction()">{{ installPrompt() ? '安裝成 App，地圖可全螢幕' : '怎麼安裝成 App' }}</button>
+          @if (installHelp()) {
+            <p class="pwa-tip">{{ isIosSafari ? '點瀏覽器的「分享」，選「加入主畫面」。' : '開瀏覽器選單，選「安裝應用程式」或「加到主畫面」。' }}從主畫面打開就沒有網址列，整個畫面都是地圖。</p>
+          }
+        }
         <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
         <label>街道與建物<input type="checkbox" role="switch" [checked]="showRoads()" (change)="toggleMapOption('roads')"></label>
         <label>水系與綠地<input type="checkbox" role="switch" [checked]="showNature()" (change)="toggleMapOption('nature')"></label>
@@ -140,16 +160,13 @@
         <label>人流圖例<input type="checkbox" role="switch" [checked]="showLegend()" (change)="toggleMapOption('legend')"></label>
         <label>流向動畫<input type="checkbox" role="switch" [checked]="!paused()" (change)="togglePause()"></label>
         <label>比例尺<input type="checkbox" role="switch" [checked]="showScale()" (change)="toggleMapOption('scale')"></label>
+        <label class="mobile-only-row">立體地圖與人流<input type="checkbox" role="switch" [checked]="tower3d()" (change)="toggleTower3d()"></label>
+        <label class="mobile-only-row">深色模式<input type="checkbox" role="switch" [checked]="theme() === 'dark'" (change)="setTheme(theme() === 'dark' ? 'light' : 'dark')"></label>
         <label>全螢幕地圖<input type="checkbox" role="switch" [checked]="mapFullscreen()" (change)="toggleMapFullscreen(); layerMenu.open = false"></label>
         <div class="layer-mobile-actions">
           <button type="button" (click)="resetMap(); layerMenu.open = false">回到全圖</button>
           <button type="button" (click)="about.open(); layerMenu.open = false">關於與授權</button>
         </div>
-        @if (installPrompt() && !isStandalone) {
-          <button type="button" class="pwa-install-btn" (click)="installApp(); layerMenu.open = false">安裝成網頁 App</button>
-        } @else if (isIosSafari && !isStandalone) {
-          <p class="pwa-tip">iPhone 可點底部「分享 → 加入主畫面」，即可隱藏網址列當成 App 使用。</p>
-        }
         @if (view() === 'station' && explore()?.isComparing()) {
           <div class="map-metric segmented" role="group" aria-label="人流呈現方式">
             <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'volume'" (click)="explore()?.mapMetric?.set('volume')">人次</button>
@@ -157,6 +174,11 @@
           </div>
         }
         @if (showLegend()) {
+          <details class="layer-legend" [open]="!panelFolded('legend', phone.matches)"
+            (toggle)="toggleMapPanel('legend', !$any($event.target).open)">
+            <summary class="overlay-fold" [attr.aria-expanded]="!panelFolded('legend', phone.matches)">人流圖例
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </summary>
           <div class="layer-key">
             @if (tower3d()) {
               <p>{{ view() === 'pairs' || view() === 'network' ? '站塔越高，進站人次越多。' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
@@ -173,6 +195,7 @@
               @if (view() === 'station' && explore()?.isComparing()) { <p><i class="sw flow dashed"></i>比對照期少</p> }
             }
           </div>
+          </details>
         }
         @if (view() === 'station') { <ng-container *ngTemplateOutlet="flowPause" /> }
         <a class="layer-source" href="https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d" target="_blank" rel="noopener">資料來源<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
@@ -188,6 +211,7 @@
   </div>
   @if (tower3d()) {
     <div class="tower-key" [class.tower-key-pair]="view() === 'pairs' && selected()">
+      @if (!panelFolded('tower')) {
       @if (showLegend() && !selectedMapStation()) {
         <svg viewBox="0 0 25 20" aria-hidden="true"><path d="M1 18l3-6 3 6M9 18l3.5-12 3.5 12M18 18l3.5-16 3.5 16"/></svg>
         <span class="tower-key-caption">
@@ -198,17 +222,22 @@
       <button type="button" class="map-angle" [attr.aria-pressed]="lowAngle()" (click)="toggleLowAngle()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.194 13.707 3.814 1.86-1.86 3.814"/><path d="M16.47214 7.52786 A 5 10 0 1 0 13 21.79796"/><path d="M21.79796 11 A 10 5 0 1 0 19 15.57071"/></svg>低視角
       </button>
+      }
+      <ng-container *ngTemplateOutlet="mapPanelToggle; context: {panel: 'tower', label: '立體', folded: panelFolded('tower'), showLabel: true}" />
     </div>
   }
   @if (view() === 'station' && rankedStations().length && !selectedMapStation()) {
     <div class="map-rank-focus" role="group" aria-label="地圖人流線數量">
+      @if (!panelFolded('rank', phone.matches)) {
       <button type="button" [attr.aria-pressed]="stationArcLimit() === 5" title="只顯示前 5 名往來路線並對焦" (click)="setStationArcLimit(5)">前 5</button>
       <button type="button" [attr.aria-pressed]="stationArcLimit() === 10" title="只顯示前 10 名往來路線並對焦" (click)="setStationArcLimit(10)">前 10</button>
       <button type="button" [attr.aria-pressed]="stationArcLimit() === 0" title="顯示全部往來路線" (click)="setStationArcLimit(0)">全部</button>
+      }
+      <ng-container *ngTemplateOutlet="mapPanelToggle; context: {panel: 'rank', label: '往來排名', folded: panelFolded('rank', phone.matches), showLabel: true}" />
     </div>
   }
   @if (selectedMapStation(); as station) {
-    <section class="station-preview" aria-label="地圖所選車站" [class.preview-compact]="lowAngle() && phone.matches && !lowPreviewExpanded()">
+    <section class="station-preview" aria-label="地圖所選車站" [class.preview-compact]="stationPreviewFolded()">
       <div class="station-preview-head">
         <div class="station-preview-title">
           <h2>{{ station }}</h2>
@@ -216,11 +245,7 @@
             @for (l of linesOfStation(station); track l.code) { <b class="badge" [attr.data-code]="l.code" [style.--line]="l.color" [title]="l.name">{{ stationCode(l.code, station) }}</b> }
           </div>
         </div>
-        @if (lowAngle() && phone.matches) {
-          <button type="button" class="preview-toggle" [attr.aria-expanded]="lowPreviewExpanded()" (click)="lowPreviewExpanded.update(expanded => !expanded)">
-            {{ lowPreviewExpanded() ? '收合資訊' : '車站資訊' }}
-          </button>
-        }
+        <ng-container *ngTemplateOutlet="mapPanelToggle; context: {panel: 'station', label: '車站資訊', folded: stationPreviewFolded()}" />
         <button type="button" class="icon-button" aria-label="關閉車站資訊" title="關閉（也可按 Esc、再點一次車站或點地圖空白處）" (click)="selectMapStation(null)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       @if (stationInfo(); as info) {
@@ -396,9 +421,11 @@
     </section>
   }
   @if (focusedFlow(); as flow) {
-    <section class="flow-preview" aria-label="所選路線流向資訊">
+    @let routeFolded = panelFolded('route', phone.matches && explore()?.unit() === 'date');
+    <section class="flow-preview" aria-label="所選路線流向資訊" [class.preview-compact]="routeFolded">
       <div class="flow-preview-head">
         <h2><span>{{ flow.origin }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>{{ flow.destination }}</span></h2>
+        <ng-container *ngTemplateOutlet="mapPanelToggle; context: {panel: 'route', label: '流向資訊', folded: routeFolded}" />
         <button type="button" class="icon-button" aria-label="關閉路線資訊" (click)="explore()?.focusRelation(null)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div class="flow-preview-stats">
@@ -416,7 +443,7 @@
   }
 
   <aside class="panel" [class.closed]="!panelOpen()" [class.wide]="isPanelWide()" (keydown.escape)="isPanelWide() && togglePanelWide()" aria-label="旅次變化分析">
-    <header class="sign" (click)="panelOpen() || panelOpen.set(true)">
+    <header class="sign" (click)="panelOpen() || togglePanelOpen()">
       <h1><app-brand [compact]="!panelOpen()" /></h1>
       <div class="sign-actions">
         @if (panelOpen()) {
@@ -424,7 +451,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="isPanelWide() ? 'M14 10l7-7M20 10h-6V4M3 21l7-7M4 14h6v6' : 'M15 3h6v6M21 3l-7 7M3 21l7-7M9 21H3v-6'"/></svg>
           </button>
         }
-        <button type="button" class="icon-button" [attr.aria-expanded]="panelOpen()" aria-controls="panel-body" [attr.aria-label]="panelOpen() ? '收合面板，地圖全開' : '展開面板'" [attr.title]="panelOpen() ? '收合面板（快速鍵 [）' : '展開面板（快速鍵 [）'" (click)="$event.stopPropagation(); panelOpen.set(!panelOpen())">
+        <button type="button" class="icon-button" [attr.aria-expanded]="panelOpen()" aria-controls="panel-body" [attr.aria-label]="panelOpen() ? '收合面板，地圖全開' : '展開面板'" [attr.title]="panelOpen() ? '收合面板（快速鍵 [）' : '展開面板（快速鍵 [）'" (click)="$event.stopPropagation(); togglePanelOpen()">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="panelOpen() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg>
         </button>
       </div>
@@ -604,7 +631,7 @@
         [dailyTrips]="dailyTrips"
         (toggleFav)="toggleFavPair()"
         (toggleWide)="detailOpen.set(true); detailWide.update(v => !v); panelWide.set(false)"
-        (toggleOpen)="detailOpen.set(!detailOpen())"
+        (toggleOpen)="toggleDetailOpen()"
         (close)="closeDetail()"
         (focusStation)="focusStation($event)"
         (choose)="choose($event)"
@@ -622,7 +649,7 @@
       </div>
       <ng-container *ngTemplateOutlet="flowPause" />
       @if (showLegend()) { <app-hint class="flow-help" label="人流圖例" [entries]="flowHint()" /> }
-      <button type="button" class="flow-fold" [attr.aria-expanded]="!flowFolded()" [attr.aria-label]="flowFolded() ? '展開流動模式' : '收合流動模式'" (click)="flowFolded.set(!flowFolded())"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="flowFolded() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg></button>
+      <button type="button" class="overlay-fold flow-fold" [attr.aria-expanded]="!flowFolded()" [attr.aria-label]="flowFolded() ? '展開流動模式' : '收合流動模式'" (click)="toggleFlowFold()">@if (flowFolded()) { <span>人流</span> }<svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="flowFolded() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg></button>
       @if (showLegend() && streams().length) { <ul class="legend">
         @for (s of streams(); track s.label; let i = $index) {
           <li>
@@ -644,5 +671,11 @@
         <svg viewBox="0 0 24 24" aria-hidden="true">@if (paused()) { <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/> } @else { <rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/> }</svg>
       </button>
     }
+  </ng-template>
+  <ng-template #mapPanelToggle let-panel="panel" let-label="label" let-folded="folded" let-showLabel="showLabel">
+    <button type="button" class="overlay-fold" [attr.aria-expanded]="!folded" [attr.aria-label]="(folded ? '展開' : '收合') + label" (click)="toggleMapPanel(panel, !folded)">
+      @if (folded && showLabel) { <span>{{ label }}</span> }
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="folded ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg>
+    </button>
   </ng-template>
 </main>

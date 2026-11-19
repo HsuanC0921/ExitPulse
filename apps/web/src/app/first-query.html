@@ -6,7 +6,7 @@
     <div class="first-query-title-wrap">
       <h2 id="first-query-title">從一個車站開始</h2>
     </div>
-    <button type="button" class="first-query-toggle" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="collapsed() ? '展開查詢卡片' : '收合以露出地圖'" (click)="collapsed.set(!collapsed())">
+    <button type="button" class="first-query-toggle" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="collapsed() ? '展開查詢卡片' : '收合以露出地圖'" (click)="toggleCollapsed()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="collapsed() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg>
     </button>
   </div>

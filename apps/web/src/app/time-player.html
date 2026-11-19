@@ -1,13 +1,13 @@
 <!-- 時間軸：24 小時人次分布與時段選擇 -->
-<section class="time-player" [class.compact]="compact() && !expanded()" aria-label="單日人流時間軸">
-  @if (compact() && !expanded()) {
-    <button type="button" class="compact-time" aria-expanded="false" aria-label="展開時間軸" (click)="expanded.set(true)">
+<section class="time-player" [class.compact]="compact() && !expanded() || !compact() && daily() && folded()" aria-label="單日人流時間軸">
+  @if (compact() && !expanded() || !compact() && daily() && folded()) {
+    <button type="button" class="compact-time" aria-expanded="false" aria-label="展開時間軸" (click)="setFolded(false)">
       <span><strong>{{ station() || '全網人次' }}</strong><span>{{ failure() ? '查詢未完成' : unrecorded() ? '這個時段無紀錄' : daily() ? range() : '人流時間軸' }}</span></span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
     </button>
   } @else if (!daily()) {
     <div class="player-heading"><h2>人流時間軸</h2><button type="button" class="date-link" (click)="edit.emit()">選日期</button>
-      @if (compact()) { <button type="button" class="icon" aria-label="收合時間軸" (click)="expanded.set(false)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button> }
+      @if (compact()) { <button type="button" class="icon" aria-label="收合時間軸" (click)="setFolded(true)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button> }
     </div>
     <button type="button" class="start" (click)="start.emit()">逐時播放 <time [attr.datetime]="date()">{{ date() }}</time><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
   } @else {
@@ -22,7 +22,7 @@
       <button type="button" class="date-link" [attr.aria-label]="date() + ' 選日期'" (click)="edit.emit()"><time [attr.datetime]="date()">{{ date() }}</time><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
       <button type="button" class="icon" aria-label="後一天" [disabled]="!next()" (click)="step.emit(1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
       <app-hint label="單日時間軸" [alignToPanel]="true" [entries]="guide()" />
-      <button type="button" class="fold" [attr.aria-expanded]="compact() || !folded()" [attr.aria-label]="compact() || !folded() ? '收合時間軸' : '展開時間軸'" (click)="compact() ? expanded.set(false) : folded.update(value => !value)"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="!compact() && folded() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg></button>
+      <button type="button" class="fold" [attr.aria-expanded]="compact() || !folded()" [attr.aria-label]="compact() || !folded() ? '收合時間軸' : '展開時間軸'" (click)="setFolded(true)"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="!compact() && folded() ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'"/></svg></button>
     </div>
     <div class="playback">
       <div class="time-readout">
