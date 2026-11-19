@@ -4,7 +4,7 @@ import { autoRetry } from './auto-retry';
 import { watchDeviceProfile } from './device-profile';
 import { moveControls } from './control-motion';
 import { MotionPreference } from './motion-preference';
-import { drawRankLink, installRankLink, zoomScaled } from './rank-map-link';
+import { dotScaleAt, drawRankLink, installRankLink, zoomScaled } from './rank-map-link';
 import { readFold, writeFold } from './fold-preference';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
@@ -2534,6 +2534,42 @@ export class Radar implements OnDestroy {
     if (countsLabel.textContent !== counts) countsLabel.textContent = counts;
   }
 
+  private focusRing?: { marker: maplibregl.Marker; radius: number; station: string };
+  private focusRingZoom = false;
+
+  /** 轉乘站被聚焦時，圓圈外環依各線分段上色，不替它挑單一顏色 */
+  private syncFocusRing() {
+    const map = this.map, layer = this.exploreLayer();
+    const station = this.view() === 'network' && !this.tower3d() ? layer?.focus ?? null : null;
+    const lines = station ? this.linesOfStation(station) : [];
+    const circle = station ? layer?.circles.find(c => c.station === station) : undefined;
+    const at = station ? this.stops.get(station) : undefined;
+    if (!map || !this.ml || !station || lines.length < 2 || !circle || !at) {
+      this.focusRing?.marker.remove();
+      this.focusRing = undefined;
+      return;
+    }
+    if (!this.focusRing || this.focusRing.station !== station) {
+      this.focusRing?.marker.remove();
+      const element = document.createElement('div');
+      element.className = 'focus-ring';
+      element.setAttribute('aria-hidden', 'true');
+      const step = 360 / lines.length;
+      element.style.background = `conic-gradient(${lines.map((l, i) => `${l.color} ${i * step}deg ${(i + 1) * step}deg`).join(', ')})`;
+      this.focusRing = { marker: new this.ml.Marker({ element, anchor: 'center' }).setLngLat(at).addTo(map), radius: circle.radius, station };
+    }
+    this.focusRing.radius = circle.radius;
+    this.sizeFocusRing();
+    if (!this.focusRingZoom) { this.focusRingZoom = true; map.on('zoom', () => this.sizeFocusRing()); }
+  }
+
+  private sizeFocusRing() {
+    const ring = this.focusRing, map = this.map;
+    if (!ring || !map) return;
+    const size = Math.round(ring.radius * dotScaleAt(map.getZoom()) * 2 + 6);
+    ring.marker.getElement().style.width = ring.marker.getElement().style.height = `${size}px`;
+  }
+
   private drawExplore(fly: boolean) {
     const map = this.map, layer = this.exploreLayer();
     if (!map || !this.layersReady) { this.pendingFly ||= fly; return; }
@@ -2555,6 +2591,7 @@ export class Radar implements OnDestroy {
     this.drawStreams(streams);
     (map.getSource('od-stops') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? circles.flatMap(point) : [] });
     (map.getSource('explore-circles') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? [] : circles.filter(c => c.radius > 0).flatMap(point) });
+    this.syncFocusRing();
     this.drawTowers();
     if (fly && !this.explore()?.selectedRank()) {
       if (this.lowAngle()) this.focusLowAngle();

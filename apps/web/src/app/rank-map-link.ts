@@ -4,6 +4,14 @@ import type { Feature, FeatureCollection } from 'geojson';
 const SOURCE = 'rank-highlight';
 /** 圓圈半徑（像素）隨縮放級別放大，讓圈圈跟底圖一起變大，但不照幾何比例放大（每級 2 倍會在近景大到蓋住街道）。 */
 const ZOOM_SCALE: [number, number][] = [[9, .6], [11, 1], [13, 1.8], [16, 3.2]];
+/** 與 zoomScaled 同一條曲線，給 DOM 元素用，讓外環和地圖圓圈一樣大 */
+export function dotScaleAt(zoom: number): number {
+  const [first] = ZOOM_SCALE, last = ZOOM_SCALE[ZOOM_SCALE.length - 1];
+  if (zoom <= first[0]) return first[1];
+  if (zoom >= last[0]) return last[1];
+  const i = ZOOM_SCALE.findIndex(([z]) => z > zoom), [z0, k0] = ZOOM_SCALE[i - 1], [z1, k1] = ZOOM_SCALE[i];
+  return k0 + (k1 - k0) * (zoom - z0) / (z1 - z0);
+}
 export function zoomScaled(value: unknown[] | number, pad = 0, divisor = 1) {
   const expr = (k: number) => ['/', ['+', ['*', value, k], pad], divisor];
   return ['interpolate', ['linear'], ['zoom'], ...ZOOM_SCALE.flatMap(([zoom, k]) => [zoom, expr(k)])] as never;
