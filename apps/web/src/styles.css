@@ -145,13 +145,49 @@ button, summary, [role='button'], label:has(input[type='checkbox']), select {
 }
 
 /* Keep MapLibre controls clear of mobile overlays and safe areas. */
-@media (max-width: 720px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+:where(app-root[data-layout='compact']) {
   .workspace .maplibregl-ctrl-bottom-right { right: calc(var(--safe-right) + 12px); }
   .workspace .maplibregl-ctrl-group { border-radius: 12px; background: var(--panel); }
   .workspace .maplibregl-ctrl-group button { width: 44px; height: 44px; }
   .workspace .maplibregl-ctrl-compass .maplibregl-ctrl-icon { opacity: 1; }
   .workspace:has(.map-tools > details[open], .mobile-view-menu) .maplibregl-ctrl-group { visibility: hidden; }
 }
+
+.device-inset-probe {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  box-sizing: content-box;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+.device-status-area {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 8;
+  height: var(--safe-top);
+  background: var(--band);
+  overflow: hidden;
+  pointer-events: none;
+}
+.device-progress {
+  position: absolute;
+  inset: auto var(--safe-right) 0 var(--safe-left);
+  height: 2px;
+  background: color-mix(in srgb, var(--on-band) 22%, transparent);
+}
+.device-progress::after {
+  content: '';
+  display: block;
+  width: 34%;
+  height: 100%;
+  background: var(--on-band);
+  animation: device-loading 1.4s ease-in-out infinite alternate;
+}
+@keyframes device-loading { to { transform: translateX(194%); } }
+@media (prefers-reduced-motion: reduce) { .device-progress::after { animation: none; } }
 
 @media (max-width: 720px) {
   .workspace .maplibregl-ctrl-bottom-right {
@@ -171,7 +207,7 @@ button, summary, [role='button'], label:has(input[type='checkbox']), select {
   .workspace.map-active :is(.mobile-overview, .panel-body app-first-query, .flow-preview) {
     background: color-mix(in srgb, var(--panel) 96%, transparent);
   }
-  .workspace:has(.install-banner) :is(.flowbar, .tower-key, .map-rank-focus) { visibility: hidden; }
+  .workspace:has(:is(.tower-key, .flowbar, .map-rank-focus, .station-preview, app-time-player)) .install-banner { display: none; }
   .workspace:has(.map-tools > details[open], .mobile-view-menu) :is(.mobile-overview, .flow-preview, .tower-key, .flowbar, .map-rank-focus) { visibility: hidden; }
 }
 @media (max-width: 360px) and (max-height: 650px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {

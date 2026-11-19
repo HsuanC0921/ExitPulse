@@ -257,24 +257,19 @@ button { cursor: pointer; }
   .flowbar { left: calc(362px + (100% - 362px) / 2); max-width: calc(100% - 394px); }
 }
 app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); --safe-right: env(safe-area-inset-right, 0px); }
-@media (max-width: 720px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  app-root { --tabbar: var(--safe-bottom); --mobile-top: calc(52px + var(--safe-top)); --tools-top: calc(var(--mobile-top) + 8px); --tools-end: calc(var(--tools-top) + 52px); --card-h: 76px; }
+app-root[data-layout='compact'] { --tabbar: var(--safe-bottom); --mobile-top: calc(52px + var(--safe-top)); --tools-top: calc(var(--mobile-top) + 8px); --tools-end: calc(var(--tools-top) + 52px); --card-h: 76px; }
+:where(app-root[data-layout='compact']) {
   .workspace:has(.mobile-overview.min) { --card-h: 44px; }
   .workspace.bar-hidden[data-mobile-page='map'] { --mobile-top: var(--safe-top); --tools-top: calc(var(--mobile-top) + 8px); --tools-end: calc(var(--tools-top) + 52px); --card-h: 76px; }
   /* 手機不預留提示列的高度，空白時不要在區塊之間留出缺口，訊息出現時才佔位 */
   .radar-feedback { min-height: 0; }
   .panel-body .view-tabs, .panel .sign, .panel > .stripe { display: none; }
-  .map-tools { top: var(--tools-top); right: 12px; }
 }
 @media (max-width: 960px) {
   .map-tools :is(.map-reset, summary, .theme-switch) { gap: 0; padding: 0; }
   .map-tools :is(.map-reset, summary, .theme-switch) > span:not(.theme-track) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; text-overflow: ellipsis; }
 }
-@media (max-width: 720px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  .station-preview, .map-rank-focus { top: calc(var(--tools-end) + 8px); right: 12px; }
-  .tower-key + .station-preview { top: calc(var(--tools-end) + 60px); }
-  .tower-key, .tower-key:has(+ .map-rank-focus) { top: calc(var(--tools-end) + 8px); left: 12px; right: auto; }
-  .tower-key + .map-rank-focus { top: calc(var(--tools-end) + 60px); }
+:where(app-root[data-layout='compact']) {
   .panel, .detail { inset: var(--mobile-top) var(--safe-right) 0 var(--safe-left); width: auto; height: auto; max-height: none; border-radius: 0; box-shadow: none; background: var(--panel); }
   .panel-body { flex: 1; min-height: 0; padding: 14px 16px max(12px, var(--safe-bottom)); }
   .panel-body .view-tabs { display: none; }
@@ -288,22 +283,14 @@ app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bott
   .workspace[data-mobile-page='map'] .panel-body:has(app-first-query) { display: contents; }
   .workspace[data-mobile-page='map'] .panel-body:has(app-first-query) > :not(app-first-query) { display: none; }
   .workspace[data-mobile-page='map'] .panel-body app-first-query {
-    position: absolute; inset: auto 12px calc(var(--tabbar) + 10px); max-height: calc(100dvh - var(--mobile-top) - var(--tabbar) - 76px);
+    position: absolute; inset: auto calc(var(--safe-right) + 12px) calc(var(--tabbar) + 10px) calc(var(--safe-left) + 12px); max-height: calc(100dvh - var(--tools-end) - var(--tabbar) - 18px);
     margin: 0; overflow-y: auto; overscroll-behavior: contain; border-radius: var(--r-l); box-shadow: var(--shadow);
   }
-  .map-tools { left: auto; right: max(12px, var(--safe-right)); display: flex; gap: 0; padding: 2px; }
-  .map-tools > :is(button, details) { flex: 0 0 46px; }
-  .map-tools > details > summary, .map-tools > button { width: 100%; min-width: 0; }
-  .map-tools :is(.map-fullscreen-btn, .tower-switch, .theme-switch) { display: none; }
-  .map-tools :is(.map-fit-btn, .map-about) { display: none; }
-  .layer-mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .layer-mobile-actions button { min-height: 40px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); font-size: var(--fs-xs); font-weight: 700; }
   .workspace:is([data-mobile-page='conditions'], [data-mobile-page='list']) .panel-body app-first-query { display: none; }
   .panel app-time-player { border: 0; }
+  .workspace:not([data-mobile-page='map']) { background: var(--panel); }
   .workspace:not([data-mobile-page='map']) .map { visibility: hidden; }
   .workspace:not([data-mobile-page='map']) :is(.map-veil, .map-busy, .install-banner, .map-tools, .map-rank-focus, .tower-key, .flowbar, .station-preview, .flow-preview, app-time-player) { display: none; }
-  .flow-preview { inset: auto 12px calc(var(--tabbar) + 12px); width: auto; }
-  .flow-preview-actions button { min-height: 44px; }
   .workspace[data-mobile-page='conditions'] .ranking { display: none; }
   .workspace[data-mobile-page='conditions'] :is(.explore-cond-toggle, .query-feedback, .explore-result) { display: none; }
   .workspace[data-mobile-page='conditions'] #explore-query-body { display: grid !important; }
@@ -323,19 +310,6 @@ app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bott
   .detail-actions { display: none; }
   .plate { font-size: var(--fs-xl); }
   .detail-body { padding: 20px 20px calc(28px + var(--safe-bottom)); }
-  .flowbar { top: calc(var(--tools-end) + 12px); bottom: auto; left: 12px; right: 12px; max-width: none; translate: none; }
-  .tower-key-pair ~ .flowbar { top: calc(var(--tools-end) + 60px); }
-  .flowbar .segmented { flex-wrap: wrap; }
-  .flowbar { grid-template-columns: minmax(0, 1fr) auto auto; }
-  .flowbar .segmented { grid-area: 1 / 1; }
-  .flowbar .pause { grid-area: 1 / 2; }
-  .flowbar .legend { grid-area: 2 / 1 / 3 / 3; }
-  .flowbar .flow-help { grid-area: 2 / 3; }
-  .flowbar .segmented button { flex: 1; min-height: 44px; padding-inline: 4px; }
-  :is(.flowbar, .layer-options) .pause { min-width: 44px; min-height: 44px; }
-  .month-frame { min-height: 44px; }
-  .legend { font-size: var(--fs-xs); gap: var(--sp-1) var(--sp-2); padding: 0 4px 4px; }
-  .legend .rate { display: none; }
   .chips { gap: var(--sp-1); }
   .chips button { min-height: 44px; min-width: 44px; }
   :is(.section-toggle, .list-actions button, .pair-actions button, .more, .section-tabs button, .select input) { min-height: 44px; }
@@ -364,17 +338,10 @@ app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bott
 .fav-chip { min-height: 36px; padding: 0 10px; border: 1px solid var(--rule); border-radius: var(--r-pill); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); font-weight: 700; }
 .fav-chip:hover { background: var(--panel-2); }
 /* 底圖狀態要浮在流向列之上，失敗時的重試鈕才按得到 */
-@media (min-width: 721px) { .workspace:has(.flowbar) :is(.map-veil, .map-busy) { bottom: 148px; z-index: 3; } .layer-mobile-actions { display: none; } }
+@media (min-width: 721px) { .workspace:has(.flowbar) :is(.map-veil, .map-busy) { bottom: 148px; z-index: 3; } }
 .workspace.map-fullscreen :is(app-mobile-shell, .panel, .detail, .map-tools, .flowbar, .tower-key, .map-rank-focus, .station-preview, .flow-preview) { display: none !important; }
 .exit-fullscreen { position: fixed; top: calc(var(--safe-top) + 12px); right: max(12px, var(--safe-right)); z-index: 20; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: var(--panel); font-size: var(--fs-xs); font-weight: 700; box-shadow: var(--shadow); cursor: pointer; }
 .fullscreen-tip { position: fixed; top: calc(var(--safe-top) + 64px); left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); z-index: 20; margin: 0; padding: 10px 12px; border-radius: var(--r-m); background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--ink); font-size: var(--fs-xs); line-height: 1.6; box-shadow: var(--shadow); }
-
-/* 手機橫放時只提示一次，其他裝置不顯示 */
-.rotate-tip { display: none; }
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  .rotate-tip { position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 8px); z-index: 30; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 24px); margin: 0; padding: 6px 6px 6px 12px; transform: translateX(-50%); border-radius: var(--r-m); background: var(--ink); color: var(--panel); font-size: var(--fs-s); }
-  .rotate-tip button { min-height: 44px; padding: 0 12px; border: 1px solid currentColor; border-radius: var(--r-s); background: transparent; color: inherit; font: inherit; font-weight: 700; }
-}
 
 /* 721 到 1100px：明細開著時，展開面板讓出明細的寬度，兩者不互相覆蓋 */
 @media (min-width: 721px) and (max-width: 1100px) {
