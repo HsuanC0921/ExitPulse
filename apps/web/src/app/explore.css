@@ -121,9 +121,11 @@ app-explore .tools { grid-template-columns: minmax(0, 1fr) auto; }
 .explore-legend .swatch, .dual-legend .swatch { display: inline-block; flex: none; }
 .explore-legend .swatch.line { width: 16px; height: 3px; border-radius: var(--r-s); background: var(--ink-2); }
 .explore-legend .swatch.dashed { width: 16px; height: 0; border-top: 2px dashed var(--ink-2); }
-.explore-legend .swatch.dot { width: 10px; height: 10px; border-radius: 50%; background: #6f7b85; opacity: .75; }
-.explore-legend .swatch.ref { border-radius: 50%; background: #6f7b85; opacity: .6; }
-.explore-legend .swatch.hollow { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #6f7b85; background: transparent; }
+.explore-legend .swatch.dot { width: 10px; height: 10px; border-radius: 50%; background: #0a63c9; opacity: .75; }
+app-root[data-theme='dark'] .explore-legend .swatch.dot, app-root[data-theme='dark'] .explore-legend .swatch.ref { background: #5ec8ff; }
+app-root[data-theme='dark'] .explore-legend .swatch.hollow { border-color: #5ec8ff; }
+.explore-legend .swatch.ref { border-radius: 50%; background: #0a63c9; opacity: .6; }
+.explore-legend .swatch.hollow { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #0a63c9; background: transparent; }
 .block-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-1) var(--sp-3); margin-top: 10px; }
 .block-head h2, .wide-aside h2, .explore-result h2 { display: inline-flex; align-items: center; gap: var(--sp-1); margin: 0 0 6px; font-size: var(--fs-m); line-height: 1.4; }
 .list-title { padding-bottom: 6px; border-bottom: 2px solid var(--ink); }
