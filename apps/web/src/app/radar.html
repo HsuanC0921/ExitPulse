@@ -1,13 +1,13 @@
 <!-- 兩站比較主畫面：條件、排行、站對詳情、地圖與三種檢視的切換 -->
 <main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()" [class.map-only]="mapOnly()" [class.bar-hidden]="barHidden()" [class.moving]="mapMoving()">
   <div #map class="map" role="application" aria-label="臺北捷運旅次地圖"></div>
-  @if (device().inset !== 'none') {
-    <div class="device-status-area" aria-hidden="true">
+  <div class="device-status-area" aria-hidden="true">
+    @if (device().inset !== 'none') {
       @if (basemap() === 'loading' || basemapBusy() || loading() || explore()?.loading()) {
         <span class="device-progress"></span>
       }
-    </div>
-  }
+    }
+  </div>
   @if (mapFullscreen()) {
     <button type="button" class="exit-fullscreen" (click)="toggleMapFullscreen()">退出全螢幕</button>
   } @else if (!phone() || mobilePage() === 'map') {
