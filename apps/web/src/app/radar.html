@@ -170,6 +170,7 @@
         </div>
         <details class="layer-group" [open]="!phone()">
           <summary>圖層<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <label class="range-row">圓圈透明度<input type="range" min="0" max="80" step="10" [value]="dotTransparency()" (input)="setDotTransparency($any($event.target).value)" aria-valuetext="{{ dotTransparency() }}%"><output>{{ dotTransparency() }}%</output></label>
           <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
           <label>街道與建物<input type="checkbox" role="switch" [checked]="showRoads()" (change)="toggleMapOption('roads')"></label>
           <label>水系與綠地<input type="checkbox" role="switch" [checked]="showNature()" (change)="toggleMapOption('nature')"></label>
