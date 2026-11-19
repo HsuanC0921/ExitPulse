@@ -57,13 +57,13 @@ app-root[data-theme='dark'] {
 .workspace { position: relative; height: 100%; overflow: hidden; background: var(--panel-2); }
 .map { position: absolute; inset: 0; }
 /* 底圖還沒載完時蓋住地圖，顏色與底圖陸地色一致，載完後淡出，不讓人看到空白或拼貼中的畫面 */
-.map-veil { position: absolute; left: 50%; bottom: 20px; z-index: 2; translate: -50% 0; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--sp-2); width: max-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--r-m); background: var(--panel); color: var(--ink-2); box-shadow: var(--shadow); pointer-events: none; }
+.map-veil { position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + 20px); z-index: 2; translate: -50% 0; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--sp-2); width: max-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--r-m); background: var(--panel); color: var(--ink-2); box-shadow: var(--shadow); pointer-events: none; }
 .map-veil.failed { pointer-events: auto; }
 .map-veil p { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-s); font-weight: 700; }
 .map-veil button { min-height: 44px; padding: 8px 18px; border: 0; border-radius: var(--r-m); background: var(--ink); color: var(--panel); font-weight: 700; }
 .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); animation: veil-pulse 1.1s ease-in-out infinite; }
 @keyframes veil-pulse { 50% { scale: 1.6; opacity: .35; } }
-.map-busy { position: absolute; left: 50%; bottom: 20px; translate: -50% 0; margin: 0; padding: 6px 14px; border-radius: var(--r-m); background: var(--panel); color: var(--ink-2); box-shadow: var(--shadow); font-size: var(--fs-xs); font-weight: 700; pointer-events: none; }
+.map-busy { position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + 20px); translate: -50% 0; margin: 0; padding: 6px 14px; border-radius: var(--r-m); background: var(--panel); color: var(--ink-2); box-shadow: var(--shadow); font-size: var(--fs-xs); font-weight: 700; pointer-events: none; }
 svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
@@ -83,8 +83,8 @@ button { cursor: pointer; }
 .icon-button svg { width: 16px; height: 16px; }
 
 .panel, .detail { display: flex; flex-direction: column; background: var(--panel); border-radius: var(--r-l); box-shadow: var(--shadow); overflow: hidden; }
-.panel { position: absolute; top: 16px; left: max(16px, var(--safe-left)); width: 380px; max-height: calc(100% - 32px);  }
-.detail { position: absolute; top: 68px; right: max(16px, var(--safe-right)); width: 372px; max-height: calc(100% - 184px); }
+.panel { position: absolute; top: calc(16px + var(--safe-top)); left: max(16px, var(--safe-left)); width: 380px; max-height: calc(100% - 32px - var(--safe-top));  }
+.detail { position: absolute; top: calc(68px + var(--safe-top)); right: max(16px, var(--safe-right)); width: 372px; max-height: calc(100% - 184px - var(--safe-top)); }
 @media (min-width: 1101px) {
   .panel:not(.closed):not(.wide) { width: clamp(344px, 26vw, 460px); }
   /* 左欄放大時讓出右側明細的位置，不互相覆蓋 */
@@ -202,7 +202,7 @@ button { cursor: pointer; }
 .badge[data-code='BR'], .badge[data-code='O'], .badge[data-code='Y'] { color: #1d2125; }
 
 @media (min-width: 721px) { .tower-key:has(+ .station-preview) { right: 324px; } }
-.flow-preview { position: fixed; top: 124px; right: max(16px, var(--safe-right)); z-index: 4; width: min(300px, calc(100vw - 32px)); padding: 14px; border: 1px solid var(--rule); border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: panel-in .2s cubic-bezier(.22, 1, .36, 1); }
+.flow-preview { position: fixed; top: calc(124px + var(--safe-top)); right: max(16px, var(--safe-right)); z-index: 4; width: min(300px, calc(100vw - 32px)); padding: 14px; border: 1px solid var(--rule); border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: panel-in .2s cubic-bezier(.22, 1, .36, 1); }
 .flow-preview-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .flow-preview-head h2 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin: 0; font-size: var(--fs-m); font-weight: 800; }
 .flow-preview-head svg { width: 14px; height: 14px; color: var(--ink-2); flex: none; }
@@ -253,7 +253,7 @@ button { cursor: pointer; }
   .workspace:has(.detail) .panel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
   .workspace:has(.detail) .panel > :not(.sign), .workspace:has(.detail) .panel .icon-button { display: none; }
   .workspace:has(.detail) .panel .sign, .workspace:has(.detail) .panel h1 { display: block; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; }
-  .detail { left: max(16px, var(--safe-left)); right: auto; top: 16px; width: 330px; max-height: calc(100% - 32px); }
+  .detail { left: max(16px, var(--safe-left)); right: auto; top: calc(16px + var(--safe-top)); width: 330px; max-height: calc(100% - 32px - var(--safe-top)); }
   .flowbar { left: calc(362px + (100% - 362px) / 2); max-width: calc(100% - 394px); }
 }
 app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); --safe-right: env(safe-area-inset-right, 0px); }
@@ -344,8 +344,8 @@ app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bott
   .conditions .select select { font-size: var(--fs-s); padding: 0 24px 0 8px; }
 }
 @media (min-width: 721px) {
-  .workspace:has(.tower-key) .detail { top: 120px; max-height: calc(100% - 136px); }
-  .workspace:has(.detail.closed) .station-preview { top: 190px; right: max(16px, var(--safe-right)); }
+  .workspace:has(.tower-key) .detail { top: calc(120px + var(--safe-top)); max-height: calc(100% - 136px - var(--safe-top)); }
+  .workspace:has(.detail.closed) .station-preview { top: calc(190px + var(--safe-top)); right: max(16px, var(--safe-right)); }
 }
 @media (min-width: 1101px) { .workspace:has(.detail:not(.closed)) .station-preview { right: 400px; } }
 @media (min-width: 721px) and (max-width: 960px) { .workspace:has(.detail:not(.closed)) .station-preview { top: auto; bottom: 120px; max-height: 38dvh; } }
@@ -366,8 +366,8 @@ app-root { --tabbar: 0px; --safe-top: env(safe-area-inset-top, 0px); --safe-bott
 /* 底圖狀態要浮在流向列之上，失敗時的重試鈕才按得到 */
 @media (min-width: 721px) { .workspace:has(.flowbar) :is(.map-veil, .map-busy) { bottom: 148px; z-index: 3; } .layer-mobile-actions { display: none; } }
 .workspace.map-fullscreen :is(app-mobile-shell, .panel, .detail, .map-tools, .flowbar, .tower-key, .map-rank-focus, .station-preview, .flow-preview) { display: none !important; }
-.exit-fullscreen { position: fixed; top: calc(var(--safe-top) + 12px); right: 12px; z-index: 20; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: var(--panel); font-size: var(--fs-xs); font-weight: 700; box-shadow: var(--shadow); cursor: pointer; }
-.fullscreen-tip { position: fixed; top: calc(var(--safe-top) + 64px); left: 12px; right: 12px; z-index: 20; margin: 0; padding: 10px 12px; border-radius: var(--r-m); background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--ink); font-size: var(--fs-xs); line-height: 1.6; box-shadow: var(--shadow); }
+.exit-fullscreen { position: fixed; top: calc(var(--safe-top) + 12px); right: max(12px, var(--safe-right)); z-index: 20; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: var(--panel); font-size: var(--fs-xs); font-weight: 700; box-shadow: var(--shadow); cursor: pointer; }
+.fullscreen-tip { position: fixed; top: calc(var(--safe-top) + 64px); left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); z-index: 20; margin: 0; padding: 10px 12px; border-radius: var(--r-m); background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--ink); font-size: var(--fs-xs); line-height: 1.6; box-shadow: var(--shadow); }
 
 /* 手機橫放時只提示一次，其他裝置不顯示 */
 .rotate-tip { display: none; }
