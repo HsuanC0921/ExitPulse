@@ -1311,7 +1311,9 @@ export class Radar implements OnDestroy {
     map.addLayer({ id: 'od-streams', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], false], layout: { 'line-cap': 'round', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['max', 0.8, ['*', ['get', 'width'], .24]], 'line-width-transition': { duration: 0 }, 'line-opacity': ['get', 'opacity'] } });
     map.addSource('explore-circles', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', paint: { 'circle-radius': ['get', 'radius'], 'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['get', 'hollow'], .06, .66], 'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': ['case', ['get', 'hollow'], 2.4, 1.2] } });
-    map.addLayer({ id: 'explore-labels', type: 'symbol', source: 'explore-circles', filter: ['!=', ['get', 'label'], ''], layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-anchor': 'center', 'text-padding': 4, 'symbol-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 } });
+    map.addLayer({ id: 'explore-labels', type: 'symbol', source: 'explore-circles', filter: ['!=', ['get', 'label'], ''], layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-padding': 4, 'symbol-sort-key': ['-', 0, ['get', 'radius']],
+      // 大圓把字置中；小圓放大後字會被圓與選取環蓋住，改放到圓的正下方
+      'text-anchor': ['case', ['>=', ['get', 'radius'], 15], 'center', 'top'], 'text-offset': ['case', ['>=', ['get', 'radius'], 15], ['literal', [0, 0]], ['literal', [0, 1.3]]] }, paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 } });
     // 流向：箭頭沿弧線前進，身後拖一條很細的淡出尾巴。箭頭維持站牌風格的描邊白色，不做發光或模糊。
     map.addSource('od-comets', { type: 'geojson', data: EMPTY, lineMetrics: true });
     for (const kind of ['muted', 'flow']) {
