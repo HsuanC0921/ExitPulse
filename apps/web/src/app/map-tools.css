@@ -10,7 +10,7 @@
 .map-rank-focus button:hover:not([aria-pressed='true']) { background: var(--panel-2); color: var(--ink); }
 .map-rank-focus button[aria-pressed='true'] { background: var(--ink); color: var(--panel); }
 .map-rank-focus button[aria-pressed='true']:hover { background: var(--action-hover); color: var(--on-action); }
-.theme-switch:hover, .map-reset:hover:not([aria-pressed='true']), .map-tools summary:hover, .map-tools details[open] summary { background: var(--panel-2); }
+.theme-switch:hover, .map-reset:hover:not([aria-pressed='true']), .map-tools summary:hover, .map-tools > details[open] > summary { background: var(--panel-2); }
 .theme-switch { font-weight: 700; }
 .theme-track { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: var(--panel-2); }
 .theme-track svg { width: 16px; height: 16px; }
@@ -97,6 +97,7 @@
 .overlay-fold:hover { background: var(--panel-2); }
 .station-preview-head .overlay-fold, .flow-preview-head .overlay-fold { margin-inline-start: auto; }
 .flow-preview.preview-compact > :not(.flow-preview-head) { display: none; }
+.layer-legend { margin-top: 4px; }
 .layer-legend > .overlay-fold { justify-content: space-between; width: 100%; }
 .layer-legend[open] > .overlay-fold svg { rotate: 180deg; }
 .station-preview h2 { margin: 0; font-size: var(--fs-l); font-weight: 800; text-wrap: balance; }
@@ -167,7 +168,8 @@
 .flowbar.folded { display: flex; }
 .flowbar.folded > :not(.flow-fold) { display: none; }
 @media (min-width: 721px) {
-  .flowbar:not(.folded) { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .flowbar:not(.folded) { grid-template-columns: max-content auto auto auto; }
+  .flow-help { grid-column: auto; grid-row: 1; justify-self: center; }
 }
 .pause { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); }
 .pause:hover { background: var(--rule); }
