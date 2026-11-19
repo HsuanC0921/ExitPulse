@@ -227,3 +227,5 @@ app-root[data-hover='false'] { .map-tools [data-tip]::after, .map-tools [data-ti
 .spike-scale > span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .spike-scale .spike-scale-title { align-self: flex-end; flex-direction: row; }
 .spike-scale i { display: block; width: 8px; background: var(--ink-2); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+
+.focus-ring { border-radius: 50%; pointer-events: none; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring, 4px)), #000 calc(100% - var(--ring, 4px) + .5px)); mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring, 4px)), #000 calc(100% - var(--ring, 4px) + .5px)); }

@@ -4,7 +4,7 @@ import { autoRetry } from './auto-retry';
 import { watchDeviceProfile } from './device-profile';
 import { moveControls } from './control-motion';
 import { MotionPreference } from './motion-preference';
-import { drawRankLink, installRankLink, zoomScaled } from './rank-map-link';
+import { dotScaleAt, drawRankLink, installRankLink, zoomScaled } from './rank-map-link';
 import { readFold, writeFold } from './fold-preference';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
@@ -1761,9 +1761,32 @@ export class Radar implements OnDestroy {
     this.loadStationInfo(name, !keepCamera && !this.lowAngle());
     const source = this.map?.getSource('picked-station') as GeoJSONSource | undefined;
     const coordinates = name && this.stops.get(name);
+    const lines = name ? this.linesOfStation(name) : [];
+    // 轉乘站：選取圈改由分段色環負責，這裡的單色圈透明掉
     source?.setData(coordinates && name ? { type: 'FeatureCollection', features: [
-      { type: 'Feature', properties: { color: this.lineOf(name)!.color }, geometry: { type: 'Point', coordinates } },
+      { type: 'Feature', properties: { color: lines.length > 1 ? 'rgba(0,0,0,0)' : this.lineOf(name)!.color }, geometry: { type: 'Point', coordinates } },
     ] } : EMPTY);
+    this.pickedRing?.remove();
+    this.pickedRing = undefined;
+    const map = this.map;
+    if (map && this.ml && coordinates && lines.length > 1) {
+      const element = this.lineRingElement(lines.map(l => l.color));
+      element.style.width = element.style.height = '33px';
+      element.style.setProperty('--ring', '3px');
+      this.pickedRing = new this.ml.Marker({ element, anchor: 'center' }).setLngLat(coordinates).addTo(map);
+    }
+  }
+
+  private pickedRing?: maplibregl.Marker;
+
+  /** 依各線顏色等分成色環的 DOM 元素 */
+  private lineRingElement(colors: string[]) {
+    const element = document.createElement('div');
+    element.className = 'focus-ring';
+    element.setAttribute('aria-hidden', 'true');
+    const step = 360 / colors.length;
+    element.style.background = `conic-gradient(${colors.map((c, i) => `${c} ${i * step}deg ${(i + 1) * step}deg`).join(', ')})`;
+    return element;
   }
 
   locateEntrance(exit: Entrance) {
@@ -2534,6 +2557,38 @@ export class Radar implements OnDestroy {
     if (countsLabel.textContent !== counts) countsLabel.textContent = counts;
   }
 
+  private focusRing?: { marker: maplibregl.Marker; radius: number; station: string };
+  private focusRingZoom = false;
+
+  /** 轉乘站被聚焦時，圓圈外環依各線分段上色，不替它挑單一顏色 */
+  private syncFocusRing() {
+    const map = this.map, layer = this.exploreLayer();
+    const station = this.view() === 'network' && !this.tower3d() ? layer?.focus ?? null : null;
+    const lines = station ? this.linesOfStation(station) : [];
+    const circle = station ? layer?.circles.find(c => c.station === station) : undefined;
+    const at = station ? this.stops.get(station) : undefined;
+    if (!map || !this.ml || !station || lines.length < 2 || !circle || !at) {
+      this.focusRing?.marker.remove();
+      this.focusRing = undefined;
+      return;
+    }
+    if (!this.focusRing || this.focusRing.station !== station) {
+      this.focusRing?.marker.remove();
+      const element = this.lineRingElement(lines.map(l => l.color));
+      this.focusRing = { marker: new this.ml.Marker({ element, anchor: 'center' }).setLngLat(at).addTo(map), radius: circle.radius, station };
+    }
+    this.focusRing.radius = circle.radius;
+    this.sizeFocusRing();
+    if (!this.focusRingZoom) { this.focusRingZoom = true; map.on('zoom', () => this.sizeFocusRing()); }
+  }
+
+  private sizeFocusRing() {
+    const ring = this.focusRing, map = this.map;
+    if (!ring || !map) return;
+    const size = Math.round(ring.radius * dotScaleAt(map.getZoom()) * 2 + 6);
+    ring.marker.getElement().style.width = ring.marker.getElement().style.height = `${size}px`;
+  }
+
   private drawExplore(fly: boolean) {
     const map = this.map, layer = this.exploreLayer();
     if (!map || !this.layersReady) { this.pendingFly ||= fly; return; }
@@ -2555,6 +2610,7 @@ export class Radar implements OnDestroy {
     this.drawStreams(streams);
     (map.getSource('od-stops') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? circles.flatMap(point) : [] });
     (map.getSource('explore-circles') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? [] : circles.filter(c => c.radius > 0).flatMap(point) });
+    this.syncFocusRing();
     this.drawTowers();
     if (fly && !this.explore()?.selectedRank()) {
       if (this.lowAngle()) this.focusLowAngle();
