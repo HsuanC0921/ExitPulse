@@ -1,6 +1,7 @@
 // 手機版外殼：頂部導覽與地圖摘要
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, computed, inject, input, output, signal } from '@angular/core';
 import { Brand } from './brand';
+import { moveControls } from './control-motion';
 
 export type MobilePage = 'map' | 'list' | 'conditions' | 'detail';
 export type RadarView = 'pairs' | 'station' | 'network';
@@ -24,6 +25,8 @@ export type MobileSummary = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MobileShell {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
   readonly page = input.required<MobilePage>();
   readonly view = input.required<RadarView>();
   readonly summary = input.required<MobileSummary>();
@@ -44,6 +47,7 @@ export class MobileShell {
   readonly cardOpen = signal(((): boolean => { try { return localStorage.getItem('exitpulse.card') !== 'closed'; } catch { return true; } })());
   toggleCard() {
     const next = !this.cardOpen();
+    moveControls(this.host, '.card-fold', this.injector);
     this.cardOpen.set(next);
     try { localStorage.setItem('exitpulse.card', next ? 'open' : 'closed'); } catch { /* 只在這次有效 */ }
   }

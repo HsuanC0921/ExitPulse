@@ -1,5 +1,5 @@
 <!-- 兩站比較主畫面：條件、排行、站對詳情、地圖與三種檢視的切換 -->
-<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()" [class.bar-hidden]="barHidden()" [class.moving]="mapMoving()">
+<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()" [class.map-only]="mapOnly()" [class.bar-hidden]="barHidden()" [class.moving]="mapMoving()">
   <div #map class="map" role="application" aria-label="臺北捷運旅次地圖"></div>
   @if (device().inset !== 'none') {
     <div class="device-status-area" aria-hidden="true">
@@ -10,9 +10,15 @@
   }
   @if (mapFullscreen()) {
     <button type="button" class="exit-fullscreen" (click)="toggleMapFullscreen()">退出全螢幕</button>
-    @if (!fullscreenSupported && isIosSafari && !device().standalone) {
-      <p class="fullscreen-tip" role="note">iPhone 瀏覽器無法隱藏網址列。點下方「分享 → 加入主畫面」，從主畫面打開就是全螢幕。</p>
-    }
+  } @else if (!phone() || mobilePage() === 'map') {
+    <button #mapOnlyButton type="button" class="map-reset map-only-toggle" [attr.aria-expanded]="!mapOnly()"
+      [attr.aria-label]="mapOnly() ? '顯示面板' : '只看地圖'" [title]="mapOnly() ? '顯示面板' : '只看地圖'" (click)="toggleMapOnly()">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        @if (mapOnly()) { <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 4v16m5-10 2 2-2 2"/> }
+        @else { <path d="M9 4H5a1 1 0 0 0-1 1v4m11-5h4a1 1 0 0 1 1 1v4M4 15v4a1 1 0 0 0 1 1h4m11-5v4a1 1 0 0 1-1 1h-4m-6-8 2 2 4-4"/> }
+      </svg>
+      <span>{{ mapOnly() ? '顯示面板' : '只看地圖' }}</span>
+    </button>
   }
   @if (!device().standalone && !installBannerClosed() && !openMenu() && (installPrompt() || isIosSafari)) {
     <div class="install-banner" role="note">
@@ -47,6 +53,7 @@
           <input #placeInput type="search" aria-label="輸入地點或地址" placeholder="地名、地標或地址" maxlength="80" [value]="placeQuery()" (input)="placeQuery.set(placeInput.value)">
           <button type="submit" [disabled]="placeBusy() || placeQuery().trim().length < 2">搜尋</button>
         </form>
+        <button type="button" class="place-locate" [disabled]="geoBusy()" (click)="locateMe()">使用我的位置</button>
         <p class="place-tip">可輸入店名、公園、學校或直接點地圖空白處。</p>
         @if (placeMessage() || placeBusy()) { <p class="status" role="status">{{ placeBusy() ? '搜尋中…' : placeMessage() }}</p> }
         @if (nearestPlace(); as match) {
@@ -122,11 +129,8 @@
         <p class="place-tip" role="status">{{ collectionNotice() || '收藏只存在這個瀏覽器，換電腦時用檔案或連結帶過去。' }}</p>
       </div>
     </details>
-    <button type="button" class="map-reset" data-tip="定位我的位置並找最近捷運站" [disabled]="geoBusy()" (click)="locateMe()">
+    <button type="button" class="map-reset map-locate-btn" data-tip="定位我的位置並找最近捷運站" [disabled]="geoBusy()" (click)="locateMe()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg><span>定位</span>
-    </button>
-    <button type="button" class="map-reset map-fullscreen-btn" [attr.aria-pressed]="mapFullscreen()" [attr.data-tip]="mapFullscreen() ? '退出全螢幕' : '全螢幕地圖'" aria-label="全螢幕地圖" (click)="toggleMapFullscreen()">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg><span>全螢幕</span>
     </button>
     <button type="button" class="map-reset map-fit-btn" data-tip="回到全線視角" (click)="resetMap()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg><span>全圖</span>

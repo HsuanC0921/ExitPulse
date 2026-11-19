@@ -192,12 +192,15 @@ button, summary, [role='button'], label:has(input[type='checkbox']), select {
 @media (max-width: 720px) {
   .workspace .maplibregl-ctrl-bottom-right {
     top: auto;
-    bottom: clamp(calc(var(--safe-bottom) + 12px), var(--nav-dock, var(--nav-dock-fallback, 0px)), max(28dvh, calc(100dvh - var(--tools-end) - var(--nav-stack, 144px))));
-    translate: none;
+    --nav-base: calc(var(--safe-bottom) + 12px);
+    --nav-offset: clamp(var(--nav-base), var(--nav-dock, var(--nav-dock-fallback, 0px)), max(28dvh, calc(100dvh - var(--tools-end) - var(--nav-stack, 144px))));
+    bottom: var(--nav-base);
+    translate: 0 calc(var(--nav-base) - var(--nav-offset));
+    transition: translate .16s cubic-bezier(.22, 1, .36, 1);
   }
   .workspace[data-mobile-page='map']:has(app-time-player):not(:has(.station-preview)) { --nav-dock-fallback: 192px; }
-  .workspace.map-fullscreen .maplibregl-ctrl-bottom-right { bottom: calc(var(--safe-bottom) + 12px); }
-  .workspace .flowbar.folded { width: max-content; right: auto; }
+  .workspace.map-fullscreen .maplibregl-ctrl-bottom-right { translate: none; }
+  .workspace .flowbar.folded { width: max-content; left: auto; }
   .workspace .flow-preview {
     bottom: calc(max(var(--timeline-dock, 0px), var(--tabbar)) + 12px);
     max-height: max(72px, calc(100dvh - var(--tools-end) - var(--timeline-dock, var(--tabbar)) - 68px));
@@ -217,9 +220,8 @@ button, summary, [role='button'], label:has(input[type='checkbox']), select {
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (min-width: 721px) and (max-height: 500px) {
-  .workspace .maplibregl-ctrl-bottom-right { bottom: max(calc(var(--safe-bottom) + 12px), var(--nav-dock, 0px)); }
-  .workspace.map-fullscreen .maplibregl-ctrl-bottom-right { bottom: calc(var(--safe-bottom) + 12px); }
-  .workspace .map-tools { right: calc(var(--safe-right) + 12px); }
+  .workspace .maplibregl-ctrl-bottom-right { --nav-offset: max(var(--nav-base), var(--nav-dock, 0px)); }
+  .workspace { --map-edge: calc(var(--safe-right) + 12px); }
   .workspace .map-tools > details .layer-options {
     position: fixed;
     inset: calc(var(--tools-end) + 6px) calc(var(--safe-right) + 12px) auto auto;
@@ -237,5 +239,8 @@ button, summary, [role='button'], label:has(input[type='checkbox']), select {
 }
 
 @media (min-width: 721px) and (max-width: 960px) and (min-height: 501px) {
-  .workspace:not(:has(.tower-key)) app-pair-detail .detail:not(.wide) { top: 68px; max-height: calc(100% - 84px); }
+  :where(app-root[data-layout='wide']) .workspace app-pair-detail .detail:not(.wide) {
+    top: calc(16px + var(--safe-top));
+    max-height: calc(100% - 32px - var(--safe-top));
+  }
 }

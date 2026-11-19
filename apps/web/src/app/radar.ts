@@ -2,6 +2,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, OnDestroy, ViewEncapsulation, afterNextRender, afterRenderEffect, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
 import { autoRetry } from './auto-retry';
 import { watchDeviceProfile } from './device-profile';
+import { moveControls } from './control-motion';
 import { readFold, writeFold } from './fold-preference';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
@@ -235,6 +236,19 @@ export class Radar implements OnDestroy {
   readonly fullscreenSupported = typeof document !== 'undefined' && !!document.fullscreenEnabled && typeof document.documentElement?.requestFullscreen === 'function';
   readonly isFullscreen = signal(false);
   readonly mapFullscreen = signal(false);
+  readonly mapOnly = signal(false);
+  readonly mapOnlyButton = viewChild<ElementRef<HTMLButtonElement>>('mapOnlyButton');
+  private readonly mobileShell = viewChild(MobileShell);
+
+  toggleMapOnly() {
+    const next = !this.mapOnly();
+    if (next) {
+      this.closeMenus();
+      this.mobileShell()?.viewMenu.set(false);
+    }
+    this.mapOnly.set(next);
+    this.mapOnlyButton()?.nativeElement.focus({ preventScroll: true });
+  }
   readonly toolsCollapsed = signal(((): boolean => { try { return localStorage.getItem('exitpulse.tools') === 'closed'; } catch { return false; } })());
   toggleTools() {
     const next = !this.toolsCollapsed();
@@ -245,8 +259,13 @@ export class Radar implements OnDestroy {
   readonly barHidden = signal(((): boolean => { try { return localStorage.getItem('exitpulse.bar') === 'closed'; } catch { return false; } })());
   toggleBar() {
     const next = !this.barHidden();
+    this.moveMapControls('.bar-handle, .map-tools, .map-only-toggle');
     this.barHidden.set(next);
     try { localStorage.setItem('exitpulse.bar', next ? 'closed' : 'open'); } catch { /* 不能存就只在這次有效 */ }
+  }
+  private moveMapControls(selector: string) {
+    const workspace = this.mapElement().nativeElement.closest('.workspace');
+    if (workspace) moveControls(workspace, selector, this.injector);
   }
   readonly mapMoving = signal(false);
   readonly openMenu = signal<'place' | 'collection' | 'layers' | null>(null);
@@ -337,6 +356,7 @@ export class Radar implements OnDestroy {
   /** 手機上流動模式列預設收起，只留圖例，把畫面還給地圖 */
   readonly flowFolded = signal(stored('exitpulse.flow') === 'closed' || (stored('exitpulse.flow') == null && innerWidth <= 720));
   toggleFlowFold() {
+    this.moveMapControls('.flow-fold');
     this.flowFolded.update(value => !value);
     store('exitpulse.flow', this.flowFolded() ? 'closed' : 'open');
   }
@@ -694,6 +714,7 @@ export class Radar implements OnDestroy {
       if (!document.fullscreenElement) { e.preventDefault(); void this.toggleMapFullscreen(); }
       return;
     }
+    if (e.key === 'Escape' && this.mapOnly()) { e.preventDefault(); this.toggleMapOnly(); return; }
     if (e.key === 'Escape' && this.detailWide()) { e.preventDefault(); this.detailWide.set(false); return; }
     if (e.key === 'Escape' && this.selectedMapStation()) { e.preventDefault(); this.selectMapStation(null); return; }
     if (e.key === 'Escape' && this.selected()) { e.preventDefault(); this.closeDetail(); return; }
@@ -2387,19 +2408,27 @@ export class Radar implements OnDestroy {
 
   /** 在人流弧線頂端放一顆數字標籤，一眼看出這組兩站變了多少。 */
   private showHero(at: Point | null, result?: Result | null) {
-    this.hero?.remove();
-    this.hero = undefined;
-    if (!at || !result || !this.map || !this.ml) return;
+    if (!at || !result || !this.map || !this.ml) {
+      this.hero?.remove();
+      this.hero = undefined;
+      return;
+    }
     const growth = result.baselineDaily > 0 ? (result.currentDaily / result.baselineDaily - 1) * 100 : null;
-    const chip = document.createElement('div');
-    chip.className = 'pair-chip';
-    chip.setAttribute('aria-hidden', 'true');
-    const big = document.createElement('strong');
-    big.textContent = growth == null ? '新增' : `${growth >= 0 ? '+' : '−'}${Math.round(Math.abs(growth))}%`;
-    const small = document.createElement('span');
-    small.textContent = `每日 ${formatDailyTrips(result.baselineDaily)} → ${formatDailyTrips(result.currentDaily)}`;
-    chip.append(big, small);
-    this.hero = new this.ml.Marker({ element: chip, anchor: 'center', offset: [0, 40] }).setLngLat(at).addTo(this.map);
+    const value = growth == null ? '新增' : `${growth >= 0 ? '+' : '−'}${Math.round(Math.abs(growth))}%`;
+    const counts = `每日 ${formatDailyTrips(result.baselineDaily)} → ${formatDailyTrips(result.currentDaily)}`;
+    if (!this.hero) {
+      const chip = document.createElement('div');
+      chip.className = 'pair-chip';
+      chip.setAttribute('aria-hidden', 'true');
+      chip.append(document.createElement('strong'), document.createElement('span'));
+      this.hero = new this.ml.Marker({ element: chip, anchor: 'center', offset: [0, 40] }).setLngLat(at).addTo(this.map);
+    } else {
+      const { lng, lat } = this.hero.getLngLat();
+      if (lng !== at[0] || lat !== at[1]) this.hero.setLngLat(at);
+    }
+    const [valueLabel, countsLabel] = this.hero.getElement().children;
+    if (valueLabel.textContent !== value) valueLabel.textContent = value;
+    if (countsLabel.textContent !== counts) countsLabel.textContent = counts;
   }
 
   private drawExplore(fly: boolean) {

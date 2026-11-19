@@ -1,7 +1,6 @@
 /* 手機版外殼與底部分頁的樣式 */
 :host { display: none; }
-@keyframes tab-line { from { transform: scaleX(0); } }
-@keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes card-in { from { opacity: 0; } }
 :host-context(app-root[data-layout='compact']) { display: contents; }
   .mobile-bar { position: absolute; inset: 0 0 auto; z-index: 7; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; box-sizing: border-box; height: var(--mobile-top); padding: var(--safe-top) calc(12px + var(--safe-right)) 5px calc(12px + var(--safe-left)); background: var(--band); color: var(--on-band); --track: color-mix(in srgb, var(--on-band) 14%, var(--band)); }
   .mobile-bar.off { padding-bottom: 0; background: linear-gradient(color-mix(in srgb, var(--band) 78%, transparent), transparent); pointer-events: none; }
@@ -14,7 +13,7 @@
   .mobile-view-btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 44px; min-width: 66px; padding: 0 8px 0 12px; border-radius: 12px; background: var(--track); color: var(--on-band); font-weight: 700; }
   .mobile-view-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .mobile-view-scrim { position: fixed; inset: 0; z-index: 7; border: 0; background: none; }
-  .mobile-view-menu { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; display: grid; width: 220px; padding: 4px; border-radius: var(--r-m); background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+  .mobile-view-menu { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; display: grid; width: 220px; padding: 4px; border-radius: var(--r-m); background: var(--panel); color: var(--ink); box-shadow: var(--shadow); animation: card-in .16s ease-out; }
   .mobile-view-menu button { display: grid; justify-items: start; min-height: 52px; padding: 6px 12px; border: 0; border-radius: var(--r-s); background: none; color: var(--ink); font-size: var(--fs-s); font-weight: 700; text-align: left; }
   .mobile-view-menu button small { color: var(--ink-2); font-size: var(--fs-xs); font-weight: 400; }
   .mobile-view-menu button[aria-pressed='true'] { background: var(--panel-2); }

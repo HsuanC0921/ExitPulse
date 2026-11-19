@@ -1,6 +1,6 @@
 // 時間軸：當日 24 小時人次分布、選時段與播放控制
 import { readFold, writeFold } from './fold-preference';
-import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { Hint } from './hint';
@@ -16,6 +16,8 @@ type RelationHour = { hour: number; forward: number | null; reverse: number | nu
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TimePlayer {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
   readonly date = input.required<string>();
   readonly station = input('');
   readonly counterpart = input<string | null>(null);
@@ -41,6 +43,9 @@ export class TimePlayer {
       this.folded.set(folded);
       writeFold('panel.timeline', folded);
     }
+    afterNextRender(() => {
+      this.host.querySelector<HTMLButtonElement>('.compact-time, .fold, .player-heading .icon')?.focus({ preventScroll: true });
+    }, { injector: this.injector });
   }
   readonly hourChange = output<number>();
   readonly play = output<void>();

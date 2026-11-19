@@ -1,6 +1,7 @@
 /* 地圖右上角工具列與圖例的樣式 */
 /* Map tools */
-.map-tools { position: absolute; top: calc(16px + var(--safe-top)); right: max(16px, var(--safe-right)); z-index: 6; display: flex; gap: 2px; border-radius: var(--r-m); background: var(--panel); box-shadow: var(--shadow); }
+.workspace { --map-edge: max(16px, var(--safe-right)); --map-tools-y: calc(16px + var(--safe-top)); --map-only-width: 104px; }
+.map-tools { position: absolute; top: var(--map-tools-y); right: calc(var(--map-edge) + var(--map-only-width) + 6px); z-index: 6; display: flex; gap: 2px; border-radius: var(--r-m); background: var(--panel); box-shadow: var(--shadow); }
 .theme-switch, .map-reset, .map-tools summary { display: flex; min-height: 44px; min-width: 44px; align-items: center; justify-content: center; gap: var(--sp-1); padding: 0 10px; border: 0; border-radius: var(--r-m); background: none; color: var(--ink); font-size: var(--type-label); cursor: pointer; transition: background-color .15s, color .15s, transform .12s; }
 .map-tools :is(button, summary):active { transform: scale(.97); }
 .map-tools :is(button, summary):focus-visible { outline-offset: -4px; }
@@ -14,6 +15,10 @@
 .theme-track { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: var(--panel-2); }
 .theme-track svg { width: 16px; height: 16px; }
 .map-reset svg, .map-tools summary svg { width: 17px; height: 17px; }
+.map-only-toggle { position: absolute; top: var(--map-tools-y); right: var(--map-edge); z-index: 9; width: var(--map-only-width); white-space: nowrap; background: var(--panel); box-shadow: var(--shadow); font-weight: 700; }
+.map-reset.map-only-toggle[aria-expanded='false'] { background: var(--action); color: var(--on-action); }
+.place-options .place-locate { display: none; }
+.place-locate { min-height: 44px; margin-top: 4px; padding: 0 12px; border: 0; border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); font: inherit; font-weight: 700; }
 .tower-switch[aria-pressed='true'], .tower-switch[aria-pressed='true']:hover { background: var(--ink); color: var(--panel); }
 .tower-key { position: absolute; z-index: 2; top: calc(68px + var(--safe-top)); right: max(16px, var(--safe-right)); display: flex; align-items: center; gap: var(--sp-2); border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--type-label); font-weight: 700; }
 .tower-key:has(+ .map-rank-focus) { right: 184px; }
@@ -200,10 +205,11 @@
 @media (pointer: coarse), (max-width: 1100px) { .station-nearby li button { min-height: 44px; } }
 .poi-empty { margin: 2px 0 0; color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.5; }
 /* 站對弧線上的變化量標籤，只看不點 */
-.pair-chip { display: grid; justify-items: center; gap: 2px; padding: 6px 12px 7px; border-radius: var(--r-l); background: var(--ink); color: var(--panel); box-shadow: 0 6px 18px rgb(0 0 0 / .28); pointer-events: none; animation: chip-in .4s cubic-bezier(.22, 1, .36, 1) .25s backwards; }
+.pair-chip { display: grid; justify-items: center; gap: 2px; padding: 6px 12px 7px; border-radius: var(--r-l); background: var(--ink); color: var(--panel); box-shadow: 0 6px 18px rgb(0 0 0 / .28); pointer-events: none; animation: chip-in .16s ease-out; }
 .pair-chip strong { font-size: var(--fs-xl); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .pair-chip span { font-size: var(--fs-xs); font-weight: 700; opacity: .85; font-variant-numeric: tabular-nums; white-space: nowrap; }
-@keyframes chip-in { from { opacity: 0; transform: translateY(6px) scale(.94); } }
+@keyframes chip-in { from { opacity: 0; } }
+.map-tools details[open] > .layer-options { animation: chip-in .16s ease-out; }
 @media (prefers-reduced-motion: reduce) { .pair-chip { animation: none; } }
 
 /* 收藏面板 */
@@ -234,6 +240,15 @@
 .map-tools.collapsed .tools-toggle svg { transform: rotate(180deg); }
 .map-tools.collapsed > :not(.tools-toggle, app-about) { display: none; }
 .sheet-scrim, .layer-options label.mobile-only-row, .layer-mobile-actions { display: none; }
+.layer-mobile-actions button { min-height: 44px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); font-size: var(--fs-xs); font-weight: 700; }
+@media (min-width: 721px) and (max-width: 960px) {
+  :where(app-root[data-layout='wide']) {
+    .map-tools :is(.map-locate-btn, .map-fit-btn, .map-about, .tower-switch, .theme-switch) { display: none; }
+    .place-options .place-locate { display: block; }
+    .layer-options label.mobile-only-row { display: flex; }
+    .layer-mobile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  }
+}
 @media (prefers-reduced-motion: reduce) { .tools-toggle svg { transition: none; } }
 
 /* 版面窄到只剩圖示時，滑鼠移上去、鍵盤聚焦或手指按下，都在工具下方顯示說明 */
