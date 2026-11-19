@@ -130,7 +130,7 @@
 .sw { display: inline-block; justify-self: center; }
 .sw.flow { width: 30px; height: 6px; border-radius: var(--r-s); background: var(--flow); }
 .sw.flow.dashed { height: 0; border-top: 6px dashed var(--flow); border-radius: 0; background: none; }
-.sw.dot, .sw.solid, .sw.ring { width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; background: color-mix(in srgb, var(--BL) 66%, transparent); border: 1.5px solid var(--BL); }
+.sw.dot, .sw.solid, .sw.ring { width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; background: color-mix(in srgb, var(--ink) 14%, transparent); border: 2px solid var(--ink); }
 .sw.ring { background: transparent; border-width: 2.4px; }
 /* Also defined in explore.css, which only loads with the station views; the station card needs it everywhere. */
 .station-badges { display: inline-flex; align-items: center; gap: var(--sp-1); white-space: nowrap; justify-self: start; }

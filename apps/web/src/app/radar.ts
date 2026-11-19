@@ -72,6 +72,7 @@ const PAGE = 30;
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const FLAT_FLOW_LAYERS = ['od-ribbons', 'od-streams', 'od-streams-dashed', 'od-comets-flow', 'od-comets-muted', 'od-particles', 'od-pulse', 'od-flow-labels'];
 const TOWER_PITCH = 66;
+const PHONE_TOWER_PITCH = 50;
 const WEBGL_RESTORE_TIMEOUT = 3000;
 const LOW_PITCH = 82;
 const STREET_ZOOM = 16.4;
@@ -969,7 +970,7 @@ export class Radar implements OnDestroy {
       const map = new maplibregl.Map({
         container, style: LOCAL_MAP,
         center: camera?.center ?? [121.53, 25.05], zoom: camera?.zoom ?? 10.6,
-        pitch: camera?.pitch ?? (on3d ? (this.lowAngle() ? this.streetPitch() : TOWER_PITCH) : 0),
+        pitch: camera?.pitch ?? (on3d ? (this.lowAngle() ? this.streetPitch() : this.towerPitch()) : 0),
         bearing: camera?.bearing ?? (on3d ? -14 : 0),
         minZoom: 9.5, maxZoom: 18, maxPitch: on3d ? LOW_PITCH : 0, minPitch: on3d ? MIN_TOWER_PITCH : 0,
         maxBounds: [[120.65, 24.2], [122.45, 25.7]], attributionControl: false,
@@ -1419,7 +1420,7 @@ export class Radar implements OnDestroy {
     const fit = from && to && this.ml ? map.cameraForBounds(new this.ml.LngLatBounds(from, from).extend(to), { bearing, padding: this.padding(), maxZoom: 14.5 }) : undefined;
     const overview = on ? undefined : this.beforeLowAngle;
     this.beforeLowAngle = undefined;
-    map.easeTo({ ...fit, ...overview, pitch: on ? TOWER_PITCH : 0, bearing, duration: this.reducedMotion ? 0 : 760 });
+    map.easeTo({ ...fit, ...overview, pitch: on ? this.towerPitch() : 0, bearing, duration: this.reducedMotion ? 0 : 760 });
     this.sync3DVisibility();
   }
 
@@ -1432,13 +1433,18 @@ export class Radar implements OnDestroy {
       const previous = this.beforeLowAngle;
       this.beforeLowAngle = undefined;
       this.lowAngle.set(false);
-      map.easeTo({ pitch: TOWER_PITCH, ...previous, duration: this.reducedMotion ? 0 : 650 });
+      map.easeTo({ pitch: this.towerPitch(), ...previous, duration: this.reducedMotion ? 0 : 650 });
       return;
     }
     this.beforeLowAngle = { center: map.getCenter().toArray(), zoom: map.getZoom(), pitch: map.getPitch() };
     this.lowAngle.set(true);
     if (this.phone() && stored('exitpulse.flow') == null) this.flowFolded.set(true);
     this.focusLowAngle();
+  }
+
+  /** 手機畫面窄長，傾角太大會讓上半部整片是空的天空，浪費地圖空間 */
+  private towerPitch() {
+    return this.phone() ? PHONE_TOWER_PITCH : TOWER_PITCH;
   }
 
   private streetPitch() {
