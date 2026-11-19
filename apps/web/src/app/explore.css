@@ -187,7 +187,7 @@ app-explore .tools { grid-template-columns: minmax(0, 1fr) auto; }
 .diverge { position: relative; display: block; height: 8px; margin: 6px 0 4px; border-radius: var(--r-s); background: var(--panel-2); }
 .diverge::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--ink-2); opacity: .55; }
 .diverge i { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; border-radius: 0 3px 3px 0; background: var(--up); transform: scaleX(var(--w)); transform-origin: left; transition: transform .5s var(--ease); }
-.diverge.down i { left: auto; right: 50%; border-radius: 3px 0 0 3px; background: var(--down); transform-origin: right; }
+.diverge.down i { background: var(--down); transform: scaleX(calc(-1 * var(--w))); }
 app-explore .relations .delta:not(.down) { color: var(--up); }
 app-explore .relations .delta.plain { color: var(--ink); }
 .relations li button:hover, .movers button:hover { background: var(--panel-2); }

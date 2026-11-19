@@ -21,8 +21,9 @@
         @for (note of cautions(); track note) { <p class="verdict caution"><svg class="caution-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>{{ note }}</p> }
       </div>
       <div class="numbers">
-        <div><span>{{ data().baseline }}</span><strong>{{ story().tile?.a ?? dailyTrips()(counts()[0]) }}</strong><small>{{ story().tile?.unit ?? '每日人次' }}</small></div>
-        <div class="now" [style.--line]="lineOf()(item().origin)?.color"><span>{{ data().current }}</span><strong>{{ story().tile?.b ?? dailyTrips()(counts()[1]) }}</strong><small>{{ story().tile?.unit ?? '每日人次' }}</small></div>
+        @let shareUnit = story().shareUnit;
+        <div><span>{{ data().baseline }}</span><strong><app-animated-count [value]="shareUnit ? story().shareA : item().baselineDaily" [format]="shareUnit ? 'percent' : 'daily'" /></strong><small>{{ shareUnit ?? '每日人次' }}</small></div>
+        <div class="now" [style.--line]="lineOf()(item().origin)?.color"><span>{{ data().current }}</span><strong><app-animated-count [value]="shareUnit ? story().shareB : item().currentDaily" [format]="shareUnit ? 'percent' : 'daily'" /></strong><small>{{ shareUnit ?? '每日人次' }}</small></div>
       </div>
 
       @if (story().reversal) { <p class="callout">{{ story().reversal }}</p> }
@@ -90,7 +91,7 @@
         }
 
         <h3>回程</h3>
-        <p class="body route-readout"><span>{{ item().destination }} → {{ item().origin }}</span><span>每日 {{ dailyTrips()(item().reverseBaseline / data().days[0]) }} → {{ dailyTrips()(counts()[3]) }} 人次</span></p>
+        <p class="body route-readout"><span>{{ item().destination }} → {{ item().origin }}</span><span>每日 {{ dailyTrips()(item().reverseBaseline / data().days[0]) }} → {{ dailyTrips()(item().reverseCurrent / (data().days[1] || 1)) }} 人次</span></p>
 
         @if (siblings().length) {
           <h3>從{{ item().origin }}出發的其他變化</h3>

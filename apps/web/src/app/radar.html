@@ -28,7 +28,7 @@
     </div>
   }
   @if (installLater() && !device().standalone && !openMenu()) {
-    <div class="install-banner later" role="status"><p>好，想裝時點上方工具列最右的「圖層」，第一項就是安裝成 App。</p></div>
+    <div class="install-banner later" role="status"><p>想安裝時，打開「工具」就能找到安裝選項。</p></div>
   }
   @if (basemap() !== 'ready') {
     <div class="map-veil" [class.failed]="basemap() === 'failed'" [attr.role]="basemap() === 'failed' ? 'alert' : 'status'">
@@ -152,61 +152,70 @@
       <span>{{ theme() === 'dark' ? '深色' : '淺色' }}</span>
     </button>
     <details #layerMenu class="layer-menu" (toggle)="layerMenu.open && (placeMenu.open = collectionMenu.open = false); setMenu('layers', layerMenu.open)" (keydown.escape)="closeMenus(true); $event.stopPropagation()">
-      <summary data-tip="切換圖層：道路、自然、動態效果"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83zM2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span>圖層</span></summary>
+      <summary class="map-tool-trigger" tabindex="0" aria-label="地圖工具" data-tip="調整地圖顯示與人流圖例">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.42.24a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.49a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.42.24a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.42-.24a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.49a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.42-.24a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span>{{ phone() ? '工具' : '地圖工具' }}</span>
+      </summary>
       <div class="layer-options">
-        <button type="button" class="sheet-close" aria-label="關閉圖層與設定" (click)="closeMenus(true)"><span>圖層與設定</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <button type="button" class="sheet-close" aria-label="關閉地圖工具" (click)="closeMenus(true)"><span>地圖工具</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <label class="mobile-only-row">深色模式<input type="checkbox" role="switch" [checked]="theme() === 'dark'" (change)="setTheme(theme() === 'dark' ? 'light' : 'dark')"></label>
+        <label class="mobile-only-row">立體地圖與人流<input type="checkbox" role="switch" [checked]="tower3d()" (change)="toggleTower3d()"></label>
+        <label>減少動態效果<input type="checkbox" role="switch" [checked]="motion.enabled()" (change)="motion.set($any($event.target).checked)"></label>
+        <div class="map-view-actions">
+          <button type="button" class="map-fit-action" (click)="resetMap(); closeMenus(true)">回到全圖</button>
+          <button type="button" (click)="toggleMapFullscreen()">全螢幕地圖</button>
+        </div>
+        <details class="layer-group" [open]="!phone()">
+          <summary>圖層<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
+          <label>街道與建物<input type="checkbox" role="switch" [checked]="showRoads()" (change)="toggleMapOption('roads')"></label>
+          <label>水系與綠地<input type="checkbox" role="switch" [checked]="showNature()" (change)="toggleMapOption('nature')"></label>
+          <label>捷運路網<input type="checkbox" role="switch" [checked]="showMetro()" (change)="toggleMapOption('metro')"></label>
+          <label>比例尺<input type="checkbox" role="switch" [checked]="showScale()" (change)="toggleMapOption('scale')"></label>
+        </details>
+        <details class="layer-legend" [open]="!panelFolded('legend', phone())"
+          (toggle)="toggleMapPanel('legend', !$any($event.target).open)">
+          <summary>人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <label>流向動畫<input type="checkbox" role="switch" [checked]="!reducedMotion && !paused()" [disabled]="reducedMotion" (change)="togglePause()"></label>
+          <label>人流圖例<input type="checkbox" role="switch" [checked]="showLegend()" (change)="toggleMapOption('legend')"></label>
+          @if (view() === 'station' && explore()?.isComparing()) {
+            <div class="map-metric segmented" role="group" aria-label="人流呈現方式">
+              <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'volume'" (click)="explore()?.mapMetric?.set('volume')">人次</button>
+              <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'change'" (click)="explore()?.mapMetric?.set('change')">人次增減</button>
+            </div>
+          }
+          @if (showLegend()) {
+            <div class="layer-key">
+              @if (tower3d()) {
+                <p>{{ view() === 'pairs' || view() === 'network' ? '站塔越高，進站人次越多。' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
+                @if (view() !== 'network') { <p>弧線越寬，這兩站之間的人次越多。箭頭朝向目的站。</p> }
+              } @else if (view() === 'network') {
+                <p><i class="sw dot"></i>圓越大，進站人次越多</p>
+                @if (explore()?.isComparing()) { <p><i class="sw ring"></i>比對照期少</p> }
+              } @else {
+                <p>{{ view() === 'station' && explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '線寬代表增減幅度（人次）' : '線寬對照（人次）' }}</p>
+                <div class="scale-samples">@for (sample of scaleSamples; track sample.trips) {
+                  <span><i [style.height.px]="sample.width"></i><span class="sample-arrows"><svg viewBox="0 0 8 10" aria-hidden="true"><path d="M2 2l3 3-3 3"/></svg>×{{ sample.arrows.length }}<span class="visually-hidden">個箭頭</span></span>{{ sample.trips | number }}</span>
+                }</div>
+                <p>人次越多，線越粗、箭頭越多。弧線是起訖站之間的示意，不是實際行車路線。</p>
+                @if (view() === 'station' && explore()?.isComparing()) { <p><i class="sw flow dashed"></i>比對照期少</p> }
+              }
+            </div>
+          }
+        </details>
         @if (!device().standalone) {
           <button type="button" class="pwa-install-btn" (click)="installAction()">{{ installPrompt() ? '安裝成 App，地圖可全螢幕' : '怎麼安裝成 App' }}</button>
           @if (installHelp()) {
             <p class="pwa-tip">{{ isIosSafari ? '點下方（或網址列旁）的「分享」方框向上箭頭，往下滑選「加入主畫面」，再按「新增」。' : '點瀏覽器右上角選單（⋮），選「安裝應用程式」或「加到主畫面」。' }}從主畫面打開就沒有網址列，整個畫面都是地圖。</p>
           }
         }
-        <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
-        <label>街道與建物<input type="checkbox" role="switch" [checked]="showRoads()" (change)="toggleMapOption('roads')"></label>
-        <label>水系與綠地<input type="checkbox" role="switch" [checked]="showNature()" (change)="toggleMapOption('nature')"></label>
-        <label>捷運路網<input type="checkbox" role="switch" [checked]="showMetro()" (change)="toggleMapOption('metro')"></label>
-        <label>人流圖例<input type="checkbox" role="switch" [checked]="showLegend()" (change)="toggleMapOption('legend')"></label>
-        <label>流向動畫<input type="checkbox" role="switch" [checked]="!paused()" (change)="togglePause()"></label>
-        <label>比例尺<input type="checkbox" role="switch" [checked]="showScale()" (change)="toggleMapOption('scale')"></label>
-        <label class="mobile-only-row">立體地圖與人流<input type="checkbox" role="switch" [checked]="tower3d()" (change)="toggleTower3d()"></label>
-        <label class="mobile-only-row">深色模式<input type="checkbox" role="switch" [checked]="theme() === 'dark'" (change)="setTheme(theme() === 'dark' ? 'light' : 'dark')"></label>
-        <label>全螢幕地圖<input type="checkbox" role="switch" [checked]="mapFullscreen()" (change)="toggleMapFullscreen(); layerMenu.open = false"></label>
-        <div class="layer-mobile-actions">
-          <button type="button" (click)="resetMap(); layerMenu.open = false">回到全圖</button>
-          <button type="button" (click)="about.open(); layerMenu.open = false">關於與授權</button>
+        <div class="map-tools-footer">
+          <a class="layer-source" href="https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d" target="_blank" rel="noopener">資料來源<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+          <button type="button" class="map-about-action" (click)="closeMenus(true); about.open()">關於與授權</button>
         </div>
-        @if (view() === 'station' && explore()?.isComparing()) {
-          <div class="map-metric segmented" role="group" aria-label="人流呈現方式">
-            <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'volume'" (click)="explore()?.mapMetric?.set('volume')">人次</button>
-            <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'change'" (click)="explore()?.mapMetric?.set('change')">人次增減</button>
-          </div>
-        }
-        @if (showLegend()) {
-          <details class="layer-legend" [open]="!panelFolded('legend', phone())"
-            (toggle)="toggleMapPanel('legend', !$any($event.target).open)">
-            <summary class="overlay-fold" [attr.aria-expanded]="!panelFolded('legend', phone())">人流圖例
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-            </summary>
-          <div class="layer-key">
-            @if (tower3d()) {
-              <p>{{ view() === 'pairs' || view() === 'network' ? '站塔越高，進站人次越多。' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
-              @if (view() !== 'network') { <p>弧線越寬，這兩站之間的人次越多。箭頭朝向目的站。</p> }
-            } @else if (view() === 'network') {
-              <p><i class="sw dot"></i>圓越大，進站人次越多</p>
-              @if (explore()?.isComparing()) { <p><i class="sw ring"></i>比對照期少</p> }
-            } @else {
-              <p>{{ view() === 'station' && explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '線寬代表增減幅度（人次）' : '線寬對照（人次）' }}</p>
-              <div class="scale-samples">@for (sample of scaleSamples; track sample.trips) {
-                <span><i [style.height.px]="sample.width"></i><span class="sample-arrows"><svg viewBox="0 0 8 10" aria-hidden="true"><path d="M2 2l3 3-3 3"/></svg>×{{ sample.arrows.length }}<span class="visually-hidden">個箭頭</span></span>{{ sample.trips | number }}</span>
-              }</div>
-              <p>人次越多，線越粗、箭頭越多。弧線是起訖站之間的示意，不是實際行車路線。</p>
-              @if (view() === 'station' && explore()?.isComparing()) { <p><i class="sw flow dashed"></i>比對照期少</p> }
-            }
-          </div>
-          </details>
-        }
-        @if (view() === 'station') { <ng-container *ngTemplateOutlet="flowPause" /> }
-        <a class="layer-source" href="https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d" target="_blank" rel="noopener">資料來源<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
       </div>
     </details>
     <button type="button" class="map-reset map-about" data-tip="資料來源、授權與免責聲明" (click)="about.open()">
@@ -215,6 +224,7 @@
     <app-about #about />
     <button type="button" class="map-reset tools-toggle" [attr.aria-expanded]="!toolsCollapsed()" [attr.aria-label]="toolsCollapsed() ? '展開地圖工具' : '收合地圖工具'" [attr.data-tip]="toolsCollapsed() ? '展開地圖工具' : '收合地圖工具'" (click)="toggleTools()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      @if (phone()) { <span>{{ toolsCollapsed() ? '展開' : '收合' }}</span> }
     </button>
   </div>
   @if (tower3d()) {
@@ -269,8 +279,8 @@
               }
             </div>
             <div class="preview-kpis-grid">
-              <div><small>進站</small><strong>{{ snap.entries | number }}</strong></div>
-              <div><small>出站</small><strong>{{ snap.exits != null ? (snap.exits | number) : '資料不足' }}</strong></div>
+              <div><small>進站</small><strong><app-animated-count [value]="snap.entries" /></strong></div>
+              <div><small>出站</small><strong><app-animated-count [value]="snap.exits ?? null" empty="資料不足" /></strong></div>
               @if (snap.rank) {
                 <div><small>全線排名</small><strong>第 {{ snap.rank }} 名<small> / {{ snap.totalStations }}</small></strong></div>
               }
@@ -424,7 +434,10 @@
       } @else if (stationInfoStatus() === 'loading') { <p class="preview-status" role="status">載入車站資料…</p> }
       @else if (stationInfoStatus() === 'failed') { <p class="preview-status" role="status">暫時讀不到車站資料</p> }
       @if (availability()?.[station]?.months?.length) {
-        <button type="button" class="view-station" (click)="openStation(station); selectMapStation(null)">看本站人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+        <div class="station-preview-actions">
+          @if (explore()?.selectedRank() === station) { <button type="button" class="preview-rank-link" (click)="showLinkedRanking()">看排行</button> }
+          <button type="button" class="view-station" (click)="openStation(station); selectMapStation(null)">看本站人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+        </div>
       } @else { <div class="empty-state compact" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><p>這站尚無旅次資料</p></div> }
     </section>
   }
@@ -437,8 +450,8 @@
         <button type="button" class="icon-button" aria-label="關閉路線資訊" (click)="explore()?.focusRelation(null)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div class="flow-preview-stats">
-        <div><small>每日旅次</small><strong>{{ flow.daily | number:'1.0-0' }} 人次</strong></div>
-        <div><small>{{ flow.outbound ? '占出發比' : '占進站比' }}</small><strong>{{ flow.share | number:'1.1-1' }}%</strong></div>
+        <div><small>每日旅次</small><strong>{{ flow.daily == null ? '無紀錄' : (flow.daily | number:'1.0-0') + ' 人次' }}</strong></div>
+        <div><small>{{ flow.outbound ? '占出發比' : '占進站比' }}</small><strong>{{ flow.share == null ? '無紀錄' : (flow.share | number:'1.1-1') + '%' }}</strong></div>
         @if (flow.hasCompare && flow.diff != null) {
           <div><small>較對照期</small><strong>{{ flow.diff > 0 ? '+' : '' }}{{ flow.diff | number:'1.0-0' }}@if (flow.growthPct != null) { <span> ({{ flow.growthPct > 0 ? '+' : '' }}{{ flow.growthPct }}%)</span> }</strong></div>
         }
@@ -467,7 +480,7 @@
     <div class="stripe" aria-hidden="true">@for (code of lineList; track code) { <i [class]="'l-' + code"></i> }</div>
 
     <div class="panel-body" id="panel-body" [attr.inert]="panelOpen() ? null : ''">
-      <div class="segmented view-tabs" role="group" aria-label="查詢方式">
+      <div class="segmented view-tabs motion-tabs" role="group" aria-label="查詢方式" [style.--tab-index]="view() === 'pairs' ? 0 : view() === 'station' ? 1 : 2">
         <button type="button" [attr.aria-pressed]="view() === 'pairs' && !firstQueryOpen()" (click)="setView('pairs')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg><span>兩站比較</span></button>
         <button type="button" [attr.aria-pressed]="view() === 'station'" (click)="setView('station')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/></svg><span>單站往來</span></button>
         <button type="button" [attr.aria-pressed]="view() === 'network'" (click)="setView('network')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span>全線人次</span></button>
@@ -478,7 +491,7 @@
       }
       @if (view() !== 'pairs') {
         @if (lineOrder(); as order) {
-          <app-explore [mode]="$any(view())" [months]="months()" [monthsReady]="apiAvailable()" [lineOrder]="order" [linesOf]="linesOfFn" [stationCodes]="stationCodes()" [availability]="availability()" (layer)="onExploreLayer($event)" (openStation)="openStation($event)" (openPair)="openPair($event.origin, $event.destination, $any($event))" (switchMode)="setView($event)" (showMap)="showMobileMap()" />
+          <app-explore [mode]="$any(view())" [months]="months()" [monthsReady]="apiAvailable()" [lineOrder]="order" [linesOf]="linesOfFn" [stationCodes]="stationCodes()" [availability]="availability()" (layer)="onExploreLayer($event)" (rankSelected)="onRankSelected($event)" (openStation)="openStation($event)" (openPair)="openPair($event.origin, $event.destination, $any($event))" (switchMode)="setView($event)" (showMap)="showMobileMap()" />
         } @else if (error()) {
           <div class="initial-state"><p role="alert">車站資料載入失敗</p><button type="button" (click)="retryInitialLoad()">重新載入</button></div>
         }
@@ -622,7 +635,6 @@
         [story]="s"
         [verdict]="verdict()"
         [cautions]="cautions()"
-        [counts]="counts()"
         [detailOpen]="detailOpen()"
         [detailWide]="detailWide()"
         [isFavPair]="isFavPair()"

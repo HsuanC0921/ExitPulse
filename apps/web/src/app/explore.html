@@ -182,7 +182,7 @@
     </section>
   }
   @if (stats().length) {
-    <details class="explore-basis">
+    <details #basis class="explore-basis" (toggle)="basisExpanded.set(basis.open)">
       <summary><span>資料依據@if (mode() === 'station' && stationPersonality(); as sp) { <b class="personality-pill" [title]="sp.note">{{ sp.tag }}</b> }@if (mode() === 'station' && stationRoleTag(); as role) { <b class="personality-pill role-pill">像{{ role.role }}站</b> }</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
       @if (periodDaysNote(); as note) { <p class="basis-meta">{{ glue(note) }}</p> }
       @if (compareBasisText(); as note) {
@@ -218,7 +218,7 @@
         @for (s of stats(); track s.label) {
           <div class="stat" [attr.data-dir]="s.diff?.dir">
             <span class="stat-label">{{ s.label }}</span>
-            <strong class="stat-value"><span>{{ s.now.value }}</span><small>{{ s.now.unit }}</small></strong>
+            <strong class="stat-value"><app-animated-count [value]="s.value" [format]="s.format" [active]="basisExpanded()" /><small>{{ s.unit }}</small></strong>
             @if (s.diff; as d) {
               <span class="stat-delta"><b>{{ d.dir === 'flat' ? '大致持平' : d.pct }}</b>@if (d.dir !== 'flat') { <span>{{ d.words }}</span> }</span>
               <span class="stat-bars" aria-hidden="true"><small>對照</small><i class="old" [style.--w]="s.wBefore"></i><small>目前</small><i [style.--w]="s.wNow"></i></span>
@@ -237,7 +237,7 @@
 
   @if (headline()) {
     <div class="section-bar">
-      <div class="segmented section-tabs" role="group" aria-label="結果內容" [style.--n]="sections().length">
+      <div class="segmented section-tabs motion-tabs" role="group" aria-label="結果內容" [style.--n]="sections().length" [style.--tab-index]="sectionIndex()">
         @for (t of sections(); track t[0]) { <button type="button" [attr.aria-pressed]="activeSection() === t[0]" [title]="t[0] === 'list' ? (mode() === 'station' ? '往來站：與本站直接起訖的對方車站，不含轉乘經過' : '各站：全線各車站進站與出站人次') : ''" (click)="section.set(t[0])">{{ t[1] }}</button> }
       </div>
     </div>
@@ -303,7 +303,7 @@
         </svg>
         <div class="dual-legend"><span><i class="swatch a"></i>進站</span><span><i class="swatch b"></i>出站</span></div>
       } @else {
-      <div class="hours" role="img" [attr.aria-label]="a.station + '各小時' + (hourSide() === 'entries' ? '進站' : '出站') + '人次'" [style.--line]="linesOf()(a.station)[0]?.color">
+      <div class="hours" animate.enter="content-arrive" role="img" [attr.aria-label]="a.station + '各小時' + (hourSide() === 'entries' ? '進站' : '出站') + '人次'" [style.--line]="linesOf()(a.station)[0]?.color">
         @for (b of h.bars; track b.h) {
           <div class="hour" [class.picked]="b.picked" [title]="b.h + ' 點'">
             @if (a.compare) { <b class="old" [class.unrecorded]="b.before == null" [style.transform]="b.before == null ? null : 'scaleY(' + b.before + ')'"></b> }
@@ -354,7 +354,7 @@
   }
 
   @if (activeSection() === 'days' && calendarChart(); as c) {
-    <app-month-calendar [chart]="c" [month]="month()" [firstDate]="firstDate()" [wideView]="wideView()" [selected]="unit() === 'date' ? date() : null" (pick)="pickDate($event)" />
+    <app-month-calendar animate.enter="content-arrive" [chart]="c" [month]="month()" [firstDate]="firstDate()" [wideView]="wideView()" [selected]="unit() === 'date' ? date() : null" (pick)="pickDate($event)" />
   }
 
   @if (activeSection() === 'years' && trendChart(); as t) {
@@ -440,6 +440,9 @@
       }
     </p>
     @if (!listCollapsed()) {
+    @if (rankChart(); as chart) {
+      <app-rank-chart [data]="chart" [state]="previewedRank() ? 'preview' : selectedRank() ? 'selected' : 'default'" />
+    }
     <div class="result-quick-bar">
       <div class="sort-group">
         <button type="button" class="result-tools-toggle" [attr.aria-expanded]="toolsOpen()" (click)="toolsOpen.set(!toolsOpen())"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg><span>篩選與匯出</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
@@ -468,7 +471,7 @@
     }
     @if (listStyle() === 'cards') { <div class="list-head"><span>車站</span><button type="button" class="list-sort-head" [class.asc]="relationSortReverse()" [attr.aria-label]="'排序：' + (relationSortReverse() ? '由小到大' : '由大到小') + '，點一下反轉'" [title]="relationSortReverse() ? '由小到大，點一下改回由大到小' : '由大到小，點一下改為由小到大'" (click)="relationSortReverse.set(!relationSortReverse())">{{ a.compare ? '增減（人次／日）' : relationSort() === 'share' ? (direction() === 'outbound' ? '占出發比' : '占抵達比') : (a.period.kind === 'date' ? '當天人次' : '每日人次') }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg></button></div> }
     @if (listStyle() === 'table') {
-      <div class="table-wrap" tabindex="0" role="region" aria-label="起訖流向資料表">
+      <div class="table-wrap" animate.enter="content-arrive" tabindex="0" role="region" aria-label="起訖流向資料表">
         <table class="data-table">
           <thead>
             <tr>
@@ -481,9 +484,9 @@
           </thead>
           <tbody>
             @for (r of tableRelations().slice(0, shown()); track r.station; let i = $index) {
-              <tr [class.selected]="focusedStation() === r.station" (click)="focusTableStation(r.station)">
+              <tr [attr.data-rank-station]="r.station" [class.selected]="selectedRank() === r.station" [class.rank-preview]="previewedRank() === r.station" (click)="focusTableStation(r.station)" (pointerenter)="previewRank(r.station, 'rank', $event)" (pointerleave)="previewRank(null, 'rank', $event)" (focusin)="previewRank(r.station, 'rank', $event)" (focusout)="previewRank(null, 'rank')">
                 <td>{{ i + 1 }}</td>
-                <td><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span></td>
+                <td><button type="button" class="link-cell" [attr.aria-pressed]="selectedRank() === r.station"><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span></button></td>
                 <td class="num">{{ r.daily == null ? stationMissingLabel(r.station) : (r.daily | number:'1.0-0') }}</td>
                 <td class="num">{{ share(r) }}</td>
                 @if (a.compare) {
@@ -495,9 +498,9 @@
         </table>
       </div>
     } @else {
-    <ol class="relations">
+    <ol class="relations" animate.enter="content-arrive">
       @for (r of visibleRelations(); track r.station; let i = $index) {
-        <li><button type="button" [attr.aria-pressed]="focusedRelation() === r.station" (click)="selectRelation(r.station)" [title]="'比較本站與' + r.station">
+        <li><button type="button" [attr.data-rank-station]="r.station" [attr.aria-pressed]="selectedRank() === r.station" [class.rank-preview]="previewedRank() === r.station" (click)="selectRelation(r.station)" (pointerenter)="previewRank(r.station, 'rank', $event)" (pointerleave)="previewRank(null, 'rank', $event)" (focus)="previewRank(r.station, 'rank', $event)" (blur)="previewRank(null, 'rank')" [title]="'比較本站與' + r.station">
           <span class="rank" [class.top]="(!relationSortReverse() && i < 3) || focusedRelation() === r.station">{{ relationSortReverse() ? relations().length - relations().indexOf(r) : relations().indexOf(r) + 1 }}</span>
           <span class="pair">
             <span class="names"><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span></span>
@@ -550,6 +553,9 @@
       @if (a.compare) { <span><i class="swatch hollow"></i>空心表示比對照期少</span> }
     </p>
     @if (!listCollapsed()) {
+    @if (listStyle() !== 'lines' && rankChart(); as chart) {
+      <app-rank-chart [data]="chart" [state]="previewedRank() ? 'preview' : selectedRank() ? 'selected' : 'default'" [canDrillDown]="true" (openStation)="openStation.emit($event)" />
+    }
     <div class="result-quick-bar">
       <button type="button" class="result-tools-toggle" [attr.aria-expanded]="toolsOpen()" (click)="toolsOpen.set(!toolsOpen())"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg><span>篩選與匯出</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
       <div class="sort-group" [hidden]="listStyle() !== 'cards'">
@@ -573,7 +579,7 @@
     }
     @if (listStyle() === 'cards') { <div class="list-head"><span>車站</span><button type="button" class="list-sort-head" [class.asc]="networkSortReverse()" [attr.aria-label]="'排序：' + (networkSortReverse() ? '由小到大' : '由大到小') + '，點一下反轉'" [title]="networkSortReverse() ? '由小到大，點一下改回由大到小' : '由大到小，點一下改為由小到大'" (click)="networkSortReverse.set(!networkSortReverse())">{{ a.compare ? '進站增減（人次／日）' : networkSort() === 'exits' ? '每日出站' : '每日進站' }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg></button></div> }
     @if (listStyle() === 'table') {
-      <div class="table-wrap" tabindex="0" role="region" aria-label="全線各站旅次資料表">
+      <div class="table-wrap" animate.enter="content-arrive" tabindex="0" role="region" aria-label="全線各站旅次資料表">
         <table class="data-table">
           <thead>
             <tr>
@@ -587,9 +593,9 @@
           </thead>
           <tbody>
             @for (r of tableNetworkRows().slice(0, shown()); track r.station; let i = $index) {
-              <tr [class.selected]="focusedStation() === r.station" (click)="focusTableStation(r.station)">
+              <tr [attr.data-rank-station]="r.station" [class.selected]="selectedRank() === r.station" [class.rank-preview]="previewedRank() === r.station" (click)="focusTableStation(r.station)" (pointerenter)="previewRank(r.station, 'rank', $event)" (pointerleave)="previewRank(null, 'rank', $event)" (focusin)="previewRank(r.station, 'rank', $event)" (focusout)="previewRank(null, 'rank')">
                 <td>{{ i + 1 }}</td>
-                <td><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span>@if (r.entries == null) { <b class="state-pill">{{ stationMissingLabel(r.station) }}</b> }</td>
+                <td><button type="button" class="link-cell" [attr.aria-pressed]="selectedRank() === r.station"><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span></button>@if (r.entries == null) { <b class="state-pill">{{ stationMissingLabel(r.station) }}</b> }</td>
                 <td class="num">{{ r.entries == null ? '—' : (r.entries | number:'1.0-0') }}</td>
                 <td class="num">{{ r.exits == null ? '—' : (r.exits | number:'1.0-0') }}</td>
                 <td class="num">{{ r.entries == null || r.exits == null ? '—' : signed(r.entries - r.exits) }}</td>
@@ -607,7 +613,7 @@
         <div class="query-failure" role="alert"><p>路線通車資料暫時無法載入。</p><button type="button" class="retry" (click)="retryCatalog()">重新載入</button></div>
       }
       <p class="hint">依該期已通車路線彙總車站進站量，轉乘站可計入多條路線。</p>
-      <ol class="relations">
+      <ol class="relations" animate.enter="content-arrive">
         @for (l of lineSummaries(); track l.code; let i = $index) {
           <li><button type="button" [style.--line]="'var(--' + l.code + ')'" (click)="setLine(l.code); listStyle.set('cards')">
             <span class="rank" [class.top]="i < 3">{{ i + 1 }}</span>
@@ -642,9 +648,9 @@
         }
       </ol>
     } @else {
-    <ol class="relations">
+    <ol class="relations" animate.enter="content-arrive">
       @for (r of networkRows().slice(0, shown()); track r.station; let i = $index) {
-        <li><button type="button" (click)="openStation.emit(r.station)" [title]="'看' + r.station + '的單站關係'">
+        <li><button type="button" [attr.data-rank-station]="r.station" [attr.aria-pressed]="selectedRank() === r.station" [class.rank-preview]="previewedRank() === r.station" (click)="focusTableStation(r.station)" (pointerenter)="previewRank(r.station, 'rank', $event)" (pointerleave)="previewRank(null, 'rank', $event)" (focus)="previewRank(r.station, 'rank', $event)" (blur)="previewRank(null, 'rank')">
           <span class="rank" [class.top]="!networkSortReverse() && i < 3">{{ networkSortReverse() ? networkRows().length - i : i + 1 }}</span>
           <span class="pair">
             <span class="names"><span class="station"><span class="codes">@for (l of linesOf()(r.station); track l.code) { <b class="badge" [style.--line]="l.color" [attr.data-code]="l.code">{{ stationCode(l.code, r.station) }}</b> }</span><span class="nm">{{ r.station }}</span></span>@if (r.entries == null) { <b class="state-pill">{{ stationMissingLabel(r.station) }}</b> }</span>
@@ -679,7 +685,7 @@
     @else if (matrix(); as m) {
       <div class="block-head"><span class="head-title"><h2>車站互搭表（前 {{ m.stations.length }} 大站）</h2><app-hint label="車站互搭表" [alignToPanel]="true" [entries]="hints['matrix']" /></span><span class="section-period">直欄迄站 · 橫列起站</span></div>
       <p class="hint">對角線灰格是同站進出旅次（不計入色階最大值）。</p>
-      <app-od-matrix [matrix]="m" [max]="matrixMax()" [days]="days()" [compare]="comparePeriod()" (station)="openStation.emit($event)" (pair)="openPair.emit({ origin: $event.origin, destination: $event.destination, period: period(), weekend: days() === 'weekend', hours: band() })" />
+      <app-od-matrix animate.enter="content-arrive" [matrix]="m" [max]="matrixMax()" [days]="days()" [compare]="comparePeriod()" (station)="openStation.emit($event)" (pair)="openPair.emit({ origin: $event.origin, destination: $event.destination, period: period(), weekend: days() === 'weekend', hours: band() })" />
     }
   }
 

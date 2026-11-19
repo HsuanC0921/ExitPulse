@@ -4,13 +4,15 @@ import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRend
 import { DecimalPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { Hint } from './hint';
+import { AnimatedCount } from './animated-count';
+import { MotionPreference } from './motion-preference';
 import { daylightAt, formatSolarTime, solarTimes, timeRange } from './daylight';
 
 type RelationHour = { hour: number; forward: number | null; reverse: number | null };
 
 @Component({
   selector: 'app-time-player',
-  imports: [DecimalPipe, Hint],
+  imports: [DecimalPipe, Hint, AnimatedCount],
   templateUrl: './time-player.html',
   styleUrl: './time-player.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,6 +20,7 @@ type RelationHour = { hour: number; forward: number | null; reverse: number | nu
 export class TimePlayer {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector = inject(Injector);
+  readonly motion = inject(MotionPreference);
   readonly date = input.required<string>();
   readonly station = input('');
   readonly counterpart = input<string | null>(null);

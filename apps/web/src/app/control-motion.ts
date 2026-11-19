@@ -1,8 +1,10 @@
 import { afterNextRender, type Injector } from '@angular/core';
+import { MotionPreference } from './motion-preference';
 
 /** Keep the same control under the eye when its surrounding panel reflows. */
 export function moveControls(host: Element, selector: string, injector: Injector) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const motion = injector.get(MotionPreference);
+  if (motion.reduced()) return;
   const controls = Array.from(host.querySelectorAll<HTMLElement>(selector))
     .filter(control => control.getClientRects().length > 0)
     .map(control => ({ control, before: control.getBoundingClientRect() }));
@@ -11,6 +13,7 @@ export function moveControls(host: Element, selector: string, injector: Injector
       for (const { control } of controls) {
         control.getAnimations().filter(animation => animation.id === 'control-position').forEach(animation => animation.cancel());
       }
+      if (motion.reduced()) return;
       const moves = controls.filter(({ control }) => control.isConnected && control.getClientRects().length > 0)
         .map(({ control, before }) => {
           const after = control.getBoundingClientRect();

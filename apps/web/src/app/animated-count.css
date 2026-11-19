@@ -1,0 +1,4 @@
+:host { display: inline-grid; white-space: nowrap; font-variant-numeric: tabular-nums; }
+span { grid-area: 1 / 1; }
+.reserve { opacity: 0; }
+.sample { user-select: none; }
