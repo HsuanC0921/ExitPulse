@@ -16,7 +16,7 @@
   .install-banner button { min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-s); background: none; color: inherit; font-size: var(--fs-xs); }
   .install-banner .primary { background: var(--panel); color: var(--ink); font-weight: 700; }
 
-  .low-angle .station-preview { top: auto; bottom: calc(var(--tabbar) + 12px); left: max(12px, var(--safe-left)); width: auto; }
+  .workspace.low-angle .station-preview { top: auto; bottom: calc(var(--tabbar) + 12px); left: max(12px, var(--safe-left)); width: auto; }
   .low-angle .station-preview.preview-compact { padding-block: 2px; }
   .low-angle .mobile-overview:not([hidden]) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2); padding: 4px 8px 4px 12px; }
   .low-angle .mobile-overview h2 { font-size: var(--fs-s); }
@@ -31,15 +31,20 @@
   .station-preview {
     --preview-clearance: calc(var(--tools-end) + 8px);
     width: min(308px, calc(100% - var(--safe-left) - var(--safe-right) - 24px));
+    grid-template-columns: minmax(0, 1fr);
     max-height: min(32rem, calc(100dvh - var(--preview-clearance) - var(--safe-bottom) - 12px));
+  }
+  .workspace:not(.low-angle):has(.mobile-overview:not([hidden])) .station-preview {
+    max-height: min(32rem, calc(100dvh - var(--preview-clearance) - var(--safe-bottom) - var(--overview-height, var(--card-h)) - 16px));
   }
   .station-preview-head { position: sticky; top: -10px; z-index: 1; background: var(--panel); }
   .tower-key + .station-preview { --preview-clearance: calc(var(--tools-end) + 60px); }
   .tower-key + .station-preview { top: calc(var(--tools-end) + 60px); }
   .tower-key, .tower-key:has(+ .map-rank-focus) { top: calc(var(--tools-end) + 8px); left: max(12px, var(--safe-left)); right: auto; }
   .tower-key + .map-rank-focus { top: calc(var(--tools-end) + 60px); }
-  .map-tools { top: var(--tools-top); left: auto; display: flex; gap: 0; padding: 2px; }
-  .map-tools > :is(button, details) { flex: 0 0 44px; }
+  .map-tools { top: var(--tools-top); left: auto; display: grid; grid-auto-flow: column; grid-auto-columns: 44px; grid-template-rows: 44px; gap: 0; padding: 2px; }
+  .map-tools > :is(button, details) { width: 44px; min-width: 44px; }
+  .map-tools > app-about { position: absolute; }
   .map-tools > details > summary, .map-tools > button { width: 100%; min-width: 0; }
   .map-tools :is(.map-locate-btn, .tower-switch, .theme-switch) { display: none; }
   .map-tools :is(.map-fit-btn, .map-about) { display: none; }

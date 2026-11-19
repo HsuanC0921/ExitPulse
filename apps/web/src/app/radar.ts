@@ -651,6 +651,7 @@ export class Radar implements OnDestroy {
       const docks = Array.from(workspace.querySelectorAll(
         '.mobile-overview, .panel-body app-first-query, app-time-player, .flow-preview, .station-preview',
       ));
+      const overview = workspace.querySelector<HTMLElement>('.mobile-overview');
       const positionControls = () => {
         const { bottom } = workspace.getBoundingClientRect();
         const timeline = workspace.querySelector('app-time-player')?.getBoundingClientRect();
@@ -664,6 +665,10 @@ export class Radar implements OnDestroy {
           } else if (rect.bottom > bottom - 96) {
             lift = Math.max(lift, bottom - rect.top + 12);
           }
+        }
+        const overviewHeight = `${overview?.offsetHeight ?? 0}px`;
+        if (workspace.style.getPropertyValue('--overview-height') !== overviewHeight) {
+          workspace.style.setProperty('--overview-height', overviewHeight);
         }
         const offset = lift ? Math.ceil(lift) + 'px' : '';
         if (workspace.style.getPropertyValue('--nav-dock') !== offset) workspace.style.setProperty('--nav-dock', offset);
