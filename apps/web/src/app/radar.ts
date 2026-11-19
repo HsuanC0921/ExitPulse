@@ -1761,9 +1761,32 @@ export class Radar implements OnDestroy {
     this.loadStationInfo(name, !keepCamera && !this.lowAngle());
     const source = this.map?.getSource('picked-station') as GeoJSONSource | undefined;
     const coordinates = name && this.stops.get(name);
+    const lines = name ? this.linesOfStation(name) : [];
+    // 轉乘站：選取圈改由分段色環負責，這裡的單色圈透明掉
     source?.setData(coordinates && name ? { type: 'FeatureCollection', features: [
-      { type: 'Feature', properties: { color: this.lineOf(name)!.color }, geometry: { type: 'Point', coordinates } },
+      { type: 'Feature', properties: { color: lines.length > 1 ? 'rgba(0,0,0,0)' : this.lineOf(name)!.color }, geometry: { type: 'Point', coordinates } },
     ] } : EMPTY);
+    this.pickedRing?.remove();
+    this.pickedRing = undefined;
+    const map = this.map;
+    if (map && this.ml && coordinates && lines.length > 1) {
+      const element = this.lineRingElement(lines.map(l => l.color));
+      element.style.width = element.style.height = '33px';
+      element.style.setProperty('--ring', '3px');
+      this.pickedRing = new this.ml.Marker({ element, anchor: 'center' }).setLngLat(coordinates).addTo(map);
+    }
+  }
+
+  private pickedRing?: maplibregl.Marker;
+
+  /** 依各線顏色等分成色環的 DOM 元素 */
+  private lineRingElement(colors: string[]) {
+    const element = document.createElement('div');
+    element.className = 'focus-ring';
+    element.setAttribute('aria-hidden', 'true');
+    const step = 360 / colors.length;
+    element.style.background = `conic-gradient(${colors.map((c, i) => `${c} ${i * step}deg ${(i + 1) * step}deg`).join(', ')})`;
+    return element;
   }
 
   locateEntrance(exit: Entrance) {
@@ -2551,11 +2574,7 @@ export class Radar implements OnDestroy {
     }
     if (!this.focusRing || this.focusRing.station !== station) {
       this.focusRing?.marker.remove();
-      const element = document.createElement('div');
-      element.className = 'focus-ring';
-      element.setAttribute('aria-hidden', 'true');
-      const step = 360 / lines.length;
-      element.style.background = `conic-gradient(${lines.map((l, i) => `${l.color} ${i * step}deg ${(i + 1) * step}deg`).join(', ')})`;
+      const element = this.lineRingElement(lines.map(l => l.color));
       this.focusRing = { marker: new this.ml.Marker({ element, anchor: 'center' }).setLngLat(at).addTo(map), radius: circle.radius, station };
     }
     this.focusRing.radius = circle.radius;
