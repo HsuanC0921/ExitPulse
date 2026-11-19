@@ -78,6 +78,9 @@ const STREET_ZOOM = 16.4;
 const PHONE_STREET_PITCH = 76;
 const PHONE_STREET_ZOOM = 15.8;
 const MIN_TOWER_PITCH = 20;
+/** 全線圓圈底色：淺底深藍、深底亮青，兩種底圖上都跟灰色路網分得開。圖層資料裡的灰色只是「未選取」的記號。 */
+const DOT = { light: '#23282d', dark: '#f1f4f6' };
+const dotColor = (dark: boolean) => ['case', ['==', ['get', 'color'], '#6f7b85'], dark ? DOT.dark : DOT.light, ['get', 'color']] as never;
 const NIGHT_STATION = { regular: '#a6b7c0', ranked: '#e7eef1', rim: '#35454e', rankInk: '#15232b' };
 /** Positron 底圖幾乎全白，這組色票讓陸地、水域、公園與文字有足夠層次，長時間看也不刺眼。 */
 const LIGHT_MAP = { land: '#e8e4da', water: '#b7d0da', park: '#d3dfc8', building: '#dcd7cb', label: '#5e5a51', halo: '#f4f1ea' };
@@ -1294,11 +1297,11 @@ export class Radar implements OnDestroy {
     const netFilter: ExpressionSpecification = ['in', ['get', 'lineId'], ['literal', this.lineList]];
     const netLayout = { 'line-cap': 'round', 'line-join': 'round' } as const;
     map.addLayer({ id: 'metro-network-casing', type: 'line', source: 'metro-network', filter: netFilter, layout: netLayout,
-      paint: { 'line-color': dark ? '#0f1316' : '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3.6, 14, 7.2], 'line-opacity': dark ? .88 : .9 } });
+      paint: { 'line-color': dark ? '#0f1316' : '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3.8, 14, 8, 17, 13], 'line-opacity': dark ? .9 : .95 } });
     map.addLayer({ id: 'metro-network', type: 'line', source: 'metro-network', filter: netFilter, layout: netLayout,
-      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.8, 14, 4.2], 'line-opacity': dark ? .82 : .78 } });
+      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 4.8, 17, 8], 'line-opacity': dark ? .9 : .9 } });
     map.addLayer({ id: 'metro-network-core', type: 'line', source: 'metro-network', filter: netFilter, layout: netLayout,
-      paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, .7, 15.5, 1.1], 'line-opacity': dark ? .24 : .44 } });
+      paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 12.5, 0, 13.5, .8, 15.5, 1.4, 17, 2], 'line-opacity': dark ? .3 : .5 } });
     map.addSource('metro-stops', { type: 'geojson', data: 'metro/stations.geojson' });
     const metroOnly: ExpressionSpecification = ['any', ...this.lineList.map(code => ['in', code, ['split', ['get', 'lines'], ',']] as ExpressionSpecification)];
     map.addLayer({ id: 'metro-stops', type: 'circle', source: 'metro-stops', minzoom: 9.5, filter: metroOnly, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 9.5, 3.5, 13, 5.5], 'circle-color': dark ? NIGHT_STATION.regular : halo, 'circle-stroke-color': dark ? NIGHT_STATION.rim : '#707a82', 'circle-stroke-width': 1.4 } });
@@ -1310,7 +1313,9 @@ export class Radar implements OnDestroy {
     map.addLayer({ id: 'od-streams-dashed', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], true], layout: { 'line-cap': 'butt', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [1.5, 1.2] } });
     map.addLayer({ id: 'od-streams', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], false], layout: { 'line-cap': 'round', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['max', 0.8, ['*', ['get', 'width'], .24]], 'line-width-transition': { duration: 0 }, 'line-opacity': ['get', 'opacity'] } });
     map.addSource('explore-circles', { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', layout: { 'circle-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'circle-radius': zoomScaled(['get', 'radius']), 'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['get', 'hollow'], .06, .5], 'circle-stroke-color': ['get', 'color'], 'circle-stroke-opacity': 1, 'circle-stroke-width': ['case', ['get', 'hollow'], 2.4, 1.6] } });
+    map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', layout: { 'circle-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'circle-radius': zoomScaled(['get', 'radius']), 'circle-color': dotColor(dark), 'circle-opacity': ['case', ['==', ['get', 'inner'], 0], .14, .06], 'circle-stroke-color': dotColor(dark), 'circle-stroke-opacity': 1, 'circle-stroke-width': 2.2 } });
+    // 比較模式：外環是本期、實心內圓是對照期，增減一眼看出（內圓比外環大就是減少）
+    map.addLayer({ id: 'explore-inner', type: 'circle', source: 'explore-circles', filter: ['>', ['get', 'inner'], 0], layout: { 'circle-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'circle-radius': zoomScaled(['get', 'inner']), 'circle-color': dotColor(dark), 'circle-opacity': .62 } });
     map.addLayer({ id: 'explore-labels', type: 'symbol', source: 'explore-circles', filter: ['!=', ['get', 'label'], ''], layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-padding': 4, 'symbol-sort-key': ['-', 0, ['get', 'radius']],
       // 字一律放在圓的正下方，間距跟著圓一起放大，避開圓與選取環
       'text-variable-anchor': ['top'], 'text-radial-offset': zoomScaled(['get', 'radius'], 11, 13) }, paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 } });
@@ -1459,7 +1464,7 @@ export class Radar implements OnDestroy {
     const lifted = this.tower3d();
     this.elevatedFlow?.show(lifted);
     const layers = [
-      ['buildings-3d', lifted], ['explore-circles', !lifted],
+      ['buildings-3d', lifted], ['explore-circles', !lifted], ['explore-inner', !lifted],
       ...FLAT_FLOW_LAYERS.map(id => [id, !lifted] as const),
     ] as const;
     for (const [id, visible] of layers) {
@@ -1972,6 +1977,9 @@ export class Radar implements OnDestroy {
     this.syncMetroNetworkPaint(shade);
     map.setPaintProperty('metro-stops', 'circle-stroke-color', dark ? NIGHT_STATION.rim : '#8d969c');
     map.setPaintProperty('od-stops', 'circle-color', dark ? NIGHT_STATION.ranked : halo);
+    map.setPaintProperty('explore-circles', 'circle-color', dotColor(dark));
+    map.setPaintProperty('explore-circles', 'circle-stroke-color', dotColor(dark));
+    map.setPaintProperty('explore-inner', 'circle-color', dotColor(dark));
     if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', dark ? DARK_MAP.building : LIGHT_MAP.building);
     map.setPaintProperty('focus-scrim', 'background-color-transition', { duration });
     this.syncScrim();
@@ -2512,7 +2520,7 @@ export class Radar implements OnDestroy {
     }
     const station = this.view() === 'station';
     const circles = station ? this.visibleStationCircles() : (layer?.circles ?? []);
-    const point = (c: ExploreLayer['circles'][number]) => { const p = at(c.station); return p ? [{ type: 'Feature' as const, properties: { name: c.station, label: c.label, count: c.count ?? '', rank: c.rank ?? 0, color: c.color, radius: c.radius, hollow: c.hollow, active: c.station === selected }, geometry: { type: 'Point' as const, coordinates: p } }] : []; };
+    const point = (c: ExploreLayer['circles'][number]) => { const p = at(c.station); return p ? [{ type: 'Feature' as const, properties: { name: c.station, label: c.label, count: c.count ?? '', rank: c.rank ?? 0, color: c.color, radius: c.radius, inner: c.innerRadius ?? 0, hollow: c.hollow, active: c.station === selected }, geometry: { type: 'Point' as const, coordinates: p } }] : []; };
     this.drawStreams(streams);
     (map.getSource('od-stops') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? circles.flatMap(point) : [] });
     (map.getSource('explore-circles') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? [] : circles.filter(c => c.radius > 0).flatMap(point) });
@@ -2526,7 +2534,7 @@ export class Radar implements OnDestroy {
 
   /** 路線外框、主色與細中心軌道線同步隨明暗與流向退讓，兼顧辨識度而不搶流向主色。 */
   private networkOpacity(shade = this.lighting()) {
-    return (shade >= .5 ? .82 : .78) * (this.displayedStreams.length ? .38 : 1);
+    return (shade >= .5 ? .9 : .9) * (this.displayedStreams.length ? .38 : 1);
   }
 
   private syncMetroNetworkPaint(shade = this.lighting()) {
@@ -2534,9 +2542,9 @@ export class Radar implements OnDestroy {
     if (!map) return;
     const dark = shade >= .5, factor = this.displayedStreams.length ? .38 : 1;
     map.setPaintProperty('metro-network-casing', 'line-color', dark ? '#0f1316' : '#ffffff');
-    map.setPaintProperty('metro-network-casing', 'line-opacity', (dark ? .88 : .9) * factor);
+    map.setPaintProperty('metro-network-casing', 'line-opacity', (dark ? .9 : .95) * factor);
     map.setPaintProperty('metro-network', 'line-opacity', this.networkOpacity(shade));
-    map.setPaintProperty('metro-network-core', 'line-opacity', (dark ? .24 : .44) * factor);
+    map.setPaintProperty('metro-network-core', 'line-opacity', (dark ? .3 : .5) * factor);
   }
 
   private drawFlowLabels(streams: Stream[]) {
