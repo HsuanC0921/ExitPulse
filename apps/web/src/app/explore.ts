@@ -172,6 +172,14 @@ export class Explore implements OnDestroy {
   // Answers
   readonly stationAnswer = signal<StationAnswer | null>(null);
   readonly networkAnswer = signal<NetworkAnswer | null>(null);
+  /** 圖例用的參考圓：挑一個整齊的人次，畫出它在地圖上的實際直徑，和地圖圓點同一把尺。 */
+  readonly sizeRef = computed(() => {
+    const a = this.networkAnswer();
+    if (!a) return null;
+    const largest = this.activeHour() != null ? 30000 : Math.max(...a.stations.map(r => r.entries ?? 0));
+    const value = [1000, 2000, 5000, 10000, 20000, 50000, 100000].filter(v => v <= largest * .6).pop();
+    return value ? { value: formatDailyTrips(value), size: Math.round(stationRadius(value, largest) * 2) } : null;
+  });
   readonly trend = signal<TrendAnswer | null>(null);
   readonly calendar = signal<CalendarAnswer | null>(null);
   readonly matrix = signal<MatrixAnswer | null>(null);
@@ -1294,7 +1302,8 @@ export class Explore implements OnDestroy {
     return {
       arcs: [],
       circles: rows.map(r => ({ station: r.station, radius: stationRadius(r.entries, largest),
-        color: focus === r.station ? color(r.station) : '#6f7b85', label: top.has(r.station) || focus === r.station ? r.station : '',
+        color: focus === r.station ? color(r.station) : '#6f7b85', label: top.has(r.station) || focus === r.station ? (r.entries ? `${r.station}
+${formatDailyTrips(r.entries)}` : r.station) : '',
         hollow: cmp && (change(r.entries, r.compareEntries) ?? 0) < 0 })),
       focus: focus && rows.some(r => r.station === focus) ? focus : null,
     };
