@@ -2,52 +2,60 @@
 :host { display: none; }
 @keyframes tab-line { from { transform: scaleX(0); } }
 @keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
-@media (max-width: 720px) {
+@media (max-width: 720px), (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   :host { display: contents; }
-  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(3, 1fr); padding: 0 8px env(safe-area-inset-bottom); border-top: 1px solid var(--rule); background: var(--panel); }
-  .tabbar button { position: relative; display: grid; justify-items: center; align-content: center; gap: 2px; height: 56px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink-2); font-size: var(--fs-xs); }
-  .tabbar button:active { background: var(--panel-2); }
-  .tabbar svg { transition: transform .18s cubic-bezier(.22, 1, .36, 1); }
-  .tabbar button:active svg { transform: scale(.88); }
-  .tabbar button:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
-  /* 目前所在的分頁：文字加粗，並在上緣加一條線，不只靠顏色分辨 */
-  .tabbar button[aria-current='page'] { color: var(--ink); font-weight: 700; }
-  .tabbar button[aria-current='page']::before { content: ''; position: absolute; top: 2px; left: 26%; right: 26%; height: 3px; border-radius: 999px; background: var(--ink); animation: tab-line .24s cubic-bezier(.22, 1, .36, 1); }
-  .tabbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
-  .tabbar button[aria-current='page'] svg { stroke-width: 2.2; }
-  .mobile-bar { position: absolute; inset: 0 0 auto; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); box-sizing: border-box; min-height: var(--mobile-top); padding: calc(8px + env(safe-area-inset-top)) 16px 12px; background: var(--band); color: var(--on-band); }
+  .mobile-bar { position: absolute; inset: 0 0 auto; z-index: 7; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; box-sizing: border-box; height: var(--mobile-top); padding: var(--safe-top) calc(12px + var(--safe-right)) 5px calc(12px + var(--safe-left)); background: var(--band); color: var(--on-band); --track: color-mix(in srgb, var(--on-band) 14%, var(--band)); }
+  .mobile-bar.off { padding-bottom: 0; background: linear-gradient(color-mix(in srgb, var(--band) 78%, transparent), transparent); pointer-events: none; }
+  .mobile-bar.off > * { visibility: hidden; }
+  .mobile-bar.off .mobile-stripe { display: none; }
+  .mobile-nav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(44px, 1fr); gap: 2px; height: 44px; border-radius: 12px; background: var(--track); }
+  .mobile-nav button, .mobile-view-btn { min-height: 0; padding: 0 8px; border: 0; border-radius: 10px; background: none; color: color-mix(in srgb, var(--on-band) 78%, var(--band)); font-size: var(--fs-s); white-space: nowrap; }
+  .mobile-nav button[aria-current='page'] { background: var(--on-band); color: var(--band); font-weight: 700; }
+  .mobile-view { position: relative; flex: none; }
+  .mobile-view-btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 44px; min-width: 66px; padding: 0 8px 0 12px; border-radius: 12px; background: var(--track); color: var(--on-band); font-weight: 700; }
+  .mobile-view-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .mobile-view-scrim { position: fixed; inset: 0; z-index: 7; border: 0; background: none; }
+  .mobile-view-menu { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; display: grid; width: 220px; padding: 4px; border-radius: var(--r-m); background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+  .mobile-view-menu button { display: grid; justify-items: start; min-height: 52px; padding: 6px 12px; border: 0; border-radius: var(--r-s); background: none; color: var(--ink); font-size: var(--fs-s); font-weight: 700; text-align: left; }
+  .mobile-view-menu button small { color: var(--ink-2); font-size: var(--fs-xs); font-weight: 400; }
+  .mobile-view-menu button[aria-pressed='true'] { background: var(--panel-2); }
+  .bar-handle { position: absolute; z-index: 4; top: var(--tools-top); left: max(12px, var(--safe-left)); display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: var(--band); color: var(--on-band); box-shadow: var(--shadow); }
+  .bar-handle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .mobile-stripe { position: absolute; inset: auto 0 0; display: flex; height: 4px; }
   .mobile-stripe i { flex: 1; }
   .mobile-bar h1 { min-width: 0; margin: 0; font-size: var(--fs-l); font-weight: 800; line-height: 1.6; }
-  .mobile-bar app-brand { --brand-word-size: 1.625rem; --brand-mark-size: 34px; }
-  .mobile-switch { flex: none; display: flex; gap: 2px; padding: 3px; border: 1px solid color-mix(in srgb, var(--on-band) 45%, var(--band)); border-radius: var(--r-m); }
-  .mobile-switch button, .mobile-back, .mobile-map-link { min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-m); background: none; color: var(--on-band); font-size: var(--fs-xs); white-space: nowrap; }
-  .mobile-switch button { min-width: 44px; padding-inline: 8px; }
-  .mobile-switch button[aria-pressed='true'] { background: var(--on-band); color: var(--band); font-weight: 700; }
-  .mobile-back, .mobile-map-link { display: inline-flex; align-items: center; gap: var(--sp-1); }
-  .mobile-back { padding-left: 0; font-size: var(--fs-s); }
-  .mobile-map-link { padding-right: 0; font-size: var(--fs-s); font-weight: 700; }
+  .mobile-brand { display: flex; align-items: center; margin: 0; line-height: 0; }
+  .mobile-bar app-brand { --brand-mark-size: 38px; --brand-word-size: 1.15rem; gap: 6px; }
+  .mobile-back, .mobile-map-link { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: transparent; color: var(--on-band); font-size: var(--fs-s); font-weight: 700; }
   .mobile-back svg, .mobile-map-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .mobile-bar :focus-visible { outline-color: var(--on-band); outline-offset: 1px; }
-  .mobile-overview { position: absolute; bottom: calc(var(--tabbar) + 12px); left: 12px; right: 12px; display: grid; padding: 16px; border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: card-in .3s cubic-bezier(.22, 1, .36, 1); }
-  .mobile-overview h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); margin: 0; font-size: var(--fs-l); font-weight: 800; line-height: 1.6; }
+  .mobile-overview { position: absolute; bottom: calc(var(--tabbar) + 8px); left: max(8px, var(--safe-left)); right: max(8px, var(--safe-right)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px; padding: 8px 8px 8px 16px; border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: card-in .3s cubic-bezier(.22, 1, .36, 1); }
+  .mobile-overview h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); grid-column: 1; margin: 0; font-size: var(--fs-m); font-weight: 800; line-height: 1.4; }
   .overview-destination { display: inline-flex; align-items: center; gap: var(--sp-2); }
   .overview-stations { display: grid; grid-template-columns: minmax(44px, auto) 12px minmax(44px, auto); align-items: center; gap: var(--sp-1); justify-content: start; }
   .overview-stations svg { width: 12px; height: 12px; color: var(--ink-2); }
   .overview-stations button { min-height: 44px; padding: 4px 6px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); font-weight: 700; line-height: 1.25; line-break: strict; text-wrap: balance; }
   .overview-stations button[aria-pressed='true'] { border-color: var(--ink); background: var(--panel-2); }
   .overview-stations button:focus-visible { outline-offset: -3px; }
-  .mobile-overview p { margin: 2px 0 12px; font-size: var(--fs-xs); color: var(--ink-2); }
-  .mobile-overview-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-2); }
-  .mobile-action { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 44px; padding: 10px 12px; border: 0; border-radius: var(--r-m); background: var(--action); color: var(--on-action); font-size: var(--fs-s); font-weight: 700; }
+  .mobile-overview p { grid-column: 1; margin: 0; font-size: var(--fs-xs); color: var(--ink-2); line-height: 1.4; }
+  .overview-stations { grid-column: 1; }
+  .mobile-overview-actions { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 6px; }
+  .mobile-action { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-1); min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-m); background: var(--action); color: var(--on-action); font-size: var(--fs-s); font-weight: 700; }
   .mobile-action:disabled { opacity: .6; cursor: progress; }
-  .mobile-secondary { min-height: 44px; padding: 8px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
+  .mobile-secondary svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+  .mobile-secondary { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
   .mobile-secondary:hover { background: var(--panel-2); }
-  .mobile-overview-actions.single { grid-template-columns: minmax(0, 1fr); }
 }
+  .mobile-overview { transition: opacity .25s ease; }
+  .card-fold { position: absolute; top: -22px; left: 50%; translate: -50% 0; display: grid; place-items: center; width: 96px; height: 24px; padding: 0; border: 0; border-radius: 12px 12px 0 0; background: var(--panel); color: var(--ink-2); box-shadow: 0 -2px 6px -2px rgb(0 0 0 / .12); }
+  .card-fold::before { content: ''; position: absolute; inset: -20px 0 0; }
+  .card-fold svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .mobile-overview.min { min-height: 44px; padding-block: 0; }
+  .mobile-overview.min :is(p, .mobile-overview-actions) { display: none; }
+  .mobile-overview.min h2 { font-size: var(--fs-m); }
 @media (max-width: 360px) {
-  .mobile-bar { padding-inline: 10px; gap: var(--sp-1); }
-  .mobile-bar app-brand { --brand-word-size: 1.25rem; --brand-mark-size: 28px; }
-  .mobile-switch button { min-width: 44px; padding-inline: 6px; font-size: var(--fs-xs); }
+  .mobile-bar { padding-inline: 8px; gap: 6px; }
+  .mobile-nav button { padding-inline: 4px; font-size: var(--fs-xs); }
+  .mobile-view-btn { min-width: 58px; padding-inline: 6px 4px; }
 }
-@media (prefers-reduced-motion: reduce) { .tabbar *, .tabbar button::before, .mobile-overview { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .mobile-overview { animation: none; transition: none; } }

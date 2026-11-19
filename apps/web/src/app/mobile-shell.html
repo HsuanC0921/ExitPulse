@@ -1,5 +1,5 @@
 <!-- 手機版頂欄、地圖摘要與底部導覽 -->
-<header class="mobile-bar">
+<header class="mobile-bar" [class.off]="barHidden() && page() === 'map'">
   @if (page() === 'detail') {
     <button type="button" class="mobile-back" (click)="action.emit('back')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>返回</button>
     <h1>兩站分析</h1>
@@ -7,17 +7,32 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>地圖
     </button>
   } @else {
-    <h1><app-brand /></h1>
-    <div class="mobile-switch" role="group" aria-label="查詢方式">
-      <button type="button" [attr.aria-pressed]="view() === 'pairs'" (click)="viewChange.emit('pairs')">兩站</button>
-      <button type="button" [attr.aria-pressed]="view() === 'station'" (click)="viewChange.emit('station')">單站</button>
-      <button type="button" [attr.aria-pressed]="view() === 'network'" (click)="viewChange.emit('network')">全線</button>
+    <h1 class="mobile-brand"><app-brand class="bar" /></h1>
+    <nav class="mobile-nav" aria-label="檢視切換">
+      <button type="button" [attr.aria-current]="page() === 'map' ? 'page' : null" (click)="action.emit('map')">地圖</button>
+      <button type="button" [attr.aria-current]="page() === 'list' ? 'page' : null" (click)="action.emit('list')">分析</button>
+      <button type="button" [attr.aria-current]="page() === 'conditions' ? 'page' : null" (click)="action.emit('conditions')">條件</button>
+    </nav>
+    <div class="mobile-view">
+      <button type="button" class="mobile-view-btn" aria-haspopup="true" [attr.aria-expanded]="viewMenu()" (click)="toggleViewMenu()">{{ viewLabel() }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      @if (viewMenu()) {
+        <button type="button" class="mobile-view-scrim" aria-label="關閉" (click)="viewMenu.set(false)"></button>
+        <div class="mobile-view-menu" role="group" aria-label="查詢方式">
+          <button type="button" [attr.aria-pressed]="view() === 'pairs'" (click)="pick('pairs')">兩站<small>比較兩個車站的往來</small></button>
+          <button type="button" [attr.aria-pressed]="view() === 'station'" (click)="pick('station')">單站<small>看一個車站的進出</small></button>
+          <button type="button" [attr.aria-pressed]="view() === 'network'" (click)="pick('network')">全線<small>整個路網的變化</small></button>
+        </div>
+      }
     </div>
   }
   <div class="mobile-stripe" aria-hidden="true"><i class="l-BL"></i><i class="l-BR"></i><i class="l-G"></i><i class="l-R"></i><i class="l-O"></i><i class="l-Y"></i></div>
 </header>
+@if (page() === 'map') {
+  <button type="button" class="bar-handle" [attr.aria-expanded]="!barHidden()" [attr.aria-label]="barHidden() ? '展開頂欄' : '收起頂欄，讓地圖更大'" (click)="barToggle.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="barHidden() ? 'm6 9 6 6 6-6' : 'm18 15-6-6-6 6'"/></svg></button>
+}
 
-<section class="mobile-overview" aria-label="地圖摘要" [hidden]="page() !== 'map' || hideOverview()">
+<section class="mobile-overview" [class.min]="!cardOpen()" aria-label="地圖摘要" [hidden]="page() !== 'map' || hideOverview()">
+  <button type="button" class="card-fold" [attr.aria-expanded]="cardOpen()" [attr.aria-label]="cardOpen() ? '收起摘要，露出地圖' : '展開摘要'" (click)="toggleCard()"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="cardOpen() ? 'm6 9 6 6 6-6' : 'm18 15-6-6-6 6'"/></svg></button>
   @if (focusedStation() && summary().to; as destination) {
     <div class="overview-stations" role="group" aria-label="低視角取景車站">
       <button type="button" [attr.aria-pressed]="focusedStation() === summary().from" (click)="stationFocus.emit(summary().from)">{{ summary().from }}</button>
@@ -30,18 +45,6 @@
   <p>{{ summary().caption }}</p>
   <div class="mobile-overview-actions" [class.single]="!summary().canEdit">
     <button type="button" class="mobile-action" [disabled]="summary().disabled" (click)="action.emit(summary().actionKind)">{{ summary().action }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
-    @if (summary().canEdit) { <button type="button" class="mobile-secondary" (click)="action.emit('conditions')">調整條件</button> }
+    @if (summary().canEdit) { <button type="button" class="mobile-secondary" aria-label="調整條件" (click)="action.emit('conditions')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h9M16 6h5M3 12h3M10 12h11M3 18h11M18 18h3"/><circle cx="14" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg></button> }
   </div>
 </section>
-
-<nav class="tabbar" aria-label="檢視切換">
-  <button type="button" [attr.aria-current]="page() === 'map' ? 'page' : null" (click)="action.emit('map')">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>地圖
-  </button>
-  <button type="button" [attr.aria-current]="page() === 'list' || page() === 'detail' ? 'page' : null" (click)="action.emit('list')">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>分析
-  </button>
-  <button type="button" [attr.aria-current]="page() === 'conditions' ? 'page' : null" (click)="action.emit('conditions')">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>條件
-  </button>
-</nav>

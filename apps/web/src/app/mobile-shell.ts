@@ -1,5 +1,5 @@
-// 手機版外殼：底部分頁與地圖摘要
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+// 手機版外殼：頂部導覽與地圖摘要
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { Brand } from './brand';
 
 export type MobilePage = 'map' | 'list' | 'conditions' | 'detail';
@@ -32,4 +32,21 @@ export class MobileShell {
   readonly stationFocus = output<string>();
   readonly action = output<MobileAction>();
   readonly viewChange = output<RadarView>();
+  readonly barHidden = input(false);
+  readonly barToggle = output<void>();
+  readonly viewMenu = signal(false);
+  readonly viewMenuOpened = output<void>();
+  toggleViewMenu() {
+    const next = !this.viewMenu();
+    this.viewMenu.set(next);
+    if (next) this.viewMenuOpened.emit();
+  }
+  readonly cardOpen = signal(((): boolean => { try { return localStorage.getItem('exitpulse.card') !== 'closed'; } catch { return true; } })());
+  toggleCard() {
+    const next = !this.cardOpen();
+    this.cardOpen.set(next);
+    try { localStorage.setItem('exitpulse.card', next ? 'open' : 'closed'); } catch { /* 只在這次有效 */ }
+  }
+  readonly viewLabel = computed(() => ({ pairs: '兩站', station: '單站', network: '全線' })[this.view()]);
+  pick(view: RadarView) { this.viewMenu.set(false); this.viewChange.emit(view); }
 }
