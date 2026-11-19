@@ -1,7 +1,13 @@
 /* Compact layout for controls and overlays on the map. */
 :where(app-root[data-layout='compact']) {
-  .workspace { --map-edge: max(12px, var(--safe-right)); --map-tools-y: calc(var(--tools-top) + 2px); --map-only-width: 92px; }
-  .map-only-toggle { padding-inline: 6px; gap: var(--sp-1); }
+  .workspace {
+    --map-edge: max(12px, var(--safe-right));
+    --map-tools-y: var(--tools-top);
+    --map-tool-size: 44px;
+    --map-tools-inset: var(--sp-tight);
+    --map-only-width: 92px;
+  }
+  .map-only-toggle { min-height: calc(var(--map-tool-size) + 2 * var(--map-tools-inset)); padding-inline: 6px; gap: var(--sp-1); }
   .place-options .place-locate { display: block; }
   .layer-options label.mobile-only-row { display: flex; }
   .sheet-scrim { position: absolute; inset: 0; z-index: 5; display: block; background: none; }
@@ -9,7 +15,7 @@
   .place-options { width: auto; max-height: calc(100dvh - var(--tools-end) - var(--safe-bottom) - 14px); }
   .sheet-close { top: -4px; margin-top: -4px; padding-right: 4px; }
   .sheet-close svg { width: 18px; height: 18px; }
-  .map-tools details[open] > summary { background: var(--ink); color: var(--panel); }
+  .map-tools > details[open] > summary { background: var(--ink); color: var(--panel); }
 
   .install-banner { position: absolute; z-index: 5; top: calc(var(--tools-end) + 8px); left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--sp-1); padding: 4px 4px 4px 14px; border-radius: var(--r-m); background: var(--ink); color: var(--panel); box-shadow: var(--shadow); font-size: var(--fs-xs); }
   .install-banner p { margin: 0; }
@@ -43,13 +49,22 @@
   .tower-key + .station-preview { top: calc(var(--tools-end) + 60px); }
   .tower-key, .tower-key:has(+ .map-rank-focus) { top: calc(var(--tools-end) + 8px); left: max(12px, var(--safe-left)); right: auto; }
   .tower-key + .map-rank-focus { top: calc(var(--tools-end) + 60px); }
-  .map-tools { top: var(--tools-top); left: auto; display: grid; grid-auto-flow: column; grid-auto-columns: 44px; grid-template-rows: 44px; gap: 0; padding: 2px; }
-  .map-tools > :is(button, details) { width: 44px; min-width: 44px; }
+  .map-tools { left: auto; display: grid; grid-auto-flow: column; grid-auto-columns: var(--map-tool-size); grid-template-rows: var(--map-tool-size); gap: 0; padding: var(--map-tools-inset); }
+  .map-tools > :is(button, details) { width: var(--map-tool-size); min-width: var(--map-tool-size); }
   .map-tools > app-about { position: absolute; }
   .map-tools > details > summary, .map-tools > button { width: 100%; min-width: 0; }
+  .map-tools > details > summary, .map-tools > .tools-toggle {
+    flex-direction: column;
+    gap: var(--sp-tight);
+    padding: 0;
+    font-weight: var(--weight-action);
+    line-height: 1.2;
+    white-space: nowrap;
+  }
   .map-tools :is(.map-locate-btn, .tower-switch, .theme-switch) { display: none; }
   .map-tools :is(.map-fit-btn, .map-about) { display: none; }
-  .layer-mobile-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); margin: var(--sp-2) 0; }
+  .map-view-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .map-fit-action, .map-about-action { display: block; }
   .collection-options button { min-height: 44px; }
   .flowbar { top: calc(var(--tools-end) + 12px); bottom: auto; left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right)); max-width: none; translate: none; }
   .tower-key-pair ~ .flowbar { top: calc(var(--tools-end) + 60px); }

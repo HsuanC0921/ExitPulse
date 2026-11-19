@@ -1,0 +1,54 @@
+/* Selection moves independently of the controls and their hit areas. */
+.motion-tabs {
+  --tab-count: 3;
+  --tab-gap: var(--sp-tight);
+  --tab-inset: 0px;
+  --tab-color: var(--ink);
+  --tab-width: calc((100% - 2 * var(--tab-inset) - (var(--tab-count) - 1) * var(--tab-gap)) / var(--tab-count));
+  position: relative;
+  isolation: isolate;
+}
+.motion-tabs::before {
+  content: '';
+  position: absolute;
+  inset: var(--tab-inset) auto var(--tab-inset) var(--tab-inset);
+  width: var(--tab-width);
+  border-radius: var(--r-m);
+  background: var(--tab-color);
+  pointer-events: none;
+  z-index: -1;
+  transform: translateX(calc(var(--tab-index, 0) * (100% + var(--tab-gap))));
+  transition: transform .24s cubic-bezier(.22, 1, .36, 1), opacity .12s;
+}
+.motion-tabs:not(:has(> [aria-pressed='true'], > [aria-current='page']))::before { opacity: 0; }
+.motion-tabs.mobile-nav { --tab-color: var(--on-band); }
+.motion-tabs.section-tabs { --tab-inset: 3px; --tab-count: var(--n); }
+.motion-tabs.view-tabs { --tab-gap: var(--sp-1); }
+.motion-tabs.view-tabs::before { top: auto; height: 2px; border-radius: 0; }
+.motion-tabs:is(.mobile-nav, .section-tabs, .view-tabs) > button:is([aria-current='page'], [aria-pressed='true']) {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
+@keyframes content-arrive { from { opacity: .45; translate: 0 4px; } }
+.content-arrive { animation: content-arrive .2s cubic-bezier(.22, 1, .36, 1); }
+:where(app-root[data-layout='compact']) .workspace[data-mobile-page='list'] :is(.explore-result, .ranking),
+:where(app-root[data-layout='compact']) .workspace[data-mobile-page='conditions'] :is(.conditions, #explore-query-body) {
+  animation: panel-in .18s ease-out;
+}
+
+/* The destination transforms stay in the chart rules. Newly visible fills start at the axis. */
+@starting-style {
+  .bars b, .meter i, .stat-bars i, .diverge i { transform: scaleX(0) !important; }
+  .hours .hour b:not(.unrecorded) { transform: scaleY(0) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-tabs::before { transition: none; }
+}
+
+html[data-reduced-motion] *, html[data-reduced-motion] *::before, html[data-reduced-motion] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}

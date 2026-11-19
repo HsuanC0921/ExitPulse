@@ -1,5 +1,28 @@
 # 開發交接
 
+## 2026-11-19 給 Sonnet：排行聯動收尾
+
+在 `D:\ExitPulse` 接續目前工作樹。這輪包含新增但未追蹤的檔案，請先看 `git status --short`。原有手機工具列、字型與動畫改動仍在工作樹，同樣要保留。這輪目前是本機修改。
+
+單站往來與全線人次已共用排行選站。桌機滑過排行或地圖車站會預覽同一站，移開回到已選車站。手機點一次即選定，點地圖站卡的「看排行」會回到分析頁。圖表和排行在這時都已指向正確車站；選站不需要重新取景。全線排行點一下改成選站，圖表內以「看本站人流」進入單站分析。圖表共用該排行的量尺，資料缺漏顯示「無紀錄」或「資料不足」。
+
+- [explore.ts](../apps/web/src/app/explore.ts#L1040) 處理預覽、正式選站、展開排行筆數與定位。[rank-chart.ts](../apps/web/src/app/rank-chart.ts) 和同名 HTML、CSS 是排行圖表。[rank-map-link.ts](../apps/web/src/app/rank-map-link.ts) 專門更新 MapLibre 高亮圖層。預覽不改查詢或鏡頭。
+- [radar.ts](../apps/web/src/app/radar.ts#L2260) 串接「看排行」和手機分頁。[motion-preference.ts](../apps/web/src/app/motion-preference.ts) 管理地圖工具裡的「減少動態效果」，預設關閉，記在本機，系統偏好會優先降低動態。開啟時停流向與逐時自動播放，可手動選小時。
+
+### 剩下的問題：手機回排行未捲到所選列
+
+用手機畫面點地圖站點再按「看排行」。Chromium 全線的市政府列與 WebKit 單站的台北101/世貿列都會被正確選中，圖表也顯示同站，但列可能留在可視區底下。實測 390 × 784，市政府列最後位於 y=762–847，台北101/世貿列位於 y=1131–1215，兩次 `.panel-body.scrollTop` 都仍為 0。攔截證實 `scrollIntoView` 有被呼叫，兩站在呼叫當下的 y 都比最終位置少 52 px，正好是手機頂欄高度。這是版面尚在安定的線索，根因還要驗證。
+
+先檢查 [radar.css](../apps/web/src/app/radar.css#L218) 的 `display` 離散過渡及 `.panel-body` 切換。可在手機分析面板實際可捲動、頂緣完成定位後，才對所選列做一次原生捲動。桌機已可定位，請維持現有行為。修好後也請驗證第 31 名以後、列表與資料表、快速換站，以及減少動態開啟時的定位。
+
+### 驗證與接手指令
+
+- `npm test` 50 項通過。更新後的開發及正式建置皆通過，最後正式包為 `main-7DPMBCOF.js`。Impeccable `layout` 和 `type` 掃描無命中。
+- Chromium 桌機單站與全線實測通過，包含排行及地圖的 hover、地圖點站與排行回定位、鏡頭坐標與縮放穩定、開關預設關閉、重整後保留、啟用系統減少動態。Chromium、WebKit 手機實測已走到正確選站與圖表，停在所選列的可視範圍檢查，手機開關持久化尚未跑完。手機使用瀏覽器觸控模擬。
+- 重現腳本是本機忽略檔 `.collab/codex-mobile-qa/rank-link-check.cjs`。從 `apps/web` 執行 `node node_modules/@angular/cli/bin/ng.js build --configuration development --output-path 'D:/ExitPulse/.collab/codex-mobile-qa/link-dev'`。回專案根目錄設定 `$env:PLAYWRIGHT_BROWSERS_PATH='D:/ExitPulse/.collab/codex-mobile-qa/browsers'`，再執行 `node .collab/codex-mobile-qa/rank-link-check.cjs`。腳本自行開臨時 HTTP 埠，API 轉發至 `localhost:4201`。開發版提供瀏覽器測試所需的 Angular 偵錯介面。
+
+---
+
 本文件更新於 2026-11-18。開始前先讀 [CONTRIBUTING.md](../CONTRIBUTING.md) 與 [README](../README.md)。本專案有站對比較、單站往來、全網人次三種檢視。Angular 和 MapLibre 管理介面，FastAPI 執行 Python 查詢，PostgreSQL 提供旅次與站點資料。
 
 ## 本機運作

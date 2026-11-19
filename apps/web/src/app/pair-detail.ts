@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, ViewEncapsulation, inpu
 import { DecimalPipe } from '@angular/common';
 import { Crowd } from './crowd';
 import { Hint } from './hint';
+import { AnimatedCount } from './animated-count';
 import type { Result } from './radar-model';
 
 export type PairDetailData = {
@@ -22,7 +23,7 @@ export type PairDetailStory = {
   scale: number;
   origin: string;
   /** 排序依據是占比時，上方兩格改顯示占比；其餘維持每日人次 */
-  tile: { a: string; b: string; unit: string } | null;
+  shareUnit: string | null;
 };
 
 export type PairDetailChart = {
@@ -44,7 +45,7 @@ export type PairDetailHourRow = {
 
 @Component({
   selector: 'app-pair-detail',
-  imports: [DecimalPipe, Crowd, Hint],
+  imports: [DecimalPipe, Crowd, Hint, AnimatedCount],
   templateUrl: './pair-detail.html',
   styleUrl: './pair-detail.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -58,7 +59,6 @@ export class PairDetail {
   readonly story = input.required<PairDetailStory>();
   readonly verdict = input.required<string>();
   readonly cautions = input.required<string[]>();
-  readonly counts = input.required<number[]>();
   readonly detailOpen = input.required<boolean>();
   readonly detailWide = input.required<boolean>();
   readonly isFavPair = input.required<boolean>();

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, ElementRef, Injector, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { autoRetry } from './auto-retry';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -13,6 +13,10 @@ import { buildCsv, downloadCsv, exportBasis, type CsvCell } from './csv-export';
 import { Hint, type HintEntry } from './hint';
 import { MonthCalendar } from './month-calendar';
 import { OdMatrix } from './od-matrix';
+import { AnimatedCount } from './animated-count';
+import { RankChart, type RankChartData } from './rank-chart';
+import { MotionPreference } from './motion-preference';
+import { revealRankRow } from './rank-scroll';
 
 export type ExploreMode = 'station' | 'network';
 export type StationLine = { code: string; name: string; color: string };
@@ -60,11 +64,16 @@ function hourRangesText(hours: readonly number[] | undefined): string {
 }
 
 @Component({
-  selector: 'app-explore', imports: [DecimalPipe, Hint, MonthCalendar, OdMatrix], templateUrl: './explore.html', styleUrls: ['./explore.css', './explore-wide.css'],
+  selector: 'app-explore', imports: [DecimalPipe, Hint, MonthCalendar, OdMatrix, AnimatedCount, RankChart], templateUrl: './explore.html', styleUrls: ['./explore.css', './explore-wide.css', './rank-link.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, encapsulation: ViewEncapsulation.None,
 })
 export class Explore implements OnDestroy {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
+  private readonly motion = inject(MotionPreference);
+  private readonly rankPreview = signal<{ station: string; source: 'rank' | 'map' } | null>(null);
   readonly mode = input.required<ExploreMode>();
+  readonly rankSelected = output<string>();
   readonly months = input.required<string[]>();
   readonly monthsReady = input.required<boolean>();
   readonly lineOrder = input.required<Record<string, string[]>>();
@@ -234,6 +243,7 @@ export class Explore implements OnDestroy {
     if (this.mode() === 'station' && (s === 'matrix' || s === 'leaders' || s === 'coverage')) return 'list';
     return s;
   });
+  readonly sectionIndex = computed(() => this.sections().findIndex(([key]) => key === this.activeSection()));
   readonly tableRelations = computed(() => sortRelationTable(this.relations(), this.relTableCol(), this.tableDir()));
   readonly stationMetrics = computed(() => {
     const a = this.stationAnswer();
@@ -486,6 +496,35 @@ export class Explore implements OnDestroy {
   });
   readonly networkSwing = computed(() => Math.max(1, ...this.networkRows().map(r => Math.abs(change(r.entries, r.compareEntries) ?? 0))));
   readonly networkScale = computed(() => Math.max(1, ...this.networkRows().map(r => Math.max(r.entries ?? 0, r.compareEntries ?? 0))));
+  private readonly rankedRows = computed(() => this.mode() === 'station'
+    ? (this.listStyle() === 'table' ? this.tableRelations() : this.relations())
+    : (this.listStyle() === 'table' ? this.tableNetworkRows() : this.networkRows()));
+  readonly selectedRank = computed(() => this.rankedRows().find(row => row.station === this.focusedStation())?.station ?? null);
+  readonly previewedRank = computed(() => this.rankedRows().find(row => row.station === this.rankPreview()?.station)?.station ?? null);
+  readonly linkedRank = computed(() => this.previewedRank() ?? this.selectedRank());
+  readonly rankArc = computed(() => {
+    if (this.mode() !== 'station') return null;
+    const other = this.relations().find(row => row.station === this.linkedRank());
+    if (!other) return null;
+    const value = this.stationAnswer()?.compare && this.mapMetric() === 'change'
+      ? change(other.daily, other.compareDaily) : other.daily;
+    if (!value) return null;
+    const station = this.station(), outbound = this.direction() === 'outbound';
+    return { from: outbound ? station : other.station, to: outbound ? other.station : station, dashed: value < 0 };
+  });
+  private readonly rankChartScale = computed(() => this.mode() === 'station' ? this.relationScale()
+    : Math.max(1, ...this.networkRows().map(row => Math.max(row.entries ?? 0, row.exits ?? 0, row.compareEntries ?? 0))));
+  readonly rankChart = computed<RankChartData | null>(() => {
+    const rows = this.rankedRows();
+    const row = rows.find(row => row.station === this.linkedRank()) ?? rows[0];
+    if (!row) return null;
+    const compare = this.mode() === 'station' ? this.stationAnswer()?.compare : this.networkAnswer()?.compare;
+    const bars = 'daily' in row
+      ? [{ label: '本期', value: row.daily }, ...(compare ? [{ label: '對照', value: row.compareDaily ?? null }] : [])]
+      : [{ label: '進站', value: row.entries }, { label: '出站', value: row.exits, empty: row.exitCovered === false ? '資料不足' : '無紀錄' },
+        ...(compare ? [{ label: '對照進站', value: row.compareEntries ?? null }] : [])];
+    return { station: row.station, bars, scale: this.rankChartScale() };
+  });
   readonly lineSummaries = computed(() => {
     const a = this.networkAnswer(), openings = this.catalog()?.lineOpenings;
     if (!a || !openings) return [];
@@ -591,11 +630,15 @@ export class Explore implements OnDestroy {
     return { peak, months, milestones, markers, targetMm: +targetMm, sameMonth, linePoints, baseY, firstMonth: t.months[0]?.month ?? '', lastMonth: t.months[t.months.length - 1]?.month ?? '' };
   });
 
+  readonly basisExpanded = signal(false);
   /** The two or so numbers that answer "how busy, and how different". */
   readonly stats = computed(() => {
     const stat = (label: string, now: number | null, before: number | null | undefined) => {
       const top = Math.max(now ?? 0, before ?? 0) || 1;
-      return { label, now: amount(now), diff: this.comparePeriod() ? diff(now, before) : null, wNow: (now ?? 0) / top, wBefore: (before ?? 0) / top };
+      const unit = amount(now).unit;
+      const value = now === null ? null : now / (unit === '萬人' ? 1e4 : 1);
+      const format = unit === '萬人' && Math.abs(now ?? 0) < 1e6 ? 'decimal' as const : 'integer' as const;
+      return { label, value, unit, format, diff: this.comparePeriod() ? diff(now, before) : null, wNow: (now ?? 0) / top, wBefore: (before ?? 0) / top };
     };
     const period = (this.stationAnswer() ?? this.networkAnswer())?.period;
     if (!period) return [];
@@ -986,19 +1029,50 @@ export class Explore implements OnDestroy {
     else { this.netTableCol.set(col); this.tableDir.set(col === 'station' ? 'asc' : 'desc'); }
   }
   focusTableStation(name: string) {
+    this.rankPreview.set(null);
     if (this.mode() === 'station') {
       this.selectRelation(name);
       return;
     }
     this.focusedStation.set(name);
+    this.rankSelected.emit(name);
+  }
+  previewRank(name: string | null, source: 'rank' | 'map', event?: PointerEvent | FocusEvent) {
+    if (event instanceof PointerEvent && event.pointerType !== 'mouse') return;
+    if (name && event instanceof FocusEvent && !(event.target instanceof HTMLElement && event.target.matches(':focus-visible'))) return;
+    if (name && this.rankedRows().some(row => row.station === name)) {
+      const previous = this.rankPreview();
+      if (previous?.station !== name || previous.source !== source) this.rankPreview.set({ station: name, source });
+    } else if (this.rankPreview()?.source === source) this.rankPreview.set(null);
+  }
+
+  selectRankFromMap(name: string): boolean {
+    const exists = this.rankedRows().some(row => row.station === name);
+    if (!exists) return false;
+    this.focusTableStation(name);
+    this.revealLinkedRank();
+    return true;
+  }
+
+  revealLinkedRank() {
+    const name = this.selectedRank();
+    if (!name || this.activeSection() !== 'list' || this.listStyle() === 'lines' || this.listCollapsed()) return;
+    const index = this.rankedRows().findIndex(row => row.station === name);
+    if (index >= this.shown()) this.shown.set(Math.ceil((index + 1) / PAGE) * PAGE);
+    afterNextRender(() => requestAnimationFrame(() => {
+      const row = Array.from(this.host.querySelectorAll<HTMLElement>('[data-rank-station]')).find(el => el.dataset['rankStation'] === name);
+      if (!row?.getClientRects().length || this.selectedRank() !== name) return;
+      revealRankRow(row, this.motion.reduced());
+    }), { injector: this.injector });
   }
   /** Keeps the selected station as the origin and focuses the chosen OD counterpart. */
   focusRelation(name: string | null) {
+    this.rankPreview.set(null);
     this.focusedRelation.set(name);
     this.focusedStation.set(name);
     this.peerStation.set(name && name !== this.station() ? name : null);
   }
-  selectRelation(name: string) { this.focusRelation(name); }
+  selectRelation(name: string) { this.focusRelation(name); this.rankSelected.emit(name); }
   swapPeer() {
     const peer = this.peerStation();
     if (!peer) return;
@@ -1067,6 +1141,7 @@ export class Explore implements OnDestroy {
   showWholeDay() { this.stopPlayback(); this.band.set('0-24'); }
   togglePlayback() {
     if (this.playing()) { this.stopPlayback(); return; }
+    if (this.motion.reduced()) return;
     if (this.unit() !== 'date') this.startHourly();
     if (this.activeHour() == null || this.activeHour() === 23) this.band.set('0-1');
     this.playing.set(true);

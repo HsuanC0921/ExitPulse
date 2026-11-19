@@ -118,7 +118,7 @@ button { cursor: pointer; }
 .primary svg { transition: transform .18s cubic-bezier(.22, 1, .36, 1); }
 .primary:hover:not(:disabled) svg { transform: translateX(3px); }
 .primary:active:not(:disabled) { transform: scale(.985); }
-.view-tabs.segmented button[aria-pressed='true'] { border-bottom-color: var(--ink); background: none; color: var(--ink); }
+.view-tabs.segmented button[aria-pressed='true'] { background: none; color: var(--ink); }
 .view-tabs button:focus-visible { outline-offset: -4px; }
 
 .conditions { margin-bottom: 12px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel-2); overflow: hidden; transition: border-color .15s; }
@@ -251,9 +251,12 @@ app-root[data-layout='compact'] { --tabbar: var(--safe-bottom); --mobile-top: ca
   .radar-feedback { min-height: 0; }
   .panel-body .view-tabs, .panel .sign, .panel > .stripe { display: none; }
 }
-@media (max-width: 960px) {
-  .map-tools :is(.map-reset, summary, .theme-switch) { gap: 0; padding: 0; }
-  .map-tools :is(.map-reset, summary, .theme-switch) > span:not(.theme-track) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; text-overflow: ellipsis; }
+@media (max-width: 1100px) {
+  :where(app-root[data-layout='wide']) {
+    .map-tools > :is(.map-reset, .theme-switch), .map-tools > details > summary { gap: 0; padding: 0; }
+    .map-tools > :is(.map-reset, .theme-switch) > span:not(.theme-track),
+    .map-tools > details > summary > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; text-overflow: ellipsis; }
+  }
 }
 :where(app-root[data-layout='compact']) {
   .panel, .detail { inset: var(--mobile-top) var(--safe-right) 0 var(--safe-left); width: auto; height: auto; max-height: none; border-radius: 0; box-shadow: none; background: var(--panel); }

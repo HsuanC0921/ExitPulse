@@ -1,5 +1,6 @@
 // 全螢幕人潮對比：同一對起訖站，左邊基準月、右邊比較月，一個小人代表固定人次，用同一個比例，疏密差異一眼可見。
 import { ChangeDetectionStrategy, Component, ElementRef, NgZone, OnDestroy, computed, effect, inject, input, signal, viewChild, viewChildren } from '@angular/core';
+import { MotionPreference } from './motion-preference';
 import { DecimalPipe } from '@angular/common';
 
 type Walker = { t: number; speed: number; lane: number; phase: number; tone: number };
@@ -64,7 +65,7 @@ export class Crowd implements OnDestroy {
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   private readonly canvases = viewChildren<ElementRef<HTMLCanvasElement>>('stage');
   private readonly zone = inject(NgZone);
-  private readonly reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private readonly motion = inject(MotionPreference);
   private stages: Stage[] = [];
   private tone = { ground: '', far: '', ink: '', dark: false };
   private frame?: number;
@@ -140,10 +141,11 @@ export class Crowd implements OnDestroy {
     this.resize = new ResizeObserver(() => { for (const s of this.stages) this.fit(s.canvas); this.draw(this.elapsed); });
     for (const s of this.stages) this.resize.observe(s.canvas);
     for (const s of this.stages) this.fit(s.canvas);
-    if (this.reduced) { this.draw(0); return; }
+    if (this.motion.reduced()) { this.draw(0); return; }
     let last = performance.now();
     this.zone.runOutsideAngular(() => {
       const loop = (now: number) => {
+        if (this.motion.reduced()) return;
         const dt = Math.min(.05, (now - last) / 1000); last = now; this.elapsed += dt;
         for (const s of this.stages) for (const w of s.walkers) { w.t += w.speed * dt; if (w.t > 1) w.t -= 1; }
         this.draw(this.elapsed);

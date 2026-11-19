@@ -8,7 +8,7 @@
     </button>
   } @else {
     <h1 class="mobile-brand"><app-brand class="bar" /></h1>
-    <nav class="mobile-nav" aria-label="檢視切換">
+    <nav class="mobile-nav motion-tabs" aria-label="檢視切換" [style.--tab-index]="page() === 'map' ? 0 : page() === 'list' ? 1 : 2">
       <button type="button" [attr.aria-current]="page() === 'map' ? 'page' : null" (click)="action.emit('map')">地圖</button>
       <button type="button" [attr.aria-current]="page() === 'list' ? 'page' : null" (click)="action.emit('list')">分析</button>
       <button type="button" [attr.aria-current]="page() === 'conditions' ? 'page' : null" (click)="action.emit('conditions')">條件</button>

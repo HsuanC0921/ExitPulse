@@ -1,0 +1,16 @@
+<section aria-label="排行人次圖" [attr.data-station]="data().station" [attr.data-state]="state()">
+  <header>
+    <h3>{{ data().station }} <small>人次</small></h3>
+    <span class="state">{{ state() === 'preview' ? '預覽' : state() === 'selected' ? '已選取' : '排行首位' }}</span>
+  </header>
+  @for (bar of data().bars; track $index) {
+    <div class="bar">
+      <span>{{ bar.label }}</span>
+      <i aria-hidden="true" [class.no-data]="bar.value === null"><b [style.transform]="'scaleX(' + (bar.value ?? 0) / data().scale + ')'"></b></i>
+      <strong>{{ bar.value === null ? bar.empty ?? '無紀錄' : (bar.value | number:'1.0-0') }}</strong>
+    </div>
+  }
+  @if (canDrillDown()) {
+    <button type="button" [disabled]="state() !== 'selected'" (click)="openStation.emit(data().station)">看本站人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+  }
+</section>

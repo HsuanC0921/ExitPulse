@@ -8,7 +8,7 @@
   .mobile-bar.off .mobile-stripe { display: none; }
   .mobile-nav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(44px, 1fr); gap: var(--sp-tight); height: 44px; border-radius: var(--r-l); background: var(--track); }
   .mobile-nav button, .mobile-view-btn { min-height: 0; padding: 0 8px; border: 0; border-radius: var(--r-m); background: none; color: color-mix(in srgb, var(--on-band) 78%, var(--band)); font-size: var(--fs-s); white-space: nowrap; }
-  .mobile-nav button[aria-current='page'] { background: var(--on-band); color: var(--band); font-weight: var(--weight-action); }
+  .mobile-nav button[aria-current='page'] { color: var(--band); font-weight: var(--weight-action); }
   .mobile-view { position: relative; flex: none; }
   .mobile-view-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-tight); height: 44px; min-width: 66px; padding: 0 8px 0 12px; border-radius: var(--r-m); background: var(--track); color: var(--on-band); font-weight: var(--weight-action); }
   .mobile-view-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

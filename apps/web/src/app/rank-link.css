@@ -1,0 +1,7 @@
+app-explore .relations button[data-rank-station], app-explore .data-table tr[data-rank-station] { transition: background-color .14s ease-out, box-shadow .14s ease-out; }
+app-explore [data-rank-station] { scroll-margin-block: var(--sp-2); }
+app-explore :is(.relations button, .data-table tr).rank-preview { background: var(--panel-2); }
+app-explore .relations button[data-rank-station][aria-pressed='true'], app-explore .data-table tr[data-rank-station].selected {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--ink-2);
+}

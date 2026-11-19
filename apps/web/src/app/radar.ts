@@ -3,6 +3,8 @@ import { ChangeDetectionStrategy, Component, ElementRef, Injector, OnDestroy, Vi
 import { autoRetry } from './auto-retry';
 import { watchDeviceProfile } from './device-profile';
 import { moveControls } from './control-motion';
+import { MotionPreference } from './motion-preference';
+import { drawRankLink, installRankLink } from './rank-map-link';
 import { readFold, writeFold } from './fold-preference';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
@@ -18,6 +20,7 @@ import { Hint, type HintEntry } from './hint';
 import { Brand } from './brand';
 import { About } from './about';
 import { PairDetail } from './pair-detail';
+import { AnimatedCount } from './animated-count';
 import { buildCsv, downloadCsv, exportBasis } from './csv-export';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
 import { StationHistory } from './station-history';
@@ -100,8 +103,8 @@ const stored = (key: string) => { try { return localStorage.getItem(key); } catc
 const store = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode: the choice lasts this visit only */ } };
 
 @Component({
-  selector: 'app-root', imports: [DecimalPipe, NgTemplateOutlet, Explore, MobileShell, TimePlayer, Hint, Brand, FirstQuery, StationHistory, About, PairDetail],
-  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './station-preview.css', './mobile-map.css', './radar.css'],
+  selector: 'app-root', imports: [DecimalPipe, NgTemplateOutlet, Explore, MobileShell, TimePlayer, Hint, Brand, FirstQuery, StationHistory, About, PairDetail, AnimatedCount],
+  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './station-preview.css', './mobile-map.css', './radar.css', './hour-chart.css', './interface-motion.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, host: {
     '[attr.data-theme]': 'theme()',
     '[attr.data-inset]': 'device().inset',
@@ -383,7 +386,6 @@ export class Radar implements OnDestroy {
   /** 底圖狀態：loading 是第一次載入，ready 是載完，failed 是重試後仍有圖磚載不到。busy 是載完之後又在補圖磚。 */
   readonly basemap = signal<'loading' | 'ready' | 'failed'>('loading');
   readonly basemapBusy = signal(false);
-  readonly counts = signal([0, 0, 0, 0]);
   readonly timePhase = signal<'baseline' | 'current'>('baseline');
   private readonly pairTowerTotals = httpResource<NetworkAnswer>(() => {
     const data = this.data();
@@ -483,7 +485,7 @@ export class Radar implements OnDestroy {
       headline: glue(change),
       origin: glue(`${r.origin}出發的總人次每天 ${fmt(Math.round(originA))} → ${fmt(Math.round(originB))} 人，${Math.abs(originChange) < .05 ? '大致持平' : `${originChange > 0 ? '多了' : '少了'} ${Math.round(Math.abs(originChange) * 100)}%`}。`),
       shareA, shareB, scale: Math.max(shareA, shareB) * 1.15 || 1,
-      tile: key === 'share' ? { a: `${shareA.toFixed(1)}%`, b: `${shareB.toFixed(1)}%`, unit: `占${r.origin}出發量` } : null,
+      shareUnit: key === 'share' ? `占${r.origin}出發量` : null,
       reversal: r.reversal ? glue(`兩站之間的主要方向反過來了。${d.baseline} 是${flow(r.directionBaseline)}的人比較多，${d.current} 變成${flow(r.directionCurrent)}比較多。`) : '',
     };
   });
@@ -509,11 +511,11 @@ export class Radar implements OnDestroy {
     const outbound = ex.direction() === 'outbound';
     const origin = outbound ? ex.station() : row.station;
     const destination = outbound ? row.station : ex.station();
-    const diff = row.compareDaily != null ? (row.daily ?? 0) - row.compareDaily : null;
-    const growthPct = row.compareDaily && row.compareDaily > 0 ? Math.round(((row.daily ?? 0) - row.compareDaily) / row.compareDaily * 100) : null;
+    const diff = change(row.daily, row.compareDaily);
+    const growthPct = diff !== null && row.compareDaily && row.compareDaily > 0 ? Math.round(diff / row.compareDaily * 100) : null;
     return {
       origin, destination, other: row.station, outbound,
-      daily: row.daily ?? 0, share: row.share ?? 0,
+      daily: row.daily, share: row.share,
       compareDaily: row.compareDaily, diff, growthPct,
       period: ex.period(), days: ex.days() === 'workday' ? 'workday' as PairDayType : ex.days() === 'weekend' ? 'weekend' as PairDayType : 'weekday' as PairDayType, weekend: ex.days() === 'weekend', hours: ex.band(),
       hasCompare: ex.isComparing(),
@@ -602,7 +604,6 @@ export class Radar implements OnDestroy {
   private stationLines = new Map<string, Line[]>();
   private frame?: number;
   private particleElapsed = 0;
-  private tweenFrame?: number;
   private profileRequest = 0;
   /** 只要還有資料來源在載入，isStyleLoaded() 就會是 false，所以改在這裡自行追蹤是否就緒。 */
   private layersReady = false;
@@ -616,7 +617,8 @@ export class Radar implements OnDestroy {
   private remountNotBefore = 0;
   private savedMapCamera?: { center: Point; zoom: number; pitch: number; bearing: number };
   private mapGuard?: ReturnType<typeof setInterval>;
-  readonly reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  readonly motion = inject(MotionPreference);
+  get reducedMotion() { return this.motion.reduced(); }
 
   constructor() {
     autoRetry(() => this.error(), () => this.retryInitialLoad());
@@ -706,6 +708,21 @@ export class Radar implements OnDestroy {
       const playing = this.explore()?.playing() ?? false;
       this.applyMapLighting(shade, playing);
     });
+    effect(() => this.syncRankLink());
+    effect(() => {
+      const reduced = this.motion.reduced();
+      document.documentElement.toggleAttribute('data-reduced-motion', reduced);
+      untracked(() => {
+        if (reduced) {
+          this.explore()?.stopPlayback();
+          this.map?.stop();
+          for (const animation of document.getAnimations()) {
+            if (animation.id === 'control-position') animation.cancel();
+          }
+        }
+        this.redraw(false);
+      });
+    });
     addEventListener('keydown', this.onKey);
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
     addEventListener('beforeinstallprompt', this.onBeforeInstall);
@@ -720,8 +737,9 @@ export class Radar implements OnDestroy {
       return;
     }
     if (e.key === 'Escape' && this.mapOnly()) { e.preventDefault(); this.toggleMapOnly(); return; }
+    if (e.key === 'Escape' && this.openMenu()) { e.preventDefault(); this.closeMenus(true); return; }
     if (e.key === 'Escape' && this.detailWide()) { e.preventDefault(); this.detailWide.set(false); return; }
-    if (e.key === 'Escape' && this.selectedMapStation()) { e.preventDefault(); this.selectMapStation(null); return; }
+    if (e.key === 'Escape' && this.selectedMapStation()) { e.preventDefault(); this.closeStationPreview(); return; }
     if (e.key === 'Escape' && this.selected()) { e.preventDefault(); this.closeDetail(); return; }
     if (e.key === 'Escape' && this.phone() && this.mobilePage() === 'conditions') { this.showResults() ? this.showMobileList() : this.showMobileMap(); return; }
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -916,8 +934,6 @@ export class Radar implements OnDestroy {
         this.pendingFly = false;
         this.stop();
         ++this.ribbonFrame;
-        if (this.tweenFrame != null) cancelAnimationFrame(this.tweenFrame);
-        this.tweenFrame = undefined;
         this.map = undefined;
         try { previous.remove(); } catch {}
       }
@@ -990,11 +1006,15 @@ export class Radar implements OnDestroy {
       map.on('moveend', () => { settle = window.setTimeout(() => this.mapMoving.set(false), 450); });
       map.on('click', stationLayers, e => {
         const name = e.features?.[0]?.properties?.['name'];
-        // 再點一次同一站就取消
-        if (name && this.linesOfStation(name).length) this.selectMapStation(this.selectedMapStation() === name ? null : name);
+        if (name && this.linesOfStation(name).length) this.pickStationOnMap(name);
       });
       map.on('mouseenter', stationLayers, () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', stationLayers, () => { map.getCanvas().style.cursor = ''; });
+      map.on('mousemove', stationLayers, e => {
+        if (!this.device().hover || map.isMoving()) return;
+        const name = e.features?.[0]?.properties?.['name'];
+        this.explore()?.previewRank(typeof name === 'string' ? name : null, 'map');
+      });
+      map.on('mouseleave', stationLayers, () => { map.getCanvas().style.cursor = ''; this.explore()?.previewRank(null, 'map'); });
       map.on('click', e => {
         if (!this.layersReady) return;
         if (map.queryRenderedFeatures(e.point, { layers: stationLayers }).length) return;
@@ -1009,13 +1029,16 @@ export class Radar implements OnDestroy {
               lng: e.lngLat.lng,
               lat: e.lngLat.lat,
             });
-          } else if (this.selectedMapStation()) this.selectMapStation(null); // 點地圖空白處收起車站卡
+          } else if (this.selectedMapStation()) this.closeStationPreview();
           return;
         }
         if (this.view() === 'station') {
           const explorer = this.explore();
           const other = typeof key === 'string' ? key.split('>').find(name => name !== explorer?.station()) : undefined;
-          if (other) explorer?.focusRelation(explorer.focusedRelation() === other ? null : other);
+          if (other && explorer) {
+            if (explorer.focusedRelation() === other) explorer.focusRelation(null);
+            else explorer.selectRankFromMap(other);
+          }
           return;
         }
         const hit = this.results().find(r => `${r.origin}>${r.destination}` === key);
@@ -1341,6 +1364,8 @@ export class Radar implements OnDestroy {
       paint: { 'line-color': '#7251ab', 'line-width': 2, 'line-dasharray': [2, 2] } });
     map.addLayer({ id: 'place-points', type: 'circle', source: 'place-result', filter: ['==', '$type', 'Point'],
       paint: { 'circle-radius': 6.5, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+    installRankLink(map);
+    this.syncRankLink();
     this.elevatedFlow?.installLayer();
     this.layersReady = true;
     this.sync3DVisibility();
@@ -1672,14 +1697,30 @@ export class Radar implements OnDestroy {
     });
   }
 
-  selectMapStation(name: string | null) {
+  private pickStationOnMap(name: string) {
+    const explorer = this.explore();
+    if (this.selectedMapStation() === name) {
+      this.closeStationPreview();
+      return;
+    }
+    const linked = explorer?.selectRankFromMap(name) ?? false;
+    this.selectMapStation(name, linked);
+  }
+
+  closeStationPreview() {
+    const explorer = this.explore();
+    if (explorer?.selectedRank() === this.selectedMapStation()) explorer?.focusRelation(null);
+    this.selectMapStation(null);
+  }
+
+  selectMapStation(name: string | null, keepCamera = false) {
     this.selectedMapStation.set(name);
     this.showEntrances.set(false);
     this.compareEntrances.set(false);
     this.selectedEntrance.set(null);
     // 車站資訊卡會占掉地圖空間，等它畫好後重新取景，讓站對不被遮住
-    if (name && this.selected()) { this.detailOpen.set(false); setTimeout(() => this.redraw(!this.lowAngle())); }
-    this.loadStationInfo(name, !this.lowAngle());
+    if (name && this.selected()) { this.detailOpen.set(false); setTimeout(() => this.redraw(!keepCamera && !this.lowAngle())); }
+    this.loadStationInfo(name, !keepCamera && !this.lowAngle());
     const source = this.map?.getSource('picked-station') as GeoJSONSource | undefined;
     const coordinates = name && this.stops.get(name);
     source?.setData(coordinates && name ? { type: 'FeatureCollection', features: [
@@ -2029,7 +2070,6 @@ export class Radar implements OnDestroy {
     if (moveFocus) {
       afterNextRender(() => this.detailView()?.focusPanel(), { injector: this.injector });
     }
-    this.tween([result.baselineDaily, result.currentDaily, Math.abs(result.currentDaily - result.baselineDaily), result.reverseCurrent / Math.max(1, this.data()!.days[1])]);
     this.redraw(true);
     void this.loadProfile(result);
   }
@@ -2189,18 +2229,6 @@ export class Radar implements OnDestroy {
 
   private stop() { if (this.frame != null) cancelAnimationFrame(this.frame); this.frame = undefined; }
 
-  private tween(targets: number[]) {
-    if (this.tweenFrame != null) cancelAnimationFrame(this.tweenFrame);
-    if (this.reducedMotion) { this.counts.set(targets); return; }
-    const from = this.counts(), started = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, Math.max(0, now - started) / 700), eased = 1 - Math.pow(2, -10 * t);
-      this.counts.set(targets.map((target, i) => from[i] + (target - from[i]) * (t === 1 ? 1 : eased)));
-      if (t < 1) this.tweenFrame = requestAnimationFrame(step);
-    };
-    this.tweenFrame = requestAnimationFrame(step);
-  }
-
   /** 從 a 到 b 的弧線，彎向由行進方向決定，所以 A→B 與 B→A 會分開。 */
   private arc(a: Point, b: Point, bend: number): Point[] {
     const dx = b[0] - a[0], dy = b[1] - a[1];
@@ -2234,10 +2262,23 @@ export class Radar implements OnDestroy {
     this.panelOpen.set(true);
     this.mobilePage.set('list');
     this.conditionsOpen.set(false);
+    this.explore()?.revealLinkedRank();
+  }
+  showLinkedRanking() {
+    const explorer = this.explore();
+    if (!explorer) return;
+    explorer.section.set('list');
+    explorer.listCollapsed.set(false);
+    if (explorer.listStyle() === 'lines') explorer.listStyle.set('cards');
+    this.showMobileList();
+  }
+  onRankSelected(station: string) {
+    const previous = this.selectedMapStation();
+    if (previous && previous !== station) this.selectMapStation(null);
   }
   showMobileMap() {
     this.mobilePage.set('map');
-    requestAnimationFrame(() => this.redraw(true));
+    requestAnimationFrame(() => this.redraw(!this.explore()?.selectedRank()));
   }
   editMobileConditions() {
     this.explore()?.stopPlayback();
@@ -2267,6 +2308,7 @@ export class Radar implements OnDestroy {
     this.explore()?.stopPlayback();
     this.showMobileList();
     if (view === this.view()) return;
+    this.explore()?.focusRelation(null);
     this.closeDetail(); this.view.set(view); this.exploreLayer.set(null); this.lastFocus = undefined;
     this.showMobileList();
     if (view === 'pairs') history.replaceState(null, '', this.showResults() ? writeState(this.viewState()) : location.pathname);
@@ -2317,11 +2359,21 @@ export class Radar implements OnDestroy {
 
   onExploreLayer(layer: ExploreLayer) {
     // 每個對象只取景一次，而且要等有內容可顯示之後
-    const key = layer.focus ?? 'network';
+    const key = this.view() === 'network' ? 'network' : layer.focus ?? 'network';
     const fly = layer.arcs.length + layer.circles.length > 0 && key !== this.lastFocus;
     if (fly) this.lastFocus = key;
     this.exploreLayer.set(layer);
     this.redraw(fly);
+  }
+
+  private syncRankLink() {
+    const explorer = this.explore();
+    const station = explorer?.linkedRank() ?? null;
+    const flow = explorer?.rankArc();
+    const from = flow && this.stops.get(flow.from), to = flow && this.stops.get(flow.to);
+    const ink = FLOW[this.lighting() >= .5 ? 'dark' : 'light'];
+    drawRankLink(this.map, station, station ? this.stops.get(station) : undefined, ink,
+      station !== null && station === explorer?.selectedRank(), from && to ? this.arc(from, to, -.14) : undefined, flow?.dashed);
   }
 
   fitRankedStations() {
@@ -2462,8 +2514,10 @@ export class Radar implements OnDestroy {
     (map.getSource('od-stops') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? circles.flatMap(point) : [] });
     (map.getSource('explore-circles') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? [] : circles.filter(c => c.radius > 0).flatMap(point) });
     this.drawTowers();
-    if (fly && this.lowAngle()) this.focusLowAngle();
-    else if (fly) this.fitExploreStations(circles.map(circle => circle.station));
+    if (fly && !this.explore()?.selectedRank()) {
+      if (this.lowAngle()) this.focusLowAngle();
+      else this.fitExploreStations(circles.map(circle => circle.station));
+    }
     this.animate(streams, false);
   }
 
@@ -2653,7 +2707,15 @@ export class Radar implements OnDestroy {
   }
   layerOpenHint() {
     const el = this.placeMenu().nativeElement.closest('.map-tools')?.querySelector<HTMLDetailsElement>('.layer-menu');
-    if (el) el.open = true;
+    if (el) {
+      if (this.toolsCollapsed()) this.toggleTools();
+      el.open = true;
+      afterNextRender(() => {
+        const install = el.querySelector<HTMLButtonElement>('.pwa-install-btn');
+        install?.scrollIntoView({ block: 'nearest' });
+        install?.focus({ preventScroll: true });
+      }, { injector: this.injector });
+    }
     this.dismissInstallBanner();
   }
   readonly installBannerClosed = signal(((): boolean => { try { return localStorage.getItem('exitpulse.install') === 'no'; } catch { return false; } })());
@@ -2676,5 +2738,5 @@ export class Radar implements OnDestroy {
     if (res.outcome === 'accepted') this.installPrompt.set(null);
   }
 
-  ngOnDestroy() { removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); if (this.tweenFrame != null) cancelAnimationFrame(this.tweenFrame); this.map?.remove(); }
+  ngOnDestroy() { removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); this.map?.remove(); }
 }
