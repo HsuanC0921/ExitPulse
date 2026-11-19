@@ -1,18 +1,18 @@
 /* 單站每日進站月曆 */
 app-month-calendar { display: block; }
 .day-head { grid-row: 1; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-1); }
-.day-val { color: var(--ink-2); font-size: var(--fs-xs); font-weight: 400; font-variant-numeric: tabular-nums; }
+.day-val { color: var(--ink-2); font-size: var(--fs-xs); font-weight: var(--weight-body); font-variant-numeric: tabular-nums; }
 .calendar-weekdays, .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--sp-1); }
-.calendar-weekdays { margin-top: 16px; color: var(--ink-2); text-align: center; font-size: var(--fs-xs); font-weight: 700; }
+.calendar-weekdays { margin-top: 16px; color: var(--ink-2); text-align: center; font-size: var(--fs-xs); font-weight: var(--weight-action); }
 .calendar-weekdays span:nth-child(n+6) { color: var(--BL); }
 .calendar { margin-top: 6px; }
 .day { display: grid; grid-template-rows: auto 25px; align-items: end; gap: var(--sp-1); min-height: 50px; padding: 3px 5px 5px; border: 1px solid var(--rule); border-radius: var(--r-s); background: var(--panel); color: var(--ink); font-size: var(--type-label); font-variant-numeric: tabular-nums; transition: border-color .15s, background-color .15s; }
-.day span { grid-row: 1; font-weight: 700; }
+.day span { grid-row: 1; font-weight: var(--weight-action); }
 .day b { display: block; grid-row: 2; height: 100%; border-radius: var(--r-s) var(--r-s) 0 0; background: var(--ink); transform-origin: bottom; transition: transform .4s var(--ease); }
 .day.weekend { border-color: color-mix(in srgb, var(--BL) 26%, var(--rule)); background: color-mix(in srgb, var(--BL) 8%, var(--panel)); color: color-mix(in srgb, var(--BL) 75%, var(--ink)); }
 .day.weekend b, .key i.weekend { background: var(--BL); }
 .day.holiday { border-color: color-mix(in srgb, var(--down) 32%, var(--rule)); background: color-mix(in srgb, var(--down) 8%, var(--panel)); }
-.day.holiday span { color: var(--down); font-weight: 800; }
+.day.holiday span { color: var(--down); font-weight: var(--weight-emphasis); }
 .day.low, .key i.low { border: 1.5px dashed var(--ink-2); box-shadow: none; }
 .day:hover:not(:disabled) { border-color: var(--ink-2); background: var(--panel-2); }
 .day.weekend:hover:not(:disabled) { border-color: var(--BL); background: color-mix(in srgb, var(--BL) 14%, var(--panel)); }

@@ -10,13 +10,13 @@
   align-items: center;
   gap: var(--sp-2);
   cursor: pointer;
-  font-weight: 700;
+  font-weight: var(--weight-action);
   list-style: none;
 }
 
 .station-history > summary::-webkit-details-marker { display: none; }
 .station-history > summary > span:first-child { margin-inline-end: auto; }
-.station-history .history-count { color: var(--ink-2, #555e66); font-size: var(--fs-xs); font-weight: 400; }
+.station-history .history-count { color: var(--ink-2, #555e66); font-size: var(--fs-xs); font-weight: var(--weight-body); }
 .station-history > summary svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; transition: rotate .18s ease; }
 .station-history[open] > summary svg { rotate: 180deg; }
 
@@ -60,9 +60,9 @@
 }
 
 .history-list li.in-period::before { background: var(--ink, #1d2125); }
-.history-list time { grid-column: 1 / -1; color: var(--ink-2, #555e66); font-size: .77rem; font-variant-numeric: tabular-nums; }
+.history-list time { grid-column: 1 / -1; color: var(--ink-2, #555e66); font-size: var(--type-label); font-variant-numeric: tabular-nums; }
 .history-event { display: grid; min-width: 0; }
-.history-event strong { font-size: .88rem; line-height: 1.45; text-wrap: balance; }
+.history-event strong { font-size: var(--type-ui); line-height: 1.45; text-wrap: balance; }
 .history-event span { color: var(--ink-2, #555e66); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: break-word; text-wrap: pretty; }
 @keyframes hist-in { from { opacity: 0; transform: translateY(-4px); } }
 .station-history[open] .history-list { animation: hist-in .2s cubic-bezier(.22, 1, .36, 1); }

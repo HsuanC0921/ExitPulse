@@ -49,6 +49,16 @@
                 "input": "public"
               },
               {
+                "glob": "{index.css,LICENSE,files/*.woff2}",
+                "input": "node_modules/@fontsource-variable/noto-sans-tc",
+                "output": "fonts/noto-sans-tc"
+              },
+              {
+                "glob": "{LICENSE,files/barlow-latin-{700,800}-normal.woff2}",
+                "input": "node_modules/@fontsource/barlow",
+                "output": "fonts/barlow"
+              },
+              {
                 "glob": "maplibre-gl-worker.mjs",
                 "input": "node_modules/maplibre-gl/dist",
                 "output": "workers"

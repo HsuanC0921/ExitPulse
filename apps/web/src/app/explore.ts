@@ -60,7 +60,7 @@ function hourRangesText(hours: readonly number[] | undefined): string {
 }
 
 @Component({
-  selector: 'app-explore', imports: [DecimalPipe, Hint, MonthCalendar, OdMatrix], templateUrl: './explore.html', styleUrl: './explore.css',
+  selector: 'app-explore', imports: [DecimalPipe, Hint, MonthCalendar, OdMatrix], templateUrl: './explore.html', styleUrls: ['./explore.css', './explore-wide.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, encapsulation: ViewEncapsulation.None,
 })
 export class Explore implements OnDestroy {

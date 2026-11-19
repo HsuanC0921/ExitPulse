@@ -1,0 +1,31 @@
+/* 放大分析面板 */
+@keyframes backdrop-in { from { opacity: 0; } }
+@keyframes sheet-in { from { opacity: 0; transform: scale(.97) translateY(6px); } }
+
+.wide-sheet .day { grid-template-rows: auto 34px; min-height: 76px; padding: 6px 8px; }
+.wide-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: rgba(15, 19, 22, .56); animation: backdrop-in .16s ease-out; }
+.wide-sheet { width: min(100%, 1060px); max-height: 90dvh; overflow: auto; padding: 20px; border: 1px solid var(--rule); border-radius: var(--r-l); background: var(--panel); box-shadow: var(--shadow); animation: sheet-in .2s var(--ease); }
+.wide-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--rule); }
+.wide-tabs { display: inline-flex; flex-wrap: wrap; gap: var(--sp-1); }
+.wide-tabs button, .wide-close { border-radius: var(--r-m); }
+.wide-tabs button { min-height: 36px; padding: 4px 10px; border: 1px solid var(--rule); background: var(--panel-2); color: var(--ink-2); font-size: var(--fs-xs); font-weight: var(--weight-action); transition: background-color .15s, border-color .15s, color .15s; }
+.wide-tabs button:hover:not([aria-pressed='true']) { border-color: var(--ink-2); color: var(--ink); }
+.wide-tabs button[aria-pressed='true'] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
+.wide-close { border: 1px solid var(--ink); background: var(--panel); color: var(--ink); font-weight: var(--weight-action); }
+.wide-close { min-height: 36px; padding: 4px 12px; font-size: var(--fs-xs); }
+.wide-close:hover { background: var(--panel-2); }
+.wide-sheet .matrix-wrap, .wide-sheet .table-wrap { max-height: none; }
+.wide-sheet .month { grid-template-rows: 180px auto; }
+.wide-sheet .hours { height: 180px; }
+.wide-sheet .dual-chart { height: 140px; }
+@media (min-width: 721px) {
+  .wide-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: var(--sp-4); align-items: start; }
+  .wide-grid > * { min-width: 0; }
+  .wide-grid:not(:has(.wide-aside > *)) { grid-template-columns: minmax(0, 1fr); }
+  .wide-sheet .matrix-table .v-name { writing-mode: horizontal-tb; text-orientation: mixed; }
+}
+
+@media (max-width: 720px) {
+  .wide-backdrop { padding: 0; }
+  .wide-sheet { width: 100%; height: 100dvh; max-height: none; border: 0; border-radius: 0; padding: calc(12px + var(--safe-top)) 14px calc(24px + var(--safe-bottom)); }
+}
