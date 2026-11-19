@@ -13,8 +13,8 @@
       <button type="button" [attr.aria-current]="page() === 'list' ? 'page' : null" (click)="action.emit('list')">分析</button>
       <button type="button" [attr.aria-current]="page() === 'conditions' ? 'page' : null" (click)="action.emit('conditions')">條件</button>
     </nav>
-    <div class="mobile-view">
-      <button type="button" class="mobile-view-btn" aria-haspopup="true" [attr.aria-expanded]="viewMenu()" (click)="toggleViewMenu()">{{ viewLabel() }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="mobile-view" (keydown.escape)="viewMenu.set(false); viewButton.focus(); $event.stopPropagation()">
+      <button #viewButton type="button" class="mobile-view-btn" aria-haspopup="true" [attr.aria-expanded]="viewMenu()" (click)="toggleViewMenu()">{{ viewLabel() }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
       @if (viewMenu()) {
         <button type="button" class="mobile-view-scrim" aria-label="關閉" (click)="viewMenu.set(false)"></button>
         <div class="mobile-view-menu" role="group" aria-label="查詢方式">
