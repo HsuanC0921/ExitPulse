@@ -4,7 +4,7 @@ import { autoRetry } from './auto-retry';
 import { watchDeviceProfile } from './device-profile';
 import { moveControls } from './control-motion';
 import { MotionPreference } from './motion-preference';
-import { drawRankLink, installRankLink } from './rank-map-link';
+import { drawRankLink, installRankLink, zoomScaled } from './rank-map-link';
 import { readFold, writeFold } from './fold-preference';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
@@ -1310,10 +1310,10 @@ export class Radar implements OnDestroy {
     map.addLayer({ id: 'od-streams-dashed', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], true], layout: { 'line-cap': 'butt', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [1.5, 1.2] } });
     map.addLayer({ id: 'od-streams', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], false], layout: { 'line-cap': 'round', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['max', 0.8, ['*', ['get', 'width'], .24]], 'line-width-transition': { duration: 0 }, 'line-opacity': ['get', 'opacity'] } });
     map.addSource('explore-circles', { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', paint: { 'circle-radius': ['get', 'radius'], 'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['get', 'hollow'], .06, .66], 'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': ['case', ['get', 'hollow'], 2.4, 1.2] } });
+    map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', paint: { 'circle-radius': zoomScaled(['get', 'radius']), 'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['get', 'hollow'], .06, .66], 'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': ['case', ['get', 'hollow'], 2.4, 1.2] } });
     map.addLayer({ id: 'explore-labels', type: 'symbol', source: 'explore-circles', filter: ['!=', ['get', 'label'], ''], layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-padding': 4, 'symbol-sort-key': ['-', 0, ['get', 'radius']],
-      // 大圓把字置中；小圓放大後字會被圓與選取環蓋住，改放到圓的正下方
-      'text-anchor': ['case', ['>=', ['get', 'radius'], 15], 'center', 'top'], 'text-offset': ['case', ['>=', ['get', 'radius'], 15], ['literal', [0, 0]], ['literal', [0, 1.3]]] }, paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 } });
+      // 字一律放在圓的正下方，間距跟著圓一起放大，避開圓與選取環
+      'text-variable-anchor': ['top'], 'text-radial-offset': zoomScaled(['get', 'radius'], 11, 13) }, paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 } });
     // 流向：箭頭沿弧線前進，身後拖一條很細的淡出尾巴。箭頭維持站牌風格的描邊白色，不做發光或模糊。
     map.addSource('od-comets', { type: 'geojson', data: EMPTY, lineMetrics: true });
     for (const kind of ['muted', 'flow']) {
@@ -1339,12 +1339,12 @@ export class Radar implements OnDestroy {
       paint: { 'circle-radius': ['get', 'r'], 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': ['get', 'color'],
         'circle-stroke-width': ['get', 'w'], 'circle-stroke-opacity': ['get', 'o'], 'circle-radius-transition': { duration: 0 } } });
     map.addSource('od-stops', { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'od-stops', type: 'circle', source: 'od-stops', paint: { 'circle-radius': ['coalesce', ['get', 'radius'], 7], 'circle-color': dark ? NIGHT_STATION.ranked : halo, 'circle-stroke-width': ['case', ['==', ['get', 'active'], true], 5, ['>', ['coalesce', ['get', 'radius'], 7], 5], 3.5, 2.5], 'circle-stroke-color': ['get', 'color'] } });
+    map.addLayer({ id: 'od-stops', type: 'circle', source: 'od-stops', paint: { 'circle-radius': zoomScaled(['coalesce', ['get', 'radius'], 7]), 'circle-color': dark ? NIGHT_STATION.ranked : halo, 'circle-stroke-width': ['case', ['==', ['get', 'active'], true], 5, ['>', ['coalesce', ['get', 'radius'], 7], 5], 3.5, 2.5], 'circle-stroke-color': ['get', 'color'] } });
     const labelPaint = { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 2 };
     map.addLayer({ id: 'od-labels', type: 'symbol', source: 'od-stops',
       filter: ['==', ['coalesce', ['get', 'count'], ''], ''],
       layout: { 'text-field': ['coalesce', ['get', 'label'], ['get', 'name']], 'text-font': ['Noto Sans Bold'],
-        'text-size': 15, 'text-offset': [0, 1.1], 'text-anchor': 'top' }, paint: labelPaint });
+        'text-size': 15, 'text-variable-anchor': ['top'], 'text-radial-offset': zoomScaled(['coalesce', ['get', 'radius'], 7], 8, 13) }, paint: labelPaint });
     // 每條流向線旁直接寫期別與人次，不必回頭對照圖例
     map.addSource('od-flow-labels', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'od-flow-labels', type: 'symbol', source: 'od-flow-labels',
@@ -1353,7 +1353,7 @@ export class Radar implements OnDestroy {
     map.addLayer({ id: 'od-count-labels', type: 'symbol', source: 'od-stops', filter: ['!=', ['coalesce', ['get', 'count'], ''], ''],
       layout: { 'text-field': ['format', ['get', 'name'], { 'font-scale': .93 }, '\n', {}, ['get', 'count'], { 'font-scale': 1.03 }],
         'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
-        'text-radial-offset': 1.12, 'text-justify': 'auto', 'text-padding': 3,
+        'text-radial-offset': zoomScaled(['coalesce', ['get', 'radius'], 7], 8, 13), 'text-justify': 'auto', 'text-padding': 3,
         'symbol-sort-key': ['coalesce', ['get', 'rank'], 99] }, paint: labelPaint });
     map.addLayer({ id: 'od-ranks', type: 'symbol', source: 'od-stops', filter: ['>', ['coalesce', ['get', 'rank'], 0], 0],
       layout: { 'text-field': ['to-string', ['get', 'rank']], 'text-font': ['Noto Sans Bold'], 'text-size': 11,
@@ -2375,7 +2375,8 @@ export class Radar implements OnDestroy {
     const from = flow && this.stops.get(flow.from), to = flow && this.stops.get(flow.to);
     const ink = FLOW[this.lighting() >= .5 ? 'dark' : 'light'];
     drawRankLink(this.map, station, station ? this.stops.get(station) : undefined, ink,
-      station !== null && station === explorer?.selectedRank(), from && to ? this.arc(from, to, -.14) : undefined, flow?.dashed);
+      station !== null && station === explorer?.selectedRank(), from && to ? this.arc(from, to, -.14) : undefined, flow?.dashed,
+      this.exploreLayer()?.circles.find(c => c.station === station)?.radius);
   }
 
   fitRankedStations() {
