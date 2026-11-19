@@ -16,15 +16,19 @@
 
 @media (max-width: 720px) {
   .first-query {
+    --fq-pad: 12px;
     gap: 6px;
-    padding: 12px;
+    min-width: 0;
+    padding: var(--fq-pad);
     border: 1px solid var(--rule, #dfe3e2);
     border-radius: var(--r-l);
     background: var(--panel, #fff);
   }
   /* 手機：輸入框自帶提示字，標籤只留給讀屏；例子改成一列可左右滑，卡片矮一半 */
   .first-query-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .first-query .first-query-preset-list { display: flex; gap: 8px; overflow-x: auto; margin-inline: -12px; padding: 0 12px 2px; scroll-snap-type: x proximity; scrollbar-width: none; }
+  .first-query-presets { min-width: 0; }
+  .first-query .first-query-preset-list { display: flex; gap: 8px; overflow-x: auto; margin-inline: calc(var(--fq-pad) * -1); padding: 2px var(--fq-pad) 4px; scroll-padding-inline: var(--fq-pad); scroll-snap-type: x proximity; scrollbar-width: none; }
+  .first-query .first-query-preset-list::after { content: ''; flex: 0 0 calc(var(--fq-pad) - 8px); }
   .first-query .first-query-preset-list button { flex: 0 0 148px; scroll-snap-align: start; }
 }
 
@@ -179,6 +183,6 @@
 :host-context([data-theme='dark']) #first-query-station { color-scheme: dark; }
 
 @media (max-width: 420px) {
-  .first-query { gap: var(--sp-2); padding: 11px; }
+  .first-query { --fq-pad: 11px; gap: var(--sp-2); padding: var(--fq-pad); }
   .first-query-matches { max-height: 150px; }
 }

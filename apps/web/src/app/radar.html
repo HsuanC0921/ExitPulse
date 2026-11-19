@@ -158,7 +158,7 @@
         @if (!device().standalone) {
           <button type="button" class="pwa-install-btn" (click)="installAction()">{{ installPrompt() ? '安裝成 App，地圖可全螢幕' : '怎麼安裝成 App' }}</button>
           @if (installHelp()) {
-            <p class="pwa-tip">{{ isIosSafari ? '點瀏覽器的「分享」，選「加入主畫面」。' : '開瀏覽器選單，選「安裝應用程式」或「加到主畫面」。' }}從主畫面打開就沒有網址列，整個畫面都是地圖。</p>
+            <p class="pwa-tip">{{ isIosSafari ? '點下方（或網址列旁）的「分享」方框向上箭頭，往下滑選「加入主畫面」，再按「新增」。' : '點瀏覽器右上角選單（⋮），選「安裝應用程式」或「加到主畫面」。' }}從主畫面打開就沒有網址列，整個畫面都是地圖。</p>
           }
         }
         <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
