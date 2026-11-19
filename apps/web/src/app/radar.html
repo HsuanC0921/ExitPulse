@@ -194,6 +194,7 @@
             <div class="layer-key">
               @if (tower3d()) {
                 <p>{{ view() === 'pairs' || view() === 'network' ? '站塔越高，進站人次越多。高度取平方根，大站不會把小站壓扁。' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
+                @if (towerScale().length) { <div class="spike-scale" aria-label="站塔高度對照"><span class="spike-scale-title">對照</span>@for (tick of towerScale(); track tick.label) { <span><i [style.height.px]="tick.px"></i>{{ tick.label }}</span> }</div> }
                 @if (view() !== 'network') { <p>弧線越寬，這兩站之間的人次越多。箭頭朝向目的站。</p> }
               } @else if (view() === 'network') {
                 <p><i class="sw dot"></i>圓越大，進站人次越多</p>

@@ -250,6 +250,8 @@ export class Radar implements OnDestroy {
   }
   private beforeLowAngle?: { center: Point; zoom: number; pitch: number };
   readonly towerPeak = signal<number | null>(null);
+  /** 立體圖例的刻度：幾根和地圖同高的小尖刺，標出對應人次（高度取平方根，所以一定要有尺） */
+  readonly towerScale = signal<{ label: string; px: number }[]>([]);
   private elevatedFlow?: ElevatedFlow;
   readonly showScale = signal(false);
   readonly showRoads = signal(true);
@@ -1529,6 +1531,15 @@ export class Radar implements OnDestroy {
     // 逐時播放用固定滿刻度，各小時的尖刺才能互相比較。
     const full = hourly ? (this.view() === 'network' ? 40000 : 4000) : 4 * (this.r3d?.columnTick(peak) ?? 1);
     this.towerPeak.set(peak > 0 ? Math.round(peak) : null);
+    const spikePx = (value: number) => Math.max(3, Math.min(1.4, Math.sqrt(value / full)) * (this.r3d?.SPIKE_MAX_PX ?? 100));
+    const ticks: { label: string; px: number; value: number }[] = [];
+    for (const value of [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500]) {
+      const px = spikePx(value);
+      if (!peak || value > peak || px > 100 || px < 10 || ticks.length >= 3) continue;
+      if (ticks.length && value > ticks[ticks.length - 1].value / 2.4) continue;
+      ticks.push({ label: value >= 10000 ? `${value / 10000} 萬` : value >= 1000 ? `${value / 1000} 千` : String(value), px: Math.round(px), value });
+    }
+    this.towerScale.set(this.tower3d() ? ticks.map(({ label, px }) => ({ label, px })) : []);
     const dark = this.lighting() >= .5, ink = FLOW[dark ? 'dark' : 'light'], down = dark ? '#ff7a85' : '#b4232f';
     this.elevatedFlow?.setSpikes(amounts.flatMap(([name, amount]) => {
       const at = this.stops.get(name);
