@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, ViewEncapsulation, input, output, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, ViewEncapsulation, computed, input, linkedSignal, output, signal, viewChild } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Crowd } from './crowd';
 import { Hint } from './hint';
@@ -82,6 +82,30 @@ export class PairDetail {
   readonly choose = output<Result>();
   readonly saveCard = output<void>();
   readonly retryProfile = output<void>();
+
+  readonly hoveredHour = signal<number | null>(null);
+  readonly pinnedHour = linkedSignal(() => {
+    this.item();
+    return null as number | null;
+  });
+  readonly activeHour = computed(() => this.hoveredHour() ?? this.pinnedHour());
+  readonly activeHourRow = computed(() => {
+    const h = this.activeHour();
+    return h == null ? null : this.hourTable().find(row => row.h === h) ?? null;
+  });
+
+  readonly flowBalance = computed(() => {
+    const item = this.item(), d = this.data();
+    const rev = item.reverseCurrent / (d.days[1] || 1);
+    const total = item.currentDaily + rev;
+    if (total <= 0) return null;
+    const forwardPct = item.currentDaily / total * 100;
+    return { forwardPct, reversePct: 100 - forwardPct, rev };
+  });
+
+  toggleHour(hour: number) {
+    this.pinnedHour.update(cur => cur === hour ? null : hour);
+  }
 
   focusPanel() {
     this.panel()?.nativeElement.focus({ preventScroll: true });

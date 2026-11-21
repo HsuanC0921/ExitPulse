@@ -53,7 +53,7 @@
 .first-query-mark svg { width: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .first-query-title-wrap { flex: 1; min-width: 0; }
 .first-query-heading h2 { margin: 0; font-size: var(--fs-l); line-height: 1.35; text-wrap: balance; }
-.first-query-heading p { margin: 2px 0 0; color: var(--ink-2, #5d666c); font-size: var(--fs-s); line-height: 1.6; text-wrap: pretty; }
+.first-query-heading p, .first-query-sub { margin: 2px 0 0; color: var(--ink-2, #5d666c); font-size: var(--fs-xs); line-height: 1.45; font-variant-numeric: tabular-nums; text-wrap: pretty; }
 .first-query-toggle { flex: 0 0 44px; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--rule, #dfe3e2); border-radius: var(--r-m); background: var(--panel-2, #f0f2f1); color: var(--ink, #202427); cursor: pointer; }
 .first-query-toggle:hover { border-color: var(--ink-2, #5d666c); }
 .first-query-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }

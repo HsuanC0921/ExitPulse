@@ -1,6 +1,6 @@
 # ExitPulse｜臺北捷運旅次變化雷達
 
-![Version 1.1.1](https://img.shields.io/badge/version-1.1.1-1d2125)
+![Version 1.3.0](https://img.shields.io/badge/version-1.3.0-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3-009688)
@@ -136,9 +136,9 @@ python tools/stress_api.py --requests 200 --concurrency 20 --p95-ms 3000
 
 ## 自行架設正式環境
 
-在 Linux 主機上可用 Docker Compose 部署 PostgreSQL 18、FastAPI 與 Web 容器。旅次資料可直接由公開資料自動下載建庫，也可從自備的 PostgreSQL 18 `pg_dump` 備份還原，對外再由主機端 Caddy 提供自動 HTTPS。
+在全新的 Linux 主機上只要安裝 Docker 與 Docker Compose，抓下程式庫執行 `./deploy/install.sh` 即可一鍵完成 `.env` 隨機密碼建立、Node 22 容器編譯前端、PostgreSQL 18 零前置自動建庫、公開資料與輔助資訊匯入，並自動安裝每月與每週更新的 `systemd` 定時排程（日後更新版本只需執行 `./deploy/update-all.sh upgrade`）。若需手動調整細節或從 `pg_dump` 備份還原，也可查閱完整手冊：
 
-- **[從零自行架設指南](deploy/README.md)**：包含 `.env` 環境變數表、前端靜態檔獨立建置、公開資料／備份還原雙路線建庫、Caddy HTTPS 反向代理與上線後驗收指令。
+- **[從零自行架設與自動更新指南](deploy/README.md)**：包含一鍵安裝參數、`.env` 環境變數表、備份還原路線、Caddy HTTPS 反向代理與線上驗收。
 
 ## 系統架構與專案結構
 

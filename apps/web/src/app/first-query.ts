@@ -12,6 +12,7 @@ export interface FirstQueryPreset {
   detail: string;
   view?: 'pairs' | 'station' | 'network';
   station?: string;
+  networkMetric?: 'entries' | 'net';
   days?: 'weekday' | 'workday' | 'weekend' | 'all';
   baseline: string;
   current: string;
@@ -24,9 +25,9 @@ export interface FirstQueryPreset {
 }
 
 const DEFAULT_PRESETS: FirstQueryPreset[] = [
-  { label: '南港人流翻倍', detail: '南港→展覽館 +107%', view: 'pairs', baseline: '2022-09', current: '2026-09', start: 7, end: 10, weekend: false, type: 'increase', origin: '南港', destination: '南港展覽館' },
-  { label: '大巨蛋週末潮', detail: '國父紀念館 3.7倍', view: 'station', station: '國父紀念館', days: 'weekend', baseline: '2022-09', current: '2026-09', start: 0, end: 24, weekend: true, type: 'all' },
-  { label: '上班日回升', detail: '119 站 +25%', view: 'network', days: 'workday', baseline: '2022-09', current: '2026-09', start: 0, end: 24, weekend: false, type: 'all' },
+  { label: '南港通勤翻倍', detail: '南港→展覽館 +107%', view: 'pairs', baseline: '2022-09', current: '2026-09', start: 7, end: 10, weekend: false, type: 'increase', origin: '南港', destination: '南港展覽館' },
+  { label: '大巨蛋週末潮', detail: '國父紀念館 3.7 倍', view: 'station', station: '國父紀念館', days: 'weekend', baseline: '2022-09', current: '2026-09', start: 0, end: 24, weekend: true, type: 'all' },
+  { label: '早尖峰潮汐吸吐', detail: '全線淨進出分布', view: 'network', networkMetric: 'net', days: 'workday', baseline: '2022-09', current: '2026-09', start: 8, end: 9, weekend: false, type: 'all' },
 ];
 
 // 搜尋比對鍵：全形轉半形、「臺」統一為「台」、不分大小寫
@@ -40,6 +41,7 @@ const searchKey = (value: string) => value.trim().normalize('NFKC').replaceAll('
 })
 export class FirstQuery {
   readonly stations = input<FirstQueryStation[]>([]);
+  readonly latestMonth = input<string>('');
   readonly chooseStation = output<string>();
   readonly findPlace = output<string>();
   readonly comparePairs = output<void>();

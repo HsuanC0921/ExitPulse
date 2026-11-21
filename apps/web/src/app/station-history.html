@@ -2,7 +2,8 @@
   <details class="station-history">
     <summary>
       <span>車站沿革</span>
-      <span class="history-count">{{ events().length }} 筆附來源紀錄</span>
+      @if (tenure(); as t) { <span class="history-tenure">{{ t.year }} 通車 · 營運 {{ t.years }} 年</span> }
+      <span class="history-count">{{ events().length }} 筆</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </summary>
     <ol class="history-list">

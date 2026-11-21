@@ -180,6 +180,11 @@
         </div>
         <details class="layer-group" [open]="!phone()">
           <summary>圖層<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="map-metric segmented basemap-styles" role="group" aria-label="底圖風格">
+            <button type="button" [attr.aria-pressed]="basemapStyle() === 'positron'" (click)="setBasemapStyle('positron')">簡潔</button>
+            <button type="button" [attr.aria-pressed]="basemapStyle() === 'liberty'" (click)="setBasemapStyle('liberty')">詳圖</button>
+            <button type="button" [attr.aria-pressed]="basemapStyle() === 'nlsc'" (click)="setBasemapStyle('nlsc')">臺灣地圖</button>
+          </div>
           <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
           <label>街道與建物<input type="checkbox" role="switch" [checked]="showRoads()" (change)="toggleMapOption('roads')"></label>
           <label>水系與綠地<input type="checkbox" role="switch" [checked]="showNature()" (change)="toggleMapOption('nature')"></label>
@@ -288,7 +293,7 @@
         <button type="button" class="icon-button" aria-label="關閉車站資訊" title="關閉（也可按 Esc、再點一次車站或點地圖空白處）" (click)="selectMapStation(null)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       @if (stationInfo(); as info) {
-        <app-station-history [opening]="info.opening ?? null" [lines]="info.lines ?? []" [entrances]="info.entrances"
+        <app-station-history [stationName]="station" [opening]="info.opening ?? null" [lines]="info.lines ?? []" [entrances]="info.entrances"
           [selectedPeriod]="entranceCurrent()" [availableMonths]="availability()?.[station]?.months ?? []"
           (periodChange)="openStationHistory(station, $event)" />
         @if (stationSnapshot(); as snap) {
@@ -306,6 +311,15 @@
                 <div><small>全線排名</small><strong>第 {{ snap.rank }} 名<small> / {{ snap.totalStations }}</small></strong></div>
               }
             </div>
+            @if (snapshotBalance(); as bal) {
+              <div class="kpi-balance">
+                <div class="kpi-balance-bar" aria-hidden="true">
+                  <i [style.flex-grow]="bal.entryPct"></i>
+                  <i class="exit" [style.flex-grow]="bal.exitPct"></i>
+                </div>
+                <p><span>進站 {{ bal.entryPct }}% · 出站 {{ bal.exitPct }}%</span><b>{{ bal.label }}</b></p>
+              </div>
+            }
           </div>
         }
         @if (stationCleanNote() || info.nearby?.length || info.hubs?.length || info.youbike?.length || info.districtPop || info.catchmentPop || info.addresses?.length) {
@@ -319,61 +333,75 @@
                 <span>{{ info.addresses![0] }}</span>
               </p>
             }
-            @if (info.districtPop; as dp) {
-              <p class="station-facts">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg>
-                <span>{{ dp.district }} {{ dp.population | number }} 人@if (dp.yoyPct != null) {（較前一年 {{ dp.yoyPct >= 0 ? '+' : '−' }}{{ (dp.yoyPct < 0 ? -dp.yoyPct : dp.yoyPct) | number:'1.1-1' }}%）}</span>
-              </p>
-            }
-            @if (info.catchmentPop; as cp) {
-              <p class="station-facts">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-                <span>周邊 6 公里生活圈（{{ cp.districts.join('、') }}）約 {{ cp.population | number }} 人@if (cp.yoyPct != null) {（{{ cp.yoyPct >= 0 ? '+' : '−' }}{{ (cp.yoyPct < 0 ? -cp.yoyPct : cp.yoyPct) | number:'1.1-1' }}%）}</span>
-              </p>
+            @if (info.districtPop || info.catchmentPop) {
+              <div class="pop-strip" [class.single]="!info.districtPop || !info.catchmentPop" aria-label="周邊人口規模">
+                @if (info.districtPop; as dp) {
+                  <div>
+                    <small>{{ dp.district }}人口</small>
+                    <strong>{{ dp.population | number }}</strong>
+                    @if (dp.yoyPct != null) { <em [class.down]="dp.yoyPct < 0">年 {{ dp.yoyPct >= 0 ? '+' : '−' }}{{ (dp.yoyPct < 0 ? -dp.yoyPct : dp.yoyPct) | number:'1.1-1' }}%</em> }
+                  </div>
+                }
+                @if (info.catchmentPop; as cp) {
+                  <div>
+                    <small title="{{ cp.districts.join('、') }}">6 公里生活圈（{{ cp.districts.length }} 區）</small>
+                    <strong>{{ cp.population | number }}</strong>
+                    @if (cp.yoyPct != null) { <em [class.down]="cp.yoyPct < 0">年 {{ cp.yoyPct >= 0 ? '+' : '−' }}{{ (cp.yoyPct < 0 ? -cp.yoyPct : cp.yoyPct) | number:'1.1-1' }}%</em> }
+                  </div>
+                }
+              </div>
             }
             @if (!info.hubs?.length && !info.nearby?.length && !info.youbike?.length) {
               <p class="poi-empty">尚未收錄周邊設施、景點與 YouBike 資料</p>
             } @else {
-              <div class="nearby-head">
-                <small>周邊重要設施</small>
+              @let activeTab = nearbyTab();
+              <div class="nearby-tabs" role="tablist" aria-label="周邊設施與接駁">
+                <button type="button" role="tab" [attr.aria-selected]="activeTab === 'hubs'" (click)="nearbyTab.set('hubs')">重要設施@if (info.hubs?.length) { <b>{{ info.hubs!.length }}</b> }</button>
+                <button type="button" role="tab" [attr.aria-selected]="activeTab === 'nearby'" (click)="nearbyTab.set('nearby')">景點@if (info.nearby?.length) { <b>{{ info.nearby!.length }}</b> }</button>
+                <button type="button" role="tab" [attr.aria-selected]="activeTab === 'youbike'" (click)="nearbyTab.set('youbike')">YouBike@if (info.youbike?.length) { <b>{{ info.youbike!.length }}</b> }</button>
               </div>
-              @if (info.hubs?.length) {
-                <ul class="station-nearby" aria-label="周邊重要設施">
-                  @for (hub of info.hubs; track hub.name) {
-                    <li class="station-hub"><button type="button" [title]="hub.officialName || hub.sourceLabel || ''" (click)="focusStationPoi(hub.name, hub.kind, hub.lng, hub.lat)"><strong>{{ hub.name }}（{{ hub.kind }}）</strong><span>{{ hub.distance | number }} 公尺</span></button></li>
+              @if (activeTab === 'hubs') {
+                @if (info.hubs?.length) {
+                  <ul class="station-nearby" aria-label="周邊重要設施">
+                    @for (hub of info.hubs; track hub.name) {
+                      <li class="station-hub"><button type="button" [title]="hub.officialName || hub.sourceLabel || ''" (click)="focusStationPoi(hub.name, hub.kind, hub.lng, hub.lat)"><strong>{{ hub.name }}（{{ hub.kind }}）</strong><span>{{ hub.distance | number }}m · 約 {{ walkMinutes(hub.distance) }} 分</span></button></li>
+                    }
+                  </ul>
+                  @if (hubSources().length) {
+                    <p class="nearby-sources">來源：@for (src of hubSources(); track src.label; let last = $last) {@if (src.url) {<a [href]="src.url" target="_blank" rel="noopener">{{ src.label }}</a>} @else {<span>{{ src.label }}</span>}@if (!last) {、}}</p>
                   }
-                </ul>
-                @if (hubSources().length) {
-                  <p class="nearby-sources">來源：@for (src of hubSources(); track src.label; let last = $last) {@if (src.url) {<a [href]="src.url" target="_blank" rel="noopener">{{ src.label }}</a>} @else {<span>{{ src.label }}</span>}@if (!last) {、}}</p>
+                } @else {
+                  <p class="poi-empty">700 公尺內暫無已收錄的設施</p>
+                }
+              } @else if (activeTab === 'nearby') {
+                @if (info.nearby?.length) {
+                  <div class="nearby-head">
+                    <small>直線距離與預估步行</small>
+                    <a class="source-pill" href="https://data.gov.tw/dataset/7777" target="_blank" rel="noopener" title="觀光署景點資料">觀光署<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+                  </div>
+                  <ul class="station-nearby" aria-label="附近景點">
+                    @for (place of info.nearby; track place.name) {
+                      <li><button type="button" [title]="place.summary || ''" (click)="focusStationPoi(place.name, '景點', place.lng, place.lat)"><strong>{{ place.name }}</strong><span>{{ place.distance | number }}m · 約 {{ walkMinutes(place.distance) }} 分</span></button></li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="poi-empty">700 公尺內未收錄觀光署景點</p>
                 }
               } @else {
-                <p class="poi-empty">700 公尺內暫無已收錄的設施</p>
-              }
-              <div class="nearby-head">
-                <small>周邊景點（直線距離，未計繞行）</small>
-                <a class="source-pill" href="https://data.gov.tw/dataset/7777" target="_blank" rel="noopener" title="觀光署景點資料">觀光署<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
-              </div>
-              @if (info.nearby?.length) {
-                <ul class="station-nearby" aria-label="附近景點">
-                  @for (place of info.nearby; track place.name) {
-                    <li><button type="button" [title]="place.summary || ''" (click)="focusStationPoi(place.name, '景點', place.lng, place.lat)"><strong>{{ place.name }}</strong><span>{{ place.distance | number }} 公尺</span></button></li>
-                  }
-                </ul>
-              } @else {
-                <p class="poi-empty">700 公尺內未收錄觀光署景點</p>
-              }
-              <div class="nearby-head">
-                <small>周邊 YouBike 2.0 場站</small>
-                <a class="source-pill" href="https://data.taipei/" target="_blank" rel="noopener" title="雙北開放資料">雙北交通<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
-              </div>
-              @if (info.youbike?.length) {
-                <ul class="station-nearby" aria-label="周邊 YouBike 2.0 場站">
-                  @for (bike of info.youbike; track bike.name) {
-                    <li><button type="button" [title]="bike.address || ''" (click)="focusStationPoi(bike.name, 'YouBike 2.0', bike.lng, bike.lat)"><strong>{{ bike.name }}@if (bike.capacity > 0) {（{{ bike.capacity }} 柱）}</strong><span>{{ bike.distance | number }} 公尺</span></button></li>
-                  }
-                </ul>
-              } @else {
-                <p class="poi-empty">450 公尺內未收錄 YouBike 2.0 場站</p>
+                @if (info.youbike?.length) {
+                  @let yb = youbikeSummary();
+                  <div class="nearby-head">
+                    <small>周邊 {{ yb.count }} 站 · 共 {{ yb.totalDocks | number }} 柱</small>
+                    <a class="source-pill" href="https://data.taipei/" target="_blank" rel="noopener" title="雙北開放資料">雙北交通<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+                  </div>
+                  <ul class="station-nearby" aria-label="周邊 YouBike 2.0 場站">
+                    @for (bike of info.youbike; track bike.name) {
+                      <li><button type="button" [title]="bike.address || ''" (click)="focusStationPoi(bike.name, 'YouBike 2.0', bike.lng, bike.lat)"><strong>{{ bike.name }}@if (bike.capacity > 0) {（{{ bike.capacity }} 柱）}</strong><span>{{ bike.distance | number }}m · 約 {{ walkMinutes(bike.distance) }} 分</span></button></li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="poi-empty">450 公尺內未收錄 YouBike 2.0 場站</p>
+                }
               }
             }
           </section>
@@ -507,7 +535,7 @@
         <button type="button" [attr.aria-pressed]="view() === 'network'" (click)="setView('network')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span>全線人次</span></button>
       </div>
       @if (showFirstQuery()) {
-        <app-first-query [stations]="firstQueryStations()" (chooseStation)="openStation($event, { hourly: true })"
+        <app-first-query [stations]="firstQueryStations()" [latestMonth]="months().at(-1) ?? ''" (chooseStation)="openStation($event, { hourly: true })"
           (findPlace)="openPlaceSearch($event)" (comparePairs)="find()" (choosePreset)="applyPreset($event)" />
       }
       @if (view() !== 'pairs') {
@@ -544,11 +572,15 @@
       } @else if (!data()) {
         <p class="status">正在載入分析資料…</p>
       } @else {
-        <button class="primary" type="button" [disabled]="loading()" (click)="find()">
-          <span>{{ loading() ? '正在比較…' : '找出變化最大的兩站' }}</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-        </button>
-        <p class="radar-feedback" role="status">{{ queryError() || (showResults() && conditionsChanged() ? '條件已變更，請重新比較。' : '') }}</p>
+        @if (!showResults() || conditionsChanged() || loading()) {
+          <button class="primary" type="button" [disabled]="loading()" (click)="find()">
+            <span>{{ loading() ? '正在比較…' : '找出變化最大的兩站' }}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+          <p class="radar-feedback" role="status">{{ queryError() || (showResults() && conditionsChanged() ? '條件已變更，請重新比較。' : '') }}</p>
+        } @else if (queryError()) {
+          <p class="radar-feedback" role="status">{{ queryError() }}</p>
+        }
         @if (suggestedBand()) { <button type="button" class="link-button" (click)="useSuggestedBand()">改查{{ bandLabel(suggestedBand()) }}</button> }
         @if (!apiAvailable()) { <p class="status">目前顯示內建的預設比較，條件無法調整。</p> }
         @if (apiAvailable()) {

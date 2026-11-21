@@ -2,10 +2,33 @@
 
 這份手冊說明如何在全新的 Linux 主機上，從零部署 PostgreSQL 18、FastAPI 後端、Angular 靜態前端與 Caddy HTTPS 反向代理。以下指令皆在專案根目錄執行。
 
-## 系統需求
+## 一鍵部署可自動更新版本（推薦）
+
+在全新的 Linux 主機裝好 Docker Engine 與 Docker Compose v2 後，抓下程式碼只要一個指令即可自動完成：產生 `.env` 與隨機強密碼、建置前端、啟動 PostgreSQL 18、零前置自動建立 UTF-8 資料庫與匯入公開資料、啟動服務，並自動啟用每月／每週定時更新排程：
+
+```sh
+git clone https://github.com/HsuanC0921/ExitPulse.git
+cd ExitPulse
+./deploy/install.sh
+```
+
+常用旗標：
+- `./deploy/install.sh --all`：匯入自 `2017-01` 起的完整歷史旅次（預設為最近 12 個月）。
+- `./deploy/install.sh --port=8080 --releases=/srv/exitpulse/releases`：自訂本機埠與靜態檔發布路徑。
+- `./deploy/install.sh --no-timers`：不寫入系統 `systemd` 排程（可改由 `crontab` 手動呼叫 `deploy/update-all.sh`）。
+
+之後若需要拉取新版程式碼並原地升級前後端容器，只要再執行：
+
+```sh
+./deploy/update-all.sh upgrade
+```
+
+---
+
+## 系統需求（或手動分步部署）
 
 - Docker Engine、Docker Compose v2 與 Git
-- Node.js 22.22.3 以上的 22.x、24.15.0 以上的 24.x 或 26.x，用來建置前端。可在另一台電腦建置後再上傳。[Angular 版本需求](https://angular.dev/reference/versions)
+- 若不使用 `install.sh` 內建的 Node 22 Docker 編譯容器，需另備 Node.js 22.22.3 以上的 22.x、24.15.0 以上的 24.x 或 26.x。[Angular 版本需求](https://angular.dev/reference/versions)
 - 若要連上公網，準備指向主機的網域、可供外部連線的 80／443 埠，以及主機端的 Caddy 2。
 - 磁碟需同時容納 PostgreSQL、下載的原始資料和 Docker 映像。117 個月的正式 PostgreSQL 約 17 GiB，從公開資料建庫還需另外預留下載和匯入空間。
 
@@ -64,18 +87,18 @@ docker compose --env-file .env -f deploy/docker-compose.prod.yml build api
 
 接著選擇以下任一方式填入資料：
 
-### 路線 A：從零由公開資料自動建庫（無需既有備份）
+### 路線 A：零前置由公開資料全自動建庫（無需先手動建表或匯入）
 
-用一次性容器執行 [setup.py](../tools/setup.py)。它會下載近 12 個月的旅次、匯入車站資料，再驗證指定的月份。下載快取保留在專案的 `data/`，中斷後可以重跑。
+全新環境只要資料庫服務起來，執行單指令一鍵初始化即可自動確認／建立 UTF-8 資料庫、檢查假日曆、下載近 12 個月旅次、重建跨月索引、抓取行政區人口／車站出口／景點／YouBike，並驗證及產出預設比較 `od/default.json`。下載快取保留在專案的 `data/`，中斷後可直接重跑：
 
 ```sh
 mkdir -p data
-docker compose --env-file .env -f deploy/docker-compose.prod.yml run --rm --no-deps \
-  --volume "$PWD/data:/app/data" api \
-  sh -c 'EXITPULSE_DATABASE_URL="host=$PGHOST user=$PGUSER dbname=$PGDATABASE" exec python tools/setup.py "$@"' setup --jobs 1
+docker compose --env-file .env -f deploy/docker-compose.prod.yml --profile init run --rm init
+# 或者直接使用統一腳本（支援 init / monthly / aux / map，會自動選擇 Docker 或本機 Python）：
+./deploy/update-all.sh init
 ```
 
-要匯入 2017-01 起的所有月份，在 `setup --jobs 1` 後加 `--all`。也可在 `setup` 後指定明確的起訖月份，例如 `setup 2025-01 2026-09 --jobs 1`。站區人口與部分輔助資料可在建庫後依[更新手冊](../docs/AUTO_UPDATE.md)補齊。
+要匯入 2017-01 起的所有歷史月份，可在後方加上 `--all`（例如 `./deploy/update-all.sh init --all`）。也可指定起訖月份，例如 `./deploy/update-all.sh init 2025-01 2026-10`。若想連同 OpenStreetMap 捷運路網 GeoJSON 一起重抓並同步到前端發布目錄，可加 `--update-map` 或單獨跑 `./deploy/update-all.sh map`。
 
 ### 路線 B：由自備的 PostgreSQL 18 `pg_dump` 備份還原
 
@@ -130,7 +153,13 @@ curl --fail 'https://exitpulse.example.com/api/v1/od/network?period=2026-09'
 - 向量底圖載入完成且縮放、深淺主題與 3D 立體視角正常切換
 - 兩站比較、單站逐時查詢與站區卡片（YouBike、人口、周邊設施）顯示正常
 
-## 版本回滾與定期自動更新
+## 版本回滾、自動更新與單指令升級
 
 - **前端秒級回滾**：將 `/srv/exitpulse/releases/current` 指回上一個 `<release>` 目錄即可（若含後端 API 異動則須一併切回對應 Git 版本並重跑 `up -d --build api`）。
-- **每月／每週自動更新**：[systemd](systemd) 目錄附有每月 OD 更新與每週輔助資料更新的 unit 範本，詳細排程與警戒機制見 [docs/AUTO_UPDATE.md](../docs/AUTO_UPDATE.md)。
+- **資料庫、圖資與程式維護（`./deploy/update-all.sh`）**：
+  - `./deploy/update-all.sh init`：在空環境上自動建立資料庫、檢查跨年假日曆並完成初始資料與輔助資料匯入。
+  - `./deploy/update-all.sh monthly`：自動偵測新月份 OD、守門假日曆與新站座標、對帳後原子發布並更新 `od/default.json`。
+  - `./deploy/update-all.sh aux`：檢查當年與隔年假日曆、更新行政區人口與雙北車站／景點／YouBike。
+  - `./deploy/update-all.sh map`：安全更新 OpenStreetMap 捷運線型與站點 GeoJSON（帶 90% 站數下限防呆與 `.bak` 備份），並自動同步到 `${EXITPULSE_WEB_RELEASES}/current/metro`。
+  - `./deploy/update-all.sh upgrade`：拉取最新 Git 版本（`--ff-only`）、重編前端與重建重啟 `api`／`web` 容器並確認 `/ready`。
+- **排程單元**：[systemd](systemd) 目錄附有呼叫 `deploy/update-all.sh` 的每月 OD 與每週輔助資料定時任務範本（`install.sh` 會自動依專案實際目錄渲染並啟用），詳細告警機制見 [docs/AUTO_UPDATE.md](../docs/AUTO_UPDATE.md)。

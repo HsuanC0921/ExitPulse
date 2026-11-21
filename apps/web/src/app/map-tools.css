@@ -66,6 +66,7 @@
 .pwa-tip { margin: 6px 0 0; color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.5; }
 .layer-options .pause { float: right; margin-top: 4px; }
 .map-metric.segmented { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 8px; background: var(--panel-2); }
+.map-metric.segmented.basemap-styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .map-metric button { min-height: 36px; padding-inline: 0; }
 .place-options { width: min(320px, calc(100vw - 24px)); max-height: 55dvh; overflow: auto; overscroll-behavior: contain; }
 .place-tip { margin: var(--sp-3) 0 0; color: var(--ink-2); font-size: var(--fs-xs); }

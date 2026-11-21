@@ -23,10 +23,11 @@ import { AnimatedCount } from './animated-count';
 import { buildCsv, downloadCsv, exportBasis } from './csv-export';
 import { exportPairCard } from './card-export';
 import {
-  BANDS, DARK_MAP, DOT, EMPTY, FLAT_FLOW_LAYERS, FLOW, LIGHT_MAP, LINES, LOCAL_MAP, LOW_PITCH, MIN_TOWER_PITCH, NB,
+  BANDS, BASEMAP_STYLES, DARK_MAP, DOT, EMPTY, FLAT_FLOW_LAYERS, FLOW, LIGHT_MAP, LINES, LOCAL_MAP, LOW_PITCH, MIN_TOWER_PITCH, NB,
   NIGHT_STATION, OVERVIEW_PAIRS, PAGE, PHONE_STREET_PITCH, PHONE_STREET_ZOOM, PHONE_TOWER_PITCH, STREET_ZOOM, STYLE,
-  TOWER_PITCH, TRAVERSE_MS, TYPES, WEBGL_RESTORE_TIMEOUT, arcGeometry, dotColor, dotFill, lineRingElement,
-  networkDotColor, shadedPaint, store, stored, type MapColorProperty, type MapPaint, type Point,
+  TOWER_PITCH, TRAVERSE_MS, TYPES, WEBGL_RESTORE_TIMEOUT, arcGeometry, buildingExtrusionColor, dotColor, dotFill,
+  isBasemapStyleId, lineRingElement, mapLightConfig, networkDotColor, nlscRasterPaint, nlscStyle, roadNightColor,
+  shadedPaint, store, stored, type BasemapStyleId, type MapColorProperty, type MapPaint, type Point,
 } from './radar-map-style';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
 import { StationHistory } from './station-history';
@@ -310,6 +311,29 @@ export class Radar implements OnDestroy {
     }
     return [...seen.entries()].map(([label, url]) => ({ label, url }));
   });
+  readonly nearbyTab = linkedSignal<'hubs' | 'nearby' | 'youbike'>(() => {
+    const info = this.stationInfo();
+    if (info?.hubs?.length) return 'hubs';
+    if (info?.nearby?.length) return 'nearby';
+    if (info?.youbike?.length) return 'youbike';
+    return 'hubs';
+  });
+  readonly youbikeSummary = computed(() => {
+    const list = this.stationInfo()?.youbike ?? [];
+    return { count: list.length, totalDocks: list.reduce((sum, s) => sum + (s.capacity || 0), 0) };
+  });
+  walkMinutes(meters: number) {
+    return Math.max(1, Math.round(meters / 80));
+  }
+  readonly snapshotBalance = computed(() => {
+    const s = this.stationSnapshot();
+    if (!s || s.exits == null || s.entries + s.exits <= 0) return null;
+    const total = s.entries + s.exits;
+    const entryPct = Math.round(s.entries / total * 100);
+    const exitPct = 100 - entryPct;
+    const label = entryPct - exitPct >= 4 ? '偏淨流出' : exitPct - entryPct >= 4 ? '偏淨流入' : '進出均衡';
+    return { entryPct, exitPct, label };
+  });
   private stationInfoRequest = 0;
   /** 使用者正在看的月份或日期，車站資訊卡要對應這個期間。 */
   readonly stationPeriod = computed(() => this.view() === 'pairs' ? this.current() : this.explore()?.period());
@@ -362,6 +386,9 @@ export class Radar implements OnDestroy {
   /** 底圖狀態：loading 是第一次載入，ready 是載完，failed 是重試後仍有圖磚載不到。busy 是載完之後又在補圖磚。 */
   readonly basemap = signal<'loading' | 'ready' | 'failed'>('loading');
   readonly basemapBusy = signal(false);
+  readonly basemapStyle = signal<BasemapStyleId>(
+    (() => { const saved = stored('exitpulse.basemap'); return isBasemapStyleId(saved) ? saved : 'positron'; })(),
+  );
   readonly timePhase = signal<'baseline' | 'current'>('baseline');
   private readonly pairTowerTotals = httpResource<NetworkAnswer>(() => {
     const data = this.data();
@@ -583,7 +610,7 @@ export class Radar implements OnDestroy {
   private profileRequest = 0;
   /** 只要還有資料來源在載入，isStyleLoaded() 就會是 false，所以改在這裡自行追蹤是否就緒。 */
   private layersReady = false;
-  retryBasemap: () => void = () => undefined;
+  retryBasemap: (forceStyle?: boolean) => void = () => undefined;
   private displayedStreams: Stream[] = [];
   private ribbonMoving = false;
   private ribbonFrame = 0;
@@ -753,12 +780,17 @@ export class Radar implements OnDestroy {
   async saveCard() {
     const r = this.selected(), d = this.data(), s = this.story();
     if (!r || !d || !s) return;
+    const originLine = this.lineOf(r.origin), destLine = this.lineOf(r.destination);
     const outcome = await exportPairCard({
       result: r,
       data: d,
       story: s,
-      fromColor: this.lineOf(r.origin)?.color,
-      toColor: this.lineOf(r.destination)?.color,
+      fromColor: originLine?.color,
+      toColor: destLine?.color,
+      originLine: originLine?.code,
+      destLine: destLine?.code,
+      originCode: originLine ? this.stationCode(originLine.code, r.origin) : undefined,
+      destCode: destLine ? this.stationCode(destLine.code, r.destination) : undefined,
     });
     this.say(outcome.ok ? '已存成圖片' : outcome.reason);
   }
@@ -1007,7 +1039,7 @@ export class Radar implements OnDestroy {
   }
 
   private watchBasemap(map: MapLibreMap) {
-    const sourceID = 'openmaptiles';
+    const activeSpec = () => BASEMAP_STYLES[this.basemapStyle()];
     type Coordinate = { z: number; x: number; y: number };
     type SourceEvent = { sourceId?: string; tile?: { tileID: { canonical: Coordinate } } };
     const failedTiles = new Map<string, Coordinate>();
@@ -1035,29 +1067,41 @@ export class Radar implements OnDestroy {
         if (!hasTile || sourceFailed || failedTiles.size) confirmFailure();
       }, 12000);
     };
-    const recover = async () => {
-      if (disposed || contextLost || fetching) return;
-      attempts++;
-      const source = map.getSource<maplibregl.VectorTileSource>(sourceID);
-      if (source && this.layersReady && attempts < 2) {
+    const recover = async (forceStyle = false) => {
+      if (disposed || contextLost) return;
+      if (fetching) {
+        if (!forceStyle) return;
+        fetching.abort();
+      }
+      const spec = activeSpec();
+      const source = map.getSource<maplibregl.VectorTileSource>(spec.sourceId);
+      if (!forceStyle && source && this.layersReady && attempts < 2) {
+        attempts++;
         if ((sourceFailed || !hasTile) && source.url) {
           sourceFailed = false;
           source.setUrl(source.url);
         } else {
-          map.refreshTiles(sourceID, failedTiles.size ? [...failedTiles.values()] : undefined);
+          map.refreshTiles(spec.sourceId, failedTiles.size ? [...failedTiles.values()] : undefined);
         }
         map.triggerRepaint();
         startTimeout();
         return;
       }
+      attempts++;
       hasTile = false;
-      fetching = new AbortController();
+      const controller = new AbortController();
+      fetching = controller;
       try {
-        const response = await fetch(STYLE, { signal: AbortSignal.any([fetching.signal, AbortSignal.timeout(9000)]) });
-        if (!response.ok) throw new Error(`Basemap style HTTP ${response.status}`);
-        const style: StyleSpecification = await response.json();
-        if (!style.sources?.[sourceID]) throw new Error('Basemap style has no vector source');
-        if (disposed || contextLost) return;
+        let style: StyleSpecification;
+        if (spec.url == null) {
+          style = nlscStyle(this.theme() === 'dark');
+        } else {
+          const response = await fetch(spec.url, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(9000)]) });
+          if (!response.ok) throw new Error(`Basemap style HTTP ${response.status}`);
+          style = await response.json();
+          if (!style.sources?.[spec.sourceId]) throw new Error('Basemap style has no vector source');
+        }
+        if (disposed || contextLost || fetching !== controller) return;
         this.stop();
         this.layersReady = false;
         this.mapLighting = undefined;
@@ -1066,31 +1110,32 @@ export class Radar implements OnDestroy {
         map.setStyle(style, { diff: false });
         startTimeout();
       } catch {
-        if (!disposed && !contextLost) {
+        if (!disposed && !contextLost && fetching === controller) {
           if (!this.layersReady || !map.getLayer('metro-network')) map.setStyle(LOCAL_MAP, { diff: false });
           confirmFailure();
         }
       } finally {
-        fetching = undefined;
+        if (fetching === controller) fetching = undefined;
       }
     };
-    this.retryBasemap = () => {
+    this.retryBasemap = (forceStyle = false) => {
       if (contextLost) {
         rebuildIfLost();
         return;
       }
       clearTimeout(retry); retry = undefined;
       attempts = 0;
-      void recover();
+      void recover(forceStyle);
     };
     map.on('error', event => {
       if (contextLost) return;
       const { sourceId, tile } = event as SourceEvent;
-      if (!sourceId && !map.getSource(sourceID)) {
+      const sid = activeSpec().sourceId;
+      if (!sourceId && !map.getSource(sid)) {
         confirmFailure();
         return;
       }
-      if (sourceId !== sourceID) return;
+      if (sourceId !== sid) return;
       if (tile) failedTiles.set(tileKey(tile.tileID.canonical), tile.tileID.canonical);
       else sourceFailed = true;
       if (!hasTile) confirmFailure();
@@ -1099,18 +1144,19 @@ export class Radar implements OnDestroy {
     map.on('sourcedata', event => {
       if (contextLost) return;
       const { sourceId, tile } = event as SourceEvent;
-      if (sourceId !== sourceID) return;
+      if (sourceId !== activeSpec().sourceId) return;
       if (event.sourceDataType === 'metadata') sourceFailed = false;
       if (!tile) return;
       failedTiles.delete(tileKey(tile.tileID.canonical));
       hasTile = true;
     });
     map.on('dataloading', event => {
-      if (this.basemap() !== 'ready' || (event as SourceEvent).sourceId !== sourceID || busy !== undefined) return;
+      if (this.basemap() !== 'ready' || (event as SourceEvent).sourceId !== activeSpec().sourceId || busy !== undefined) return;
       busy = setTimeout(() => this.basemapBusy.set(true), 700);
     });
     map.on('render', () => {
-      if (contextLost || !hasTile || sourceFailed || !map.getSource(sourceID) || !map.isSourceLoaded(sourceID)) return;
+      const sid = activeSpec().sourceId;
+      if (contextLost || !hasTile || sourceFailed || !map.getSource(sid) || !map.isSourceLoaded(sid)) return;
       clearTimeout(busy); busy = undefined;
       this.basemapBusy.set(false);
       if (failedTiles.size) return;
@@ -1157,14 +1203,15 @@ export class Radar implements OnDestroy {
       if (disposed || document.hidden || fetching) return;
       if (contextLost) { rebuildIfLost(); return; }
       if (!this.layersReady && map.isStyleLoaded() && !map.getLayer('focus-scrim')) this.addLayers();
-      const src = map.getSource<maplibregl.VectorTileSource>(sourceID);
+      const spec = activeSpec();
+      const src = map.getSource(spec.sourceId);
       if (!src || this.basemap() !== 'ready' || failedTiles.size || sourceFailed) {
         if (timeout === undefined) schedule();
         return;
       }
-      if (map.loaded() && map.isSourceLoaded(sourceID)) {
+      if (spec.vector && map.loaded() && map.isSourceLoaded(spec.sourceId)) {
         const probeLayers = ['water', 'landcover', 'landuse', 'building', 'transportation', 'park'].filter(id => !!map.getLayer(id));
-        if (!probeLayers.length || (map.querySourceFeatures(sourceID).length === 0 && map.queryRenderedFeatures(undefined, { layers: probeLayers }).length === 0)) {
+        if (!probeLayers.length || (map.querySourceFeatures(spec.sourceId).length === 0 && map.queryRenderedFeatures(undefined, { layers: probeLayers }).length === 0)) {
           hasTile = false;
           schedule();
         }
@@ -1178,7 +1225,7 @@ export class Radar implements OnDestroy {
       if (this.layersReady) this.redraw(false);
       setTimeout(checkHealth, 250);
     };
-    const online = () => { wake(); if (this.basemap() !== 'ready' || failedTiles.size || !map.getSource(sourceID)) this.retryBasemap(); };
+    const online = () => { wake(); if (this.basemap() !== 'ready' || failedTiles.size || !map.getSource(activeSpec().sourceId)) this.retryBasemap(); };
     const watchdog = setInterval(checkHealth, 4000);
     addEventListener('online', online);
     addEventListener('focus', wake);
@@ -1220,17 +1267,25 @@ export class Radar implements OnDestroy {
     this.basemapPaint = this.readBasemapPaint(map);
     this.mapLighting = undefined;
     if (map.getSource('openmaptiles')) {
-      map.addLayer({
-        id: 'buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 14.5,
-        layout: { visibility: this.tower3d() ? 'visible' : 'none' },
-        paint: {
-          'fill-extrusion-color': dark ? DARK_MAP.building : LIGHT_MAP.building,
-          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14.5, 0, 15.5, ['coalesce', ['get', 'render_height'], 6]],
-          'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14.5, 0, 15.5, ['coalesce', ['get', 'render_min_height'], 0]],
-          'fill-extrusion-opacity': .82, 'fill-extrusion-vertical-gradient': true,
-        },
-      });
+      for (const layer of map.getStyle().layers) {
+        if (layer.type === 'fill-extrusion' && layer.id !== 'buildings-3d') {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        }
+      }
+      if (!map.getLayer('buildings-3d')) {
+        map.addLayer({
+          id: 'buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13,
+          layout: { visibility: this.tower3d() ? 'visible' : 'none' },
+          paint: {
+            'fill-extrusion-color': buildingExtrusionColor(dark),
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_height'], 6]],
+            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_min_height'], 0]],
+            'fill-extrusion-opacity': .74, 'fill-extrusion-vertical-gradient': true,
+          },
+        });
+      }
     }
+    try { map.setLight(mapLightConfig(dark)); } catch { /* ignore unsupported style light */ }
     // 聚焦罩：選了站對或單站時把底圖退到背景，讓人流成為畫面主角
     map.addLayer({ id: 'focus-scrim', type: 'background', paint: { 'background-color': LIGHT_MAP.land, 'background-opacity': 0, 'background-opacity-transition': { duration: 450 } } });
     map.addSource('metro-network', { type: 'geojson', data: 'metro/lines.geojson' });
@@ -1246,10 +1301,22 @@ export class Radar implements OnDestroy {
     const metroOnly: ExpressionSpecification = ['any', ...this.lineList.map(code => ['in', code, ['split', ['get', 'lines'], ',']] as ExpressionSpecification)];
     map.addLayer({ id: 'metro-stops', type: 'circle', source: 'metro-stops', minzoom: 9.5, filter: metroOnly, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 9.5, 3.5, 13, 5.5], 'circle-color': dark ? NIGHT_STATION.regular : halo, 'circle-stroke-color': dark ? NIGHT_STATION.rim : '#707a82', 'circle-stroke-width': 1.4 } });
     map.addLayer({ id: 'metro-hit', type: 'circle', source: 'metro-stops', minzoom: 9.5, filter: metroOnly, paint: { 'circle-radius': 18, 'circle-opacity': 0 } });
+    map.addSource('od-streams', { type: 'geojson', data: EMPTY });
     map.addSource('od-ribbons', { type: 'geojson', data: EMPTY });
+    map.addLayer({
+      id: 'od-streams-casing',
+      type: 'line',
+      source: 'od-streams',
+      filter: ['==', ['get', 'dashed'], false],
+      layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['get', 'opacity'] },
+      paint: {
+        'line-color': dark ? DARK_MAP.land : LIGHT_MAP.land,
+        'line-width': ['+', ['get', 'width'], 3],
+        'line-opacity': ['*', ['get', 'opacity'], dark ? .62 : .75],
+      },
+    });
     map.addLayer({ id: 'od-ribbons', type: 'fill', source: 'od-ribbons', layout: { 'fill-sort-key': ['get', 'opacity'] },
       paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['get', 'opacity'], 'fill-opacity-transition': { duration: 0 } } });
-    map.addSource('od-streams', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'od-streams-dashed', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], true], layout: { 'line-cap': 'butt', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [1.5, 1.2] } });
     map.addLayer({ id: 'od-streams', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], false], layout: { 'line-cap': 'round', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['max', 0.8, ['*', ['get', 'width'], .24]], 'line-width-transition': { duration: 0 }, 'line-opacity': ['get', 'opacity'] } });
     map.addSource('explore-circles', { type: 'geojson', data: EMPTY });
@@ -1417,7 +1484,7 @@ export class Radar implements OnDestroy {
       if (map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== layout) map.setLayoutProperty(id, 'visibility', layout);
     }
     if (map.getLayer('explore-labels')) {
-      map.setPaintProperty('explore-labels', 'text-halo-width', lifted ? 3.5 : 2);
+      map.setPaintProperty('explore-labels', 'text-halo-width', lifted ? 4 : 2);
       map.setPaintProperty('explore-labels', 'text-halo-blur', lifted ? .5 : 0);
     }
   }
@@ -1905,15 +1972,19 @@ export class Radar implements OnDestroy {
         paint.push({ layer: layer.id, property, day, night });
       };
       if (layer.type === 'background') add('background-color', DARK_MAP.land, LIGHT_MAP.land);
-      else if (layer.type === 'fill' && src === 'water') add('fill-color', DARK_MAP.water, LIGHT_MAP.water);
+      else if (layer.type === 'fill' && src === 'water') {
+        add('fill-color', DARK_MAP.water, LIGHT_MAP.water);
+        add('fill-outline-color', DARK_MAP.waterOutline, LIGHT_MAP.waterOutline);
+      }
+      else if (layer.type === 'line' && src === 'waterway') add('line-color', DARK_MAP.water, LIGHT_MAP.water);
       else if (layer.type === 'fill' && (src === 'park' || /wood|grass|park/.test(layer.id))) add('fill-color', DARK_MAP.park, LIGHT_MAP.park);
       else if (layer.type === 'fill' && src === 'building') {
         add('fill-color', DARK_MAP.building, LIGHT_MAP.building);
-        add('fill-outline-color', DARK_MAP.outline);
+        add('fill-outline-color', DARK_MAP.outline, LIGHT_MAP.outline);
       }
       else if (layer.type === 'fill' && src === 'landuse') add('fill-color', DARK_MAP.building);
       else if (layer.type === 'fill' && (src === 'aeroway' || src === 'transportation')) add('fill-color', DARK_MAP.road);
-      else if (layer.type === 'line' && (src === 'aeroway' || src === 'transportation')) add('line-color', DARK_MAP.road);
+      else if (layer.type === 'line' && (src === 'aeroway' || src === 'transportation')) add('line-color', roadNightColor(layer.id));
       else if (layer.type === 'symbol' && map.getLayoutProperty(layer.id, 'text-field') != null) {
         add('text-color', DARK_MAP.label, LIGHT_MAP.label);
         add('text-halo-color', DARK_MAP.halo, LIGHT_MAP.halo);
@@ -1950,7 +2021,7 @@ export class Radar implements OnDestroy {
       map.setPaintProperty(layer, 'text-color', ink);
       map.setPaintProperty(layer, 'text-halo-color', halo);
     }
-    map.setPaintProperty('explore-labels', 'text-halo-width', this.tower3d() ? 3.5 : 2);
+    map.setPaintProperty('explore-labels', 'text-halo-width', this.tower3d() ? 4 : 2);
     map.setPaintProperty('explore-labels', 'text-halo-blur', this.tower3d() ? .5 : 0);
     map.setPaintProperty('od-ranks', 'text-color', dark ? NIGHT_STATION.rankInk : ink);
     map.setPaintProperty('metro-stops', 'circle-color', dark ? NIGHT_STATION.regular : halo);
@@ -1960,7 +2031,19 @@ export class Radar implements OnDestroy {
     map.setPaintProperty('explore-circles', 'circle-color', networkDotColor(dark));
     map.setPaintProperty('explore-circles', 'circle-stroke-color', networkDotColor(dark));
     map.setPaintProperty('explore-inner', 'circle-color', dotColor(dark));
-    if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', dark ? DARK_MAP.building : LIGHT_MAP.building);
+    if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', buildingExtrusionColor(dark));
+    try { map.setLight(mapLightConfig(dark)); } catch { /* ignore unsupported style light */ }
+    if (map.getLayer('od-streams-casing')) {
+      map.setPaintProperty('od-streams-casing', 'line-color', dark ? DARK_MAP.land : LIGHT_MAP.land);
+      map.setPaintProperty('od-streams-casing', 'line-opacity', ['*', ['get', 'opacity'], dark ? .62 : .75]);
+    }
+    if (map.getLayer('nlsc-emap')) {
+      const nlsc = nlscRasterPaint(dark);
+      map.setPaintProperty('nlsc-emap', 'raster-brightness-max', nlsc['raster-brightness-max']);
+      map.setPaintProperty('nlsc-emap', 'raster-saturation', nlsc['raster-saturation']);
+      map.setPaintProperty('nlsc-emap', 'raster-contrast', nlsc['raster-contrast']);
+    }
+    if (map.getLayer('nlsc-background')) map.setPaintProperty('nlsc-background', 'background-color', dark ? DARK_MAP.land : LIGHT_MAP.land);
     map.setPaintProperty('focus-scrim', 'background-color-transition', { duration });
     this.syncScrim();
   }
@@ -2003,8 +2086,27 @@ export class Radar implements OnDestroy {
     } finally { this.loading.set(false); }
   }
 
-  /** 首屏的一鍵範例：套用條件、跑比較，有指定站對時直接打開該站對。 */
+  /** 首屏的一鍵範例：依範例型態切換到兩站比較、單站分析或全線潮汐。 */
   async applyPreset(p: FirstQueryPreset) {
+    if (p.view === 'station' || p.view === 'network') {
+      this.setView(p.view, () => {
+        const explorer = this.explore();
+        if (!explorer || this.view() !== p.view) return;
+        explorer.stopPlayback();
+        explorer.unit.set('month');
+        explorer.setMonth(p.current);
+        explorer.days.set(p.days ?? (p.weekend ? 'weekend' : 'weekday'));
+        explorer.band.set(`${p.start}-${p.end}`);
+        if (p.view === 'station' && p.station) {
+          explorer.pickStation(p.station);
+          explorer.setCompare(p.baseline && p.baseline !== p.current ? p.baseline : null);
+        } else if (p.view === 'network') {
+          explorer.setCompare(p.baseline && p.baseline !== p.current && !p.networkMetric ? p.baseline : null);
+          explorer.networkMetric.set(p.networkMetric ?? 'entries');
+        }
+      });
+      return;
+    }
     this.baseline.set(p.baseline); this.current.set(p.current); this.hours.set(`${p.start}-${p.end}`);
     this.dayType.set(p.weekend ? 'weekend' : 'weekday'); this.changeType.set(p.type);
     await this.find();
@@ -2052,18 +2154,22 @@ export class Radar implements OnDestroy {
     }
   }
 
-  private transition(update: () => void) {
+  private transition(update: () => void, after?: () => void) {
+    const run = () => {
+      update();
+      if (after) afterNextRender(after, { injector: this.injector });
+    };
     const doc = document as Document & { startViewTransition?: (cb: () => Promise<void> | void) => unknown };
-    if (this.reducedMotion || !doc.startViewTransition) { update(); return; }
+    if (this.reducedMotion || !doc.startViewTransition) { run(); return; }
     try {
       doc.startViewTransition(() => {
         update();
         return new Promise<void>(resolve => {
-          const timer = setTimeout(resolve, 50);
-          afterNextRender(() => { clearTimeout(timer); resolve(); }, { injector: this.injector });
+          const timer = setTimeout(() => { after?.(); resolve(); }, 50);
+          afterNextRender(() => { clearTimeout(timer); after?.(); resolve(); }, { injector: this.injector });
         });
       });
-    } catch { update(); }
+    } catch { run(); }
   }
 
   choose(result: Result, moveFocus = true) {
@@ -2074,11 +2180,11 @@ export class Radar implements OnDestroy {
       this.selected.set(result); this.detailOpen.set(moveFocus || !readFold('panel.detail'));
       this.mobilePage.set('detail');
     };
-    if (opening) this.transition(run); else run();
+    if (opening) this.transition(run, () => this.redraw(true));
+    else { run(); this.redraw(true); }
     if (moveFocus) {
       afterNextRender(() => this.detailView()?.focusPanel(), { injector: this.injector });
     }
-    this.redraw(true);
     void this.loadProfile(result);
   }
 
@@ -2243,6 +2349,14 @@ export class Radar implements OnDestroy {
     this.redraw(false);
   }
 
+  setBasemapStyle(style: BasemapStyleId) {
+    if (this.basemapStyle() === style) return;
+    this.basemapStyle.set(style);
+    store('exitpulse.basemap', style);
+    this.basemap.set('loading');
+    this.retryBasemap(true);
+  }
+
   setTheme(theme: 'light' | 'dark') {
     if (theme === this.theme()) return;
     this.theme.set(theme); store('exitpulse.theme', theme);
@@ -2255,11 +2369,10 @@ export class Radar implements OnDestroy {
       this.detailWide.set(false);
       this.selected.set(null); this.profile.set(null); this.profileRequest++;
       this.mobilePage.set('list');
-    });
+    }, () => this.redraw(true));
     const target = this.returnFocus;
     this.returnFocus = undefined;
     if (target?.isConnected) afterNextRender(() => target.focus({ preventScroll: true }), { injector: this.injector });
-    this.redraw(true);
   }
 
   private stop() { if (this.frame != null) cancelAnimationFrame(this.frame); this.frame = undefined; }
@@ -2329,11 +2442,14 @@ export class Radar implements OnDestroy {
     }
   }
 
-  setView(view: 'pairs' | ExploreMode) {
+  setView(view: 'pairs' | ExploreMode, after?: () => void) {
     this.freshVisit.set(false);
     this.explore()?.stopPlayback();
     this.showMobileList();
-    if (view === this.view()) return;
+    if (view === this.view()) {
+      if (after) afterNextRender(after, { injector: this.injector });
+      return;
+    }
     this.transition(() => {
       this.explore()?.focusRelation(null);
       this.detailWide.set(false);
@@ -2341,7 +2457,7 @@ export class Radar implements OnDestroy {
       this.returnFocus = undefined;
       this.view.set(view); this.exploreLayer.set(null); this.lastFocus = undefined;
       this.showMobileList();
-    });
+    }, after);
     if (view === 'pairs') {
       const target = this.showResults() ? writeState(this.viewState()) : location.pathname;
       history.replaceState(null, '', this.embed ? (target.includes('?') ? `${target}&embed=1` : `${target}?embed=1`) : target);
@@ -2351,9 +2467,8 @@ export class Radar implements OnDestroy {
 
   /** 從全線地圖或清單進入單站往來。 */
   openStation(name: string, options?: { hourly?: boolean; month?: string }) {
-    this.setView('station');
     if (options?.hourly) this.showMobileMap();
-    afterNextRender(() => {
+    this.setView('station', () => {
       const explorer = this.explore();
       if (!explorer || this.view() !== 'station') return;
       explorer.pickStation(name);
@@ -2367,7 +2482,7 @@ export class Radar implements OnDestroy {
         explorer.setUnit('date');
         explorer.direction.set('outbound');
       } else if (options?.month) explorer.pickMonth(options.month);
-    }, { injector: this.injector });
+    });
   }
 
   openStationHistory(name: string, date: string) {
@@ -2377,7 +2492,6 @@ export class Radar implements OnDestroy {
 
   /** 從矩陣的一格進入該站對的兩期比較。 */
   openPair(origin: string, destination: string, ctx?: { period?: string; days?: PairDayType; weekend?: boolean; hours?: string }) {
-    this.setView('pairs');
     // 帶著矩陣當下的條件，讓站對頁回答被點的那一格，而不是站對頁殘留的預設值
     if (ctx?.period) {
       const month = ctx.period.slice(0, 7);
@@ -2388,7 +2502,7 @@ export class Radar implements OnDestroy {
     else if (ctx?.weekend != null) this.dayType.set(ctx.weekend ? 'weekend' : 'weekday');
     if (ctx?.hours && ctx.hours in BANDS) this.hours.set(ctx.hours);
     this.manualOrigin.set(origin); this.manualDestination.set(destination);
-    queueMicrotask(() => void this.findPair(origin, destination));
+    this.setView('pairs', () => void this.findPair(origin, destination));
   }
 
   onExploreLayer(layer: ExploreLayer) {
@@ -2474,10 +2588,13 @@ export class Radar implements OnDestroy {
     } else if (d && (this.showResults() || this.showFirstQuery())) {
       // 首屏還沒查詢時，先用內建的預設比較把人流畫在地圖上當背景，一進來就有畫面
       const ambient = !this.showResults();
-      for (const r of (ambient ? d.results : this.results()).slice(0, OVERVIEW_PAIRS)) {
+      const list = (ambient ? d.results : this.results()).slice(0, OVERVIEW_PAIRS);
+      for (let idx = 0; idx < list.length; idx++) {
+        const r = list[idx];
         const a = this.stops.get(r.origin), b = this.stops.get(r.destination);
         const key = `${r.origin}>${r.destination}`;
-        const emphasis = this.hoveredKey ? (key === this.hoveredKey ? 1 : .2) : ambient ? .5 : undefined;
+        const tier = idx < 5 ? (ambient ? .68 : .94) : idx < 12 ? (ambient ? .34 : .48) : (ambient ? .18 : .26);
+        const emphasis = this.hoveredKey ? (key === this.hoveredKey ? 1 : .15) : tier;
         if (a && b) streams.push({ key, label: '', daily: r.currentDaily, color: FLOW[this.theme()], dashed: false, emphasis, path: arcGeometry(a, b, -.14) });
       }
     }
@@ -2689,10 +2806,13 @@ export class Radar implements OnDestroy {
       };
     };
     const all = streams.map((_, i) => i);
+    const animated = !time && streams.length > 8
+      ? all.filter(i => (streams[i].emphasis ?? 1) >= .6).slice(0, 6)
+      : all;
     let displayedMonth: number | undefined;
     const render = (elapsed: number) => {
       const features: Feature[] = [];
-      let active = all;
+      let active = animated;
       if (time) {
         const month = Math.floor(elapsed / TRAVERSE_MS) % 2;
         if (month !== displayedMonth) {

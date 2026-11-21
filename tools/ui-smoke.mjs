@@ -79,7 +79,7 @@ const overlap = (a, b) => a && b && a.left < b.right && a.right > b.left && a.to
         const firstRow = page.getByText('南港展覽館').first();
         if (await firstRow.count() > 0 && await firstRow.isVisible()) {
           await firstRow.click();
-          await page.waitForTimeout(600);
+          await page.waitForTimeout(1350);
         }
       }
 
@@ -160,8 +160,8 @@ const overlap = (a, b) => a && b && a.left < b.right && a.right > b.left && a.to
         const reselect = page.getByText('南港展覽館').first();
         if (await reselect.count() > 0 && await reselect.isVisible()) {
           await reselect.click();
-          await page.waitForTimeout(500);
-          const evidenceSummary = page.getByText('看分析細節').first();
+          await page.waitForTimeout(1350);
+          const evidenceSummary = page.getByText('深入分析與逐時分布').first();
           if (await evidenceSummary.count() > 0 && await evidenceSummary.isVisible()) {
             await evidenceSummary.click();
             await page.waitForTimeout(300);

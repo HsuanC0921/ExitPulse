@@ -4,7 +4,8 @@
       <svg viewBox="0 0 24 24"><path d="M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15"/><circle cx="18" cy="19" r="3"/><circle cx="6" cy="5" r="3"/></svg>
     </span>
     <div class="first-query-title-wrap">
-      <h2 id="first-query-title">從一個車站開始</h2>
+      <h2 id="first-query-title">探索臺北捷運人流</h2>
+      <p class="first-query-sub">官方分時旅次統計@if (latestMonth()) { · 收錄至 {{ latestMonth() }} }</p>
     </div>
     <button type="button" class="first-query-toggle" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="collapsed() ? '展開查詢卡片' : '收合以露出地圖'" (click)="toggleCollapsed()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="collapsed() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg>
@@ -13,13 +14,13 @@
 
   @if (!collapsed()) {
   <form class="first-query-search" (submit)="$event.preventDefault(); submit()">
-  <label class="first-query-label" for="first-query-station">車站名稱或代號</label>
+  <label class="first-query-label" for="first-query-station">搜尋車站名稱或代號</label>
   <input
     id="first-query-station"
     type="search"
     autocomplete="off"
     maxlength="40"
-    placeholder="例如：台北車站、BL12"
+    placeholder="輸入站名或代號，例如台北車站、BL12"
     [value]="query()"
     (input)="query.set($any($event.target).value)"
   >
@@ -53,12 +54,12 @@
   </button>
 
   <button class="first-query-compare" type="button" (click)="comparePairs.emit()">
-    <span>或比較兩個月份的人流變化</span>
+    <span>跨月比較起訖人流變化</span>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
   </button>
 
-  <div class="first-query-presets" role="group" aria-label="直接看例子">
-    <span class="first-query-presets-label">直接看例子</span>
+  <div class="first-query-presets" role="group" aria-label="精選城市觀察">
+    <span class="first-query-presets-label">精選城市觀察</span>
     <div class="first-query-preset-list">
       @for (preset of presets; track preset.label) {
         <button type="button" (click)="choosePreset.emit(preset)" [title]="preset.detail">

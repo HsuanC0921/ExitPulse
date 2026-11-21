@@ -1,10 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  BASEMAP_STYLES,
+  FLAT_FLOW_LAYERS,
   arcGeometry,
+  buildingExtrusionColor,
   dotColor,
   dotFill,
+  isBasemapStyleId,
+  mapLightConfig,
   networkDotColor,
+  nlscRasterPaint,
+  nlscStyle,
+  roadNightColor,
   shadedPaint,
   type MapPaint,
   type Point,
@@ -58,4 +66,40 @@ test('dot and network circle paint helpers produce deterministic MapLibre expres
   assert.equal(fillHalf[0], 'case');
   assert.ok(Math.abs((fillHalf[2] as number) - 0.07) < 1e-9);
   assert.ok(Math.abs((fillHalf[3] as number) - 0.03) < 1e-9);
+});
+
+test('basemap cartography helpers differentiate road tiers, building height ramps, and 3D lighting', () => {
+  assert.ok(FLAT_FLOW_LAYERS.includes('od-streams-casing'));
+  assert.equal(roadNightColor('highway_motorway_inner'), '#3a4852');
+  assert.equal(roadNightColor('road_minor'), '#232c33');
+
+  const lightBuildings = buildingExtrusionColor(false) as unknown[];
+  const darkBuildings = buildingExtrusionColor(true) as unknown[];
+  assert.equal(lightBuildings[0], 'interpolate');
+  assert.equal(lightBuildings[10], '#f4f0e8');
+  assert.equal(darkBuildings[10], '#3f515e');
+
+  const lightCfg = mapLightConfig(false);
+  const darkCfg = mapLightConfig(true);
+  assert.equal(lightCfg.anchor, 'viewport');
+  assert.ok(lightCfg.intensity > darkCfg.intensity);
+});
+
+test('multi-basemap switcher helpers validate IDs and build NLSC raster style', () => {
+  assert.equal(isBasemapStyleId('positron'), true);
+  assert.equal(isBasemapStyleId('liberty'), true);
+  assert.equal(isBasemapStyleId('nlsc'), true);
+  assert.equal(isBasemapStyleId('unknown'), false);
+  assert.equal(isBasemapStyleId(null), false);
+
+  assert.equal(BASEMAP_STYLES.liberty.sourceId, 'openmaptiles');
+  assert.equal(BASEMAP_STYLES.liberty.vector, true);
+  assert.equal(BASEMAP_STYLES.nlsc.sourceId, 'nlsc-emap');
+  assert.equal(BASEMAP_STYLES.nlsc.vector, false);
+  assert.equal(BASEMAP_STYLES.nlsc.url, null);
+
+  assert.ok(nlscRasterPaint(true)['raster-brightness-max'] < nlscRasterPaint(false)['raster-brightness-max']);
+  const styleDark = nlscStyle(true);
+  assert.equal(styleDark.version, 8);
+  assert.equal(styleDark.layers[1]?.id, 'nlsc-emap');
 });

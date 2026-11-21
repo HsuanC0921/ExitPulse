@@ -30,6 +30,12 @@
 .route-readout span:last-child { white-space: nowrap; }
 .chart-peak { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2); margin: 0 0 10px; color: var(--ink-2); font-size: var(--type-label); line-height: 1.6; }
 .chart-peak b { color: var(--ink); font-size: var(--type-ui); white-space: nowrap; }
+.section-sub { margin-top: 2px !important; }
+.balance-bar { display: flex; gap: var(--sp-tight); height: 8px; margin-top: 8px; border-radius: var(--r-pill); overflow: hidden; }
+.balance-bar i { display: block; min-width: 4px; border-radius: var(--r-pill); }
+.balance-fwd { background: var(--ink); }
+.balance-rev { background: var(--pair-old, var(--old)); }
+.balance-labels { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-1) var(--sp-2); margin: 4px 0 8px; color: var(--ink-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .muted { margin-top: 8px; color: var(--ink-2); font-size: var(--fs-xs); }
 .bars { display: grid; gap: var(--sp-1); margin-top: 10px; }
 .bars div { display: grid; grid-template-columns: 58px 1fr 48px; gap: var(--sp-2); align-items: center; color: var(--ink-2); font-size: var(--fs-xs); }
