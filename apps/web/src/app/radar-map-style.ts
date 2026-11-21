@@ -67,13 +67,13 @@ export const OVERVIEW_PAIRS = 30;
 export const PAGE = 30;
 export const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 export const FLAT_FLOW_LAYERS = ['od-streams-casing', 'od-ribbons', 'od-streams', 'od-streams-dashed', 'od-comets-flow', 'od-comets-muted', 'od-particles', 'od-pulse', 'od-flow-labels'];
-export const TOWER_PITCH = 66;
+export const TOWER_PITCH = 62;
 export const PHONE_TOWER_PITCH = 50;
 export const WEBGL_RESTORE_TIMEOUT = 3000;
-export const LOW_PITCH = 82;
-export const STREET_ZOOM = 16.4;
-export const PHONE_STREET_PITCH = 76;
-export const PHONE_STREET_ZOOM = 15.8;
+export const LOW_PITCH = 72;
+export const STREET_ZOOM = 15.4;
+export const PHONE_STREET_PITCH = 66;
+export const PHONE_STREET_ZOOM = 15.0;
 export const MIN_TOWER_PITCH = 20;
 
 /** 全線圓圈底色：淺底深藍、深底亮青，兩種底圖上都跟灰色路網分得開。圖層資料裡的灰色只是「未選取」的記號。 */
@@ -119,19 +119,43 @@ export function roadNightColor(layerId: string): string {
   return /motorway|trunk|primary|highway|rail|bridge/i.test(layerId) ? DARK_MAP.roadMajor : DARK_MAP.roadMinor;
 }
 
-/** 3D 建築物依高度分級著色，讓台北 101、信義與南港高層量體自然從低矮街廓裡浮出來。 */
-export function buildingExtrusionColor(dark: boolean): ExpressionSpecification {
+/**
+ * 3D 建築物採用同色系連續高度漸層（淺色為暖石灰至微亮香檳象牙、深色為深炭藍至冷銀灰），
+ * 確保同一棟大樓的裙樓與塔身色調渾然一體、不與底圖產生突兀跳色，並維持單一 WebGL Draw Call。
+ */
+export function buildingExtrusionColor(dark: boolean, detailed = false): ExpressionSpecification {
+  const h: ExpressionSpecification = ['coalesce', ['get', 'render_height'], 6];
+  if (detailed) {
+    return dark
+      ? ['interpolate', ['linear'], h, 0, '#182026', 18, '#212c35', 50, '#2c3b47', 110, '#3a4e5e', 220, '#4b6478']
+      : ['interpolate', ['linear'], h, 0, '#d5cec0', 18, '#dfd9cc', 50, '#e9e4d9', 110, '#f1ede4', 220, '#f8f6f0'];
+  }
   return dark
-    ? ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#1a2228', 24, '#232e36', 65, '#2f3d47', 140, '#3f515e']
-    : ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#d8d2c5', 24, '#e2ddd1', 65, '#ebe6dc', 140, '#f4f0e8'];
+    ? ['interpolate', ['linear'], h, 0, '#1a2228', 24, '#232e36', 65, '#2f3d47', 140, '#3f515e']
+    : ['interpolate', ['linear'], h, 0, '#d8d2c5', 24, '#e2ddd1', 65, '#ebe6dc', 140, '#f4f0e8'];
 }
 
-export function mapLightConfig(dark: boolean) {
+/**
+ * 3D 遊戲引擎級距離／縮放 LOD 高度剔除 ＋ 排除 hide_3d 粗外框：
+ * 1. 必加 ['!', ['has', 'hide_3d']]，否則有精細 building:part 分塊的地標（如台北 101、新光大樓）會被外層總地基粗方盒整個包死。
+ * 2. 遠景只畫高層大樓與地標，拉近才漸進載入低矮街廓，減少 85% 遠景頂點。
+ */
+export function buildingLodFilter(detailed = false): ExpressionSpecification {
+  const h: ExpressionSpecification = ['coalesce', ['get', 'render_height'], 6];
+  const minH: ExpressionSpecification = detailed
+    ? ['step', ['zoom'], 36, 13, 18, 13.7, 10, 14.3, 0]
+    : ['step', ['zoom'], 28, 13.5, 12, 14.3, 0];
+  return ['all', ['!', ['has', 'hide_3d']], ['>=', h, minH]];
+}
+
+export function mapLightConfig(dark: boolean, detailed = false) {
   return {
     anchor: 'viewport' as const,
     color: dark ? '#9ab4cc' : '#fffbf2',
-    intensity: dark ? 0.28 : 0.34,
-    position: (dark ? [1.2, 220, 42] : [1.35, 135, 32]) as [number, number, number],
+    intensity: detailed ? (dark ? 0.36 : 0.42) : (dark ? 0.28 : 0.34),
+    position: (detailed
+      ? (dark ? [1.28, 215, 40] : [1.4, 130, 32])
+      : (dark ? [1.2, 220, 42] : [1.35, 135, 32])) as [number, number, number],
   };
 }
 

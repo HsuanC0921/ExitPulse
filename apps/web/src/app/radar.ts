@@ -25,9 +25,10 @@ import { exportPairCard } from './card-export';
 import {
   BANDS, BASEMAP_STYLES, DARK_MAP, DOT, EMPTY, FLAT_FLOW_LAYERS, FLOW, LIGHT_MAP, LINES, LOCAL_MAP, LOW_PITCH, MIN_TOWER_PITCH, NB,
   NIGHT_STATION, OVERVIEW_PAIRS, PAGE, PHONE_STREET_PITCH, PHONE_STREET_ZOOM, PHONE_TOWER_PITCH, STREET_ZOOM, STYLE,
-  TOWER_PITCH, TRAVERSE_MS, TYPES, WEBGL_RESTORE_TIMEOUT, arcGeometry, buildingExtrusionColor, dotColor, dotFill,
-  isBasemapStyleId, lineRingElement, mapLightConfig, networkDotColor, nlscRasterPaint, nlscStyle, roadNightColor,
-  shadedPaint, store, stored, type BasemapStyleId, type MapColorProperty, type MapPaint, type Point,
+  TOWER_PITCH, TRAVERSE_MS, TYPES, WEBGL_RESTORE_TIMEOUT, arcGeometry, buildingExtrusionColor, buildingLodFilter,
+  dotColor, dotFill, isBasemapStyleId, lineRingElement, mapLightConfig,
+  networkDotColor, nlscRasterPaint, nlscStyle, roadNightColor, shadedPaint, store, stored, type BasemapStyleId,
+  type MapColorProperty, type MapPaint, type Point,
 } from './radar-map-style';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
 import { StationHistory } from './station-history';
@@ -389,6 +390,13 @@ export class Radar implements OnDestroy {
   readonly basemapStyle = signal<BasemapStyleId>(
     (() => { const saved = stored('exitpulse.basemap'); return isBasemapStyleId(saved) ? saved : 'positron'; })(),
   );
+  readonly supports3d = computed(() => BASEMAP_STYLES[this.basemapStyle()].vector);
+  readonly basemapToast = signal('');
+  private lastVectorBasemap: 'positron' | 'liberty' = (() => {
+    const saved = stored('exitpulse.basemap');
+    return saved === 'positron' || saved === 'liberty' ? saved : 'liberty';
+  })();
+  private toastTimer?: ReturnType<typeof setTimeout>;
   readonly timePhase = signal<'baseline' | 'current'>('baseline');
   private readonly pairTowerTotals = httpResource<NetworkAnswer>(() => {
     const data = this.data();
@@ -1266,26 +1274,30 @@ export class Radar implements OnDestroy {
     }
     this.basemapPaint = this.readBasemapPaint(map);
     this.mapLighting = undefined;
+    const detailed3d = this.basemapStyle() === 'liberty';
     if (map.getSource('openmaptiles')) {
       for (const layer of map.getStyle().layers) {
         if (layer.type === 'fill-extrusion' && layer.id !== 'buildings-3d') {
           map.setLayoutProperty(layer.id, 'visibility', 'none');
         }
       }
+      const minZ = detailed3d ? 12.2 : 13;
+      const fullZ = detailed3d ? 13.5 : 14.5;
       if (!map.getLayer('buildings-3d')) {
         map.addLayer({
-          id: 'buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13,
+          id: 'buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: minZ,
+          filter: buildingLodFilter(detailed3d),
           layout: { visibility: this.tower3d() ? 'visible' : 'none' },
           paint: {
-            'fill-extrusion-color': buildingExtrusionColor(dark),
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_height'], 6]],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_min_height'], 0]],
-            'fill-extrusion-opacity': .74, 'fill-extrusion-vertical-gradient': true,
+            'fill-extrusion-color': buildingExtrusionColor(dark, detailed3d),
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], minZ, 0, fullZ, ['coalesce', ['get', 'render_height'], 6]],
+            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], minZ, 0, fullZ, ['coalesce', ['get', 'render_min_height'], 0]],
+            'fill-extrusion-opacity': detailed3d ? .82 : .74, 'fill-extrusion-vertical-gradient': true,
           },
         });
       }
     }
-    try { map.setLight(mapLightConfig(dark)); } catch { /* ignore unsupported style light */ }
+    try { map.setLight(mapLightConfig(dark, detailed3d)); } catch { /* ignore unsupported style light */ }
     // 聚焦罩：選了站對或單站時把底圖退到背景，讓人流成為畫面主角
     map.addLayer({ id: 'focus-scrim', type: 'background', paint: { 'background-color': LIGHT_MAP.land, 'background-opacity': 0, 'background-opacity-transition': { duration: 450 } } });
     map.addSource('metro-network', { type: 'geojson', data: 'metro/lines.geojson' });
@@ -1390,7 +1402,24 @@ export class Radar implements OnDestroy {
     this.redraw(fly);
   }
 
+  private showBasemapToast(msg: string) {
+    clearTimeout(this.toastTimer);
+    this.basemapToast.set(msg);
+    if (msg) {
+      this.toastTimer = setTimeout(() => this.basemapToast.set(''), 3400);
+    }
+  }
+
   toggleTower3d() {
+    if (!this.tower3d() && !this.supports3d()) {
+      const target = this.lastVectorBasemap;
+      const label = BASEMAP_STYLES[target].label;
+      this.basemapStyle.set(target);
+      store('exitpulse.basemap', target);
+      this.basemap.set('loading');
+      this.retryBasemap(true);
+      this.showBasemapToast(`臺灣地圖為平面圖資，已自動切換為「${label}」並開啟立體 3D`);
+    }
     const map = this.map;
     this.tower3d.update(on => !on);
     if (!map) return;
@@ -1482,6 +1511,17 @@ export class Radar implements OnDestroy {
     for (const [id, visible] of layers) {
       const layout = visible ? 'visible' : 'none';
       if (map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== layout) map.setLayoutProperty(id, 'visibility', layout);
+    }
+    // 3D 立體模式下隱藏底圖瑣碎便利商店與小店鋪 POI，降低渲染負擔並讓街廓更乾淨
+    const style = map.getStyle();
+    if (style?.layers) {
+      for (const layer of style.layers) {
+        if (layer.id === 'extra-places') continue;
+        const src = 'source-layer' in layer ? String(layer['source-layer'] ?? '') : '';
+        if (src === 'poi') {
+          map.setLayoutProperty(layer.id, 'visibility', lifted ? 'none' : 'visible');
+        }
+      }
     }
     if (map.getLayer('explore-labels')) {
       map.setPaintProperty('explore-labels', 'text-halo-width', lifted ? 4 : 2);
@@ -2031,8 +2071,9 @@ export class Radar implements OnDestroy {
     map.setPaintProperty('explore-circles', 'circle-color', networkDotColor(dark));
     map.setPaintProperty('explore-circles', 'circle-stroke-color', networkDotColor(dark));
     map.setPaintProperty('explore-inner', 'circle-color', dotColor(dark));
-    if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', buildingExtrusionColor(dark));
-    try { map.setLight(mapLightConfig(dark)); } catch { /* ignore unsupported style light */ }
+    const detailed3d = this.basemapStyle() === 'liberty';
+    if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', buildingExtrusionColor(dark, detailed3d));
+    try { map.setLight(mapLightConfig(dark, detailed3d)); } catch { /* ignore unsupported style light */ }
     if (map.getLayer('od-streams-casing')) {
       map.setPaintProperty('od-streams-casing', 'line-color', dark ? DARK_MAP.land : LIGHT_MAP.land);
       map.setPaintProperty('od-streams-casing', 'line-opacity', ['*', ['get', 'opacity'], dark ? .62 : .75]);
@@ -2351,6 +2392,16 @@ export class Radar implements OnDestroy {
 
   setBasemapStyle(style: BasemapStyleId) {
     if (this.basemapStyle() === style) return;
+    if (style === 'positron' || style === 'liberty') {
+      this.lastVectorBasemap = style;
+    }
+    const was3d = this.tower3d();
+    if (!BASEMAP_STYLES[style].vector && was3d) {
+      this.toggleTower3d();
+      this.showBasemapToast('臺灣地圖為平面圖資，已切回平面；點右上「立體」可隨時切回 3D 底圖');
+    } else {
+      this.showBasemapToast('');
+    }
     this.basemapStyle.set(style);
     store('exitpulse.basemap', style);
     this.basemap.set('loading');

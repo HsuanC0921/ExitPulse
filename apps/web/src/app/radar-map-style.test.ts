@@ -5,6 +5,7 @@ import {
   FLAT_FLOW_LAYERS,
   arcGeometry,
   buildingExtrusionColor,
+  buildingLodFilter,
   dotColor,
   dotFill,
   isBasemapStyleId,
@@ -102,4 +103,11 @@ test('multi-basemap switcher helpers validate IDs and build NLSC raster style', 
   const styleDark = nlscStyle(true);
   assert.equal(styleDark.version, 8);
   assert.equal(styleDark.layers[1]?.id, 'nlsc-emap');
+
+  const detailedLight = buildingExtrusionColor(false, true) as unknown[];
+  assert.equal(detailedLight[0], 'interpolate');
+  assert.equal(detailedLight[detailedLight.length - 1], '#f8f6f0');
+  const lod = buildingLodFilter(true) as unknown[];
+  assert.equal(lod[0], 'all');
+  assert.deepEqual(lod[1], ['!', ['has', 'hide_3d']]);
 });
