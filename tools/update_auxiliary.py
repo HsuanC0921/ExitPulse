@@ -1,6 +1,9 @@
 """非 OD 外部資料穩定自動更新：年度假日曆、車站/出口/設施/景點資訊與 OSM 路網防呆檢查。"""
 import argparse
+from datetime import date
 import json
+import os
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -13,6 +16,13 @@ import od_postgres
 
 # 臺北市政府資料大平臺 / 政府資料開放平臺（中華民國政府行政機關辦公日曆表 CSV/JSON 鏡像可透過環境變數覆寫）
 HOLIDAY_URL_TEMPLATE = 'https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/{year}.json'
+
+
+def target_holiday_years(year: int | None = None) -> list[int]:
+    if year is not None:
+        return [year]
+    now = date.today().year
+    return [now, now + 1]
 
 
 def update_holiday(year: int) -> bool:
@@ -128,14 +138,29 @@ def update_district_population():
     print(f'已更新 {len(out)} 個行政區人口資料（期別 {cur_ym}）。')
 
 
+def update_metro_map(sync_dir: str | None = None):
+    """安全更新 OpenStreetMap 捷運路線與站點靜態 GeoJSON（需本機有 Node.js）。"""
+    if not shutil.which('node'):
+        print('提示：找不到 Node.js，略過捷運路網 GeoJSON 更新。')
+        return
+    cmd = ['node', 'tools/fetch-metro-osm.mjs']
+    if sync_dir:
+        cmd.append(f'--sync-dir={sync_dir}')
+    res = subprocess.run(cmd, cwd=ROOT, text=True, timeout=180)
+    if res.returncode != 0:
+        raise RuntimeError(f'捷運路網 GeoJSON 更新失敗（結束碼 {res.returncode}），已保留既有檔案。')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--year', type=int, default=2027, help='檢查並嘗試抓取指定年份假日曆')
+    parser.add_argument('--year', type=int, default=None, help='檢查並嘗試抓取指定年份假日曆（預設檢查當年與隔年）')
     parser.add_argument('--skip-station-info', action='store_true', help='略過車站資訊更新')
     parser.add_argument('--skip-population', action='store_true', help='略過內政部行政區人口更新')
+    parser.add_argument('--with-metro-map', action='store_true', help='一併從 OSM Overpass 更新捷運路網 GeoJSON')
+    parser.add_argument('--metro-sync-dir', default=os.environ.get('EXITPULSE_METRO_SYNC_DIR', '').strip(), help='將更新後的 GeoJSON 同步到靜態發布目錄')
     args = parser.parse_args()
 
-    changed = update_holiday(args.year)
+    changed = any(update_holiday(y) for y in target_holiday_years(args.year))
     if changed:
         subprocess.run([sys.executable, '-u', 'tools/build_ref.py'], cwd=ROOT, check=True)
     if not args.skip_population:
@@ -145,6 +170,11 @@ def main():
             print(f'警告：行政區人口更新失敗（{error}），沿用既有快取。')
     if not args.skip_station_info:
         update_station_info()
+    if args.with_metro_map or os.environ.get('EXITPULSE_UPDATE_METRO_MAP', '').strip() == '1':
+        try:
+            update_metro_map(args.metro_sync_dir or None)
+        except Exception as error:
+            print(f'警告：捷運路網圖資更新失敗（{error}），沿用既有 GeoJSON。')
 
 
 if __name__ == '__main__':

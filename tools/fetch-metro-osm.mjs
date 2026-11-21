@@ -1,8 +1,12 @@
-// One-off fetch of the Taipei / New Taipei rapid-transit network from OpenStreetMap (ODbL) via Overpass.
-// Writes apps/web/public/metro/{lines,stations}.geojson in the shape core/api.ts expects. Not a runtime dependency.
-// Usage: node tools/fetch-metro-osm.mjs
-import { writeFile, mkdir } from 'node:fs/promises';
+// Fetch of the Taipei / New Taipei rapid-transit network from OpenStreetMap (ODbL) via Overpass.
+// Writes apps/web/public/metro/{lines,stations}.geojson in the shape core/api.ts expects.
+// Usage: node tools/fetch-metro-osm.mjs [--sync-dir=/srv/web/current/metro]
+import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
+const syncArg = process.argv.find((arg) => arg.startsWith('--sync-dir='));
+const SYNC_DIR = (syncArg ? syncArg.slice('--sync-dir='.length) : process.env.EXITPULSE_METRO_SYNC_DIR || '').trim();
 const BBOX = '24.67,121.28,25.30,122.01'; // S,W,N,E covering both cities
 const query = `[out:json][timeout:120];
 relation["type"="route"]["route"~"^(subway|light_rail|monorail)$"](${BBOX});
@@ -63,16 +67,55 @@ const stations = elements
   }, []);
 
 const fc = (features) => ({ type: 'FeatureCollection', attribution: '© OpenStreetMap contributors (ODbL)', features });
-await mkdir('apps/web/public/metro', { recursive: true });
-await writeFile('apps/web/public/metro/lines.geojson', JSON.stringify(fc([...lines.values()].map((l) => ({
+const linesGeoJson = JSON.stringify(fc([...lines.values()].map((l) => ({
   type: 'Feature',
   properties: { operator: l.operator, lineId: l.lineId, name: l.name, nameEn: l.nameEn, color: l.color },
   geometry: { type: 'MultiLineString', coordinates: [...l.ways.values()] },
-})))));
-await writeFile('apps/web/public/metro/stations.geojson', JSON.stringify(fc(stations.map((s) => ({
+}))));
+const stationsGeoJson = JSON.stringify(fc(stations.map((s) => ({
   type: 'Feature',
   properties: { name: s.name, lines: s.on.map((l) => l.lineId).join(','), colors: s.on.map((l) => l.color).join(','), transfer: s.on.length > 1 },
   geometry: { type: 'Point', coordinates: s.at },
-})))));
+}))));
+
+if (lines.size < 6 || stations.length < 100) {
+  throw new Error(`Aborted: suspicious Overpass output (${lines.size} lines, ${stations.length} stations)`);
+}
+
+const outDir = 'apps/web/public/metro';
+const linesPath = path.join(outDir, 'lines.geojson');
+const stationsPath = path.join(outDir, 'stations.geojson');
+if (existsSync(stationsPath)) {
+  try {
+    const existing = JSON.parse(await readFile(stationsPath, 'utf8'));
+    const existingCount = Array.isArray(existing?.features) ? existing.features.length : 0;
+    if (existingCount > 0 && stations.length < Math.floor(existingCount * 0.9)) {
+      throw new Error(`Aborted: station count dropped (${existingCount} -> ${stations.length})`);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Aborted:')) throw err;
+  }
+}
+
+async function writeAtomic(filePath, content, backup) {
+  const tmpPath = `${filePath}.tmp`;
+  await writeFile(tmpPath, content, 'utf8');
+  if (backup && existsSync(filePath)) {
+    await copyFile(filePath, `${filePath}.bak`);
+  }
+  await rename(tmpPath, filePath);
+}
+
+await mkdir(outDir, { recursive: true });
+await writeAtomic(linesPath, linesGeoJson, true);
+await writeAtomic(stationsPath, stationsGeoJson, true);
+
+if (SYNC_DIR) {
+  await mkdir(SYNC_DIR, { recursive: true });
+  await writeAtomic(path.join(SYNC_DIR, 'lines.geojson'), linesGeoJson, false);
+  await writeAtomic(path.join(SYNC_DIR, 'stations.geojson'), stationsGeoJson, false);
+  console.log(`Synced metro geojson to ${SYNC_DIR}`);
+}
+
 console.log(`${lines.size} lines, ${stations.length} stations`);
 for (const l of lines.values()) console.log(l.lineId, l.name, l.color, l.ways.size, 'ways');

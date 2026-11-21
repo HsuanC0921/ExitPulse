@@ -33,6 +33,28 @@ services:
       db:
         condition: service_healthy
 
+  init:
+    profiles: ["init"]
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-exitpulse}
+      PGDATABASE: ${POSTGRES_DB:-exitpulse}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      EXITPULSE_DATABASE_URL: postgresql://${POSTGRES_USER:-exitpulse}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-exitpulse}
+      EXITPULSE_DEFAULT_JSON: /srv/web/current/od/default.json
+      EXITPULSE_METRO_SYNC_DIR: /srv/web/current/metro
+    volumes:
+      - ../data:/app/data
+      - ${EXITPULSE_WEB_RELEASES:-/srv/exitpulse/releases}:/srv/web
+    entrypoint: ["python", "-u", "tools/setup.py"]
+    command: ["--jobs", "1"]
+
   web:
     image: caddy:2-alpine
     restart: unless-stopped

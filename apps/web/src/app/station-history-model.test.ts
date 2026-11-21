@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildStationHistory } from './station-history-model.ts';
+import { buildStationHistory, openingTenure } from './station-history-model.ts';
 
 test('station history only includes dated milestones with a source and sorts them chronologically', () => {
   const events = buildStationHistory(
@@ -31,4 +31,16 @@ test('closed and reopened entrances use the source attached to each dated event'
     ['1 號出口封閉', '/closure'],
     ['1 號出口重開', '/reopen'],
   ]);
+});
+
+test('openingTenure calculates operating years and enriches post-opening milestones when stationName is provided', () => {
+  assert.deepEqual(openingTenure('1999-12-24', 2026), { year: 1999, years: 27 });
+  assert.equal(openingTenure(null), null);
+
+  const domeEvents = buildStationHistory({ date: '1999-12-24', source: '/opening' }, [], [], '國父紀念館');
+  assert.ok(domeEvents.some(e => e.kind === 'milestone' && e.date === '2023-12-02' && e.title.includes('大巨蛋')));
+  assert.ok(domeEvents.some(e => e.kind === 'milestone' && e.date === '2023-07-01'));
+
+  const newerEvents = buildStationHistory({ date: '2022-01-01', source: '/opening' }, [], [], '新測試站');
+  assert.ok(!newerEvents.some(e => e.date === '2021-05-19'), 'pre-opening network milestones must be excluded');
 });

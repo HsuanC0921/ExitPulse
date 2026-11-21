@@ -44,8 +44,9 @@
       </div>
 
       <details class="evidence" [open]="detailWide()">
-        <summary><span>看分析細節</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
-        <h3>從起站出發，有多少人搭到這裡？</h3>
+        <summary><span>深入分析與逐時分布</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <h3>起站去向占比</h3>
+        <p class="body muted section-sub">每 100 位從{{ item().origin }}出發的旅客，搭往{{ item().destination }}的比例</p>
         <div class="bars" [style.--line]="lineOf()(item().origin)?.color">
           <div><span>{{ data().baseline }}</span><i><b class="old" [style.transform]="'scaleX(' + story().shareA / story().scale + ')'"></b></i><em>{{ story().shareA | number:(story().shareA > 0 && story().shareA < 1 ? '1.2-2' : '1.1-1') }}%</em></div>
           <div><span>{{ data().current }}</span><i><b [style.transform]="'scaleX(' + story().shareB / story().scale + ')'"></b></i><em>{{ story().shareB | number:(story().shareB > 0 && story().shareB < 1 ? '1.2-2' : '1.1-1') }}%</em></div>
@@ -53,19 +54,27 @@
         <p class="body muted">{{ story().origin }}</p>
 
         @if (chart(); as c) {
-          <h3>各時段人次</h3>
-          <p class="chart-peak"><span>{{ data().current }} 最多人搭的時段</span><b>{{ c.busiest }} 點</b><span>約 {{ c.busiestDaily | number }} 人次／日</span></p>
+          <h3>24 小時分時分布</h3>
+          <p class="chart-peak" aria-live="polite">
+            @if (activeHourRow(); as row) {
+              <span>{{ row.h | number:'2.0-0' }}:00–{{ (row.h + 1) | number:'2.0-0' }}:00</span>
+              <b>{{ row.a == null ? '無紀錄' : (row.a | number:'1.0-0') }} → {{ row.b == null ? '無紀錄' : (row.b | number:'1.0-0') }} 人次</b>
+              @if (row.pct != null) { <span>{{ row.pct > 0 ? '+' : row.pct < 0 ? '−' : '' }}{{ (row.pct < 0 ? -row.pct : row.pct) * 100 | number:'1.0-0' }}%</span> }
+            } @else {
+              <span>{{ data().current }} 尖峰時段</span><b>{{ c.busiest | number:'2.0-0' }}:00</b><span>約 {{ c.busiestDaily | number }} 人次／日</span>
+            }
+          </p>
           @if (c.offPeakTip) { <p class="body muted">{{ c.offPeakTip }}</p> }
-          <div class="hours" role="img" [attr.aria-label]="item().origin + '到' + item().destination + '各小時每日人次，' + data().current + '最多在 ' + c.busiest + ' 點'" [style.--line]="lineOf()(item().origin)?.color">
+          <div class="hours" role="group" [attr.aria-label]="item().origin + '到' + item().destination + '各小時每日人次，' + data().current + '最多在 ' + c.busiest + ' 點'" [style.--line]="lineOf()(item().origin)?.color">
             @for (h of c.hours; track h.h) {
-              <div class="hour" [class.picked]="h.selected" [class.missing]="h.missing">
+              <button type="button" class="hour" [class.picked]="h.selected" [class.missing]="h.missing" [class.active]="activeHour() === h.h" [attr.aria-pressed]="pinnedHour() === h.h" [attr.aria-label]="h.h + ' 點時段'" (pointerenter)="hoveredHour.set(h.h)" (pointerleave)="hoveredHour.set(null)" (focus)="hoveredHour.set(h.h)" (blur)="hoveredHour.set(null)" (click)="toggleHour(h.h)">
                 <b class="old" [class.unrecorded]="h.a == null" [style.transform]="h.a == null ? null : 'scaleY(' + h.a / 100 + ')'"></b><b [class.unrecorded]="h.b == null" [style.transform]="h.b == null ? null : 'scaleY(' + h.b / 100 + ')'"></b>
-              </div>
+              </button>
             }
           </div>
           <div class="hour-axis" aria-hidden="true"><span>0</span><span>6</span><span>12</span><span>18</span><span>24 點</span></div>
           <details class="hour-table">
-            <summary><span>各小時數字表</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <summary><span>檢視逐時明細表</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
             <div class="table-scroll" tabindex="0" role="region" aria-label="各小時每日人次數字表">
               <table>
                 <caption class="visually-hidden">{{ item().origin }}到{{ item().destination }}，每個進站小時的每日人次</caption>
@@ -86,15 +95,25 @@
           </details>
           <ul class="key"><li><i class="old"></i>{{ data().baseline }}</li><li><i [style.background]="lineOf()(item().origin)?.color"></i>{{ data().current }}</li><li>外框：所選時段</li><li>斜線：無紀錄</li></ul>
         } @else if (profileError()) {
-          <h3>各時段人次</h3>
+          <h3>24 小時分時分布</h3>
           <p class="body muted">各時段資料暫時無法載入。<button type="button" class="retry-inline" (click)="retryProfile.emit()">重試</button></p>
         }
 
-        <h3>回程</h3>
+        <h3>去回程流向對照</h3>
+        @if (flowBalance(); as bal) {
+          <div class="balance-bar" aria-hidden="true">
+            <i class="balance-fwd" [style.flex-grow]="bal.forwardPct"></i>
+            <i class="balance-rev" [style.flex-grow]="bal.reversePct"></i>
+          </div>
+          <p class="balance-labels">
+            <span>去程（{{ item().origin }} → {{ item().destination }}）{{ bal.forwardPct | number:'1.0-0' }}%</span>
+            <span>回程 {{ bal.reversePct | number:'1.0-0' }}%</span>
+          </p>
+        }
         <p class="body route-readout"><span>{{ item().destination }} → {{ item().origin }}</span><span>每日 {{ dailyTrips()(item().reverseBaseline / data().days[0]) }} → {{ dailyTrips()(item().reverseCurrent / (data().days[1] || 1)) }} 人次</span></p>
 
         @if (siblings().length) {
-          <h3>從{{ item().origin }}出發的其他變化</h3>
+          <h3>同站出發的其他明顯變化</h3>
           <ul class="siblings">
             @for (r of siblings(); track r.destination) {
               <li><button type="button" (click)="choose.emit(r)"><span>{{ r.destination }}</span><b [class.down]="r.deltaSharePp < 0">{{ r.deltaSharePp > 0 ? '+' : '−' }}{{ (r.deltaSharePp < 0 ? -r.deltaSharePp : r.deltaSharePp) | number:'1.1-1' }}&nbsp;百分點</b></button></li>
@@ -103,7 +122,7 @@
         }
 
         <details class="basis">
-          <summary><span>查看分析依據</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <summary><span>資料口徑與計算說明</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
           <dl>
             <div><dt>原始人次</dt><dd>{{ item().baselineTrips | number }} → {{ item().currentTrips | number }}</dd></div>
             <div><dt>有效天數 <app-hint label="有效天數" [entries]="[{ label: '有效天數', value: '實際納入平均的天數。工作日會排除國定假日並納入補班日。' }]" /></dt><dd>{{ data().days[0] }} → {{ data().days[1] }} 天</dd></div>

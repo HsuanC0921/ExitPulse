@@ -16,7 +16,8 @@
 
 .station-history > summary::-webkit-details-marker { display: none; }
 .station-history > summary > span:first-child { margin-inline-end: auto; }
-.station-history .history-count { color: var(--ink-2, #555e66); font-size: var(--fs-xs); font-weight: var(--weight-body); }
+.station-history .history-tenure { padding: 2px 7px; border-radius: var(--r-pill, 999px); background: var(--panel-2, #f2f4f3); color: var(--ink-2, #555e66); font-size: var(--fs-xs); font-weight: var(--weight-action); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.station-history .history-count { color: var(--ink-2, #555e66); font-size: var(--fs-xs); font-weight: var(--weight-body); white-space: nowrap; }
 .station-history > summary svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; transition: rotate .18s ease; }
 .station-history[open] > summary svg { rotate: 180deg; }
 
@@ -41,7 +42,7 @@
 .history-list li {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--sp-1) var(--sp-2);
   min-height: 64px;
@@ -60,10 +61,11 @@
 }
 
 .history-list li.in-period::before { background: var(--ink, #1d2125); }
+.history-list li[data-kind='milestone']::before { border-color: var(--ink, #1d2125); background: var(--panel-2, #f2f4f3); }
 .history-list time { grid-column: 1 / -1; color: var(--ink-2, #555e66); font-size: var(--type-label); font-variant-numeric: tabular-nums; }
 .history-event { display: grid; min-width: 0; }
-.history-event strong { font-size: var(--type-ui); line-height: 1.45; text-wrap: balance; }
-.history-event span { color: var(--ink-2, #555e66); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: break-word; text-wrap: pretty; }
+.history-event strong { font-size: var(--type-ui); line-height: 1.45; word-break: normal; overflow-wrap: break-word; text-wrap: balance; }
+.history-event span { color: var(--ink-2, #555e66); font-size: var(--fs-xs); line-height: 1.6; word-break: normal; overflow-wrap: break-word; text-wrap: pretty; }
 @keyframes hist-in { from { opacity: 0; transform: translateY(-4px); } }
 .station-history[open] .history-list { animation: hist-in .2s cubic-bezier(.22, 1, .36, 1); }
 

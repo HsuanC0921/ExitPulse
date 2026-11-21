@@ -24,13 +24,36 @@ export type StationHistoryEvent = {
   title: string;
   detail: string;
   source: string;
-  kind: 'opening' | 'transfer' | 'entrance';
+  kind: 'opening' | 'transfer' | 'entrance' | 'milestone';
 };
+
+const NETWORK_MILESTONES: readonly Omit<StationHistoryEvent, 'kind'>[] = [
+  { date: '2021-05-19', title: '全國三級警戒防疫期間', detail: '疫情警戒啟動，全線人次驟降', source: 'https://www.cdc.gov.tw/' },
+  { date: '2023-07-01', title: 'TPASS 基北北桃 1200 月票上路', detail: '定期票開通帶動跨區通勤回流', source: 'https://www.taipei.gov.tw/' },
+];
+
+const STATION_MILESTONES: Record<string, readonly Omit<StationHistoryEvent, 'kind'>[]> = {
+  國父紀念館: [
+    { date: '2023-12-02', title: '臺北大巨蛋正式啟用', detail: '賽事與演唱會帶動假日人潮倍增', source: 'https://www.taipei.gov.tw/' },
+  ],
+  南港: [
+    { date: '2025-03-20', title: '南港 LaLaport 開幕', detail: '三鐵共構商圈與園區人流擴大', source: 'https://www.taipei.gov.tw/' },
+  ],
+};
+
+/** 計算車站通車年份與營運年資（以最近資料年份為基準，若無則用當下年度）。 */
+export function openingTenure(openingDate: string | null | undefined, refYear = 2026): { year: number; years: number } | null {
+  if (!openingDate || openingDate.length < 4) return null;
+  const year = Number(openingDate.slice(0, 4));
+  if (!Number.isFinite(year) || year < 1990) return null;
+  return { year, years: Math.max(1, refYear - year) };
+}
 
 export function buildStationHistory(
   opening: { date: string; source: string } | null | undefined,
   lines: StationHistoryLine[] | null | undefined,
   entrances: StationHistoryExit[] | null | undefined,
+  stationName?: string,
 ): StationHistoryEvent[] {
   const events: StationHistoryEvent[] = [];
   if (opening?.date && opening.source) {
@@ -66,6 +89,15 @@ export function buildStationHistory(
     }
     if (history.reopened && history.source) {
       events.push({ date: history.reopened, title: `${code} 號出口重開`, detail: entrance.name, source: history.source, kind: 'entrance' });
+    }
+  }
+
+  if (stationName) {
+    const openedDate = opening?.date ?? '';
+    for (const m of [...NETWORK_MILESTONES, ...(STATION_MILESTONES[stationName] ?? [])]) {
+      if (!openedDate || m.date > openedDate) {
+        events.push({ ...m, kind: 'milestone' });
+      }
     }
   }
 

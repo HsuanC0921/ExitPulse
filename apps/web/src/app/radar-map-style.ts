@@ -20,6 +20,24 @@ export const LINES: Record<string, string> = {
 /** 明暗共用同一張底圖，深色只是把燈調暗，樣式不換。 */
 export const STYLE = 'https://tiles.openfreemap.org/styles/positron';
 
+export type BasemapStyleId = 'positron' | 'liberty' | 'nlsc';
+
+export const BASEMAP_STYLES: Record<BasemapStyleId, {
+  id: BasemapStyleId;
+  label: string;
+  url: string | null;
+  sourceId: string;
+  vector: boolean;
+}> = {
+  positron: { id: 'positron', label: '簡潔', url: STYLE, sourceId: 'openmaptiles', vector: true },
+  liberty: { id: 'liberty', label: '詳圖', url: 'https://tiles.openfreemap.org/styles/liberty', sourceId: 'openmaptiles', vector: true },
+  nlsc: { id: 'nlsc', label: '臺灣地圖', url: null, sourceId: 'nlsc-emap', vector: false },
+};
+
+export function isBasemapStyleId(value: string | null): value is BasemapStyleId {
+  return value === 'positron' || value === 'liberty' || value === 'nlsc';
+}
+
 export const LOCAL_MAP: StyleSpecification = {
   version: 8,
   sources: {},
@@ -48,7 +66,7 @@ export const TRAVERSE_MS = 7000;
 export const OVERVIEW_PAIRS = 30;
 export const PAGE = 30;
 export const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-export const FLAT_FLOW_LAYERS = ['od-ribbons', 'od-streams', 'od-streams-dashed', 'od-comets-flow', 'od-comets-muted', 'od-particles', 'od-pulse', 'od-flow-labels'];
+export const FLAT_FLOW_LAYERS = ['od-streams-casing', 'od-ribbons', 'od-streams', 'od-streams-dashed', 'od-comets-flow', 'od-comets-muted', 'od-particles', 'od-pulse', 'od-flow-labels'];
 export const TOWER_PITCH = 66;
 export const PHONE_TOWER_PITCH = 50;
 export const WEBGL_RESTORE_TIMEOUT = 3000;
@@ -68,11 +86,84 @@ export const dotFill = (k: number) => ['case', ['==', ['get', 'inner'], 0], .14 
 
 export const NIGHT_STATION = { regular: '#a6b7c0', ranked: '#e7eef1', rim: '#35454e', rankInk: '#15232b' } as const;
 
-/** Positron 底圖幾乎全白，這組色票讓陸地、水域、公園與文字有足夠層次，長時間看也不刺眼。 */
-export const LIGHT_MAP = { land: '#e8e4da', water: '#b7d0da', park: '#d3dfc8', building: '#dcd7cb', label: '#5e5a51', halo: '#f4f1ea' } as const;
+/** Positron 底圖幾乎全白，這組色票讓陸地、水域、公園、建物邊線與道路有足夠層次，長時間看也不刺眼。 */
+export const LIGHT_MAP = {
+  land: '#e8e4da',
+  water: '#b7d0da',
+  waterOutline: '#97b7c6',
+  park: '#d3dfc8',
+  building: '#dcd7cb',
+  outline: '#ccc5b7',
+  label: '#5e5a51',
+  halo: '#f4f1ea',
+  roadMajor: '#f7f4ec',
+  roadMinor: '#efebe2',
+} as const;
 
-/** 與淺色同一組層次，燈關掉的版本：陸地最暗，水域與公園保留色相，道路略亮於陸地。 */
-export const DARK_MAP = { land: '#111619', water: '#152633', park: '#17221e', building: '#1d252a', label: '#a2acb2', halo: '#0d1215', road: '#303b43', outline: '#252e34' } as const;
+/** 與淺色同一組層次，燈關掉的版本：陸地最暗，水域與公園保留色相，幹道略亮於巷弄。 */
+export const DARK_MAP = {
+  land: '#111619',
+  water: '#152633',
+  waterOutline: '#20394c',
+  park: '#17221e',
+  building: '#1d252a',
+  label: '#a2acb2',
+  halo: '#0d1215',
+  road: '#303b43',
+  roadMajor: '#3a4852',
+  roadMinor: '#232c33',
+  outline: '#273239',
+} as const;
+
+export function roadNightColor(layerId: string): string {
+  return /motorway|trunk|primary|highway|rail|bridge/i.test(layerId) ? DARK_MAP.roadMajor : DARK_MAP.roadMinor;
+}
+
+/** 3D 建築物依高度分級著色，讓台北 101、信義與南港高層量體自然從低矮街廓裡浮出來。 */
+export function buildingExtrusionColor(dark: boolean): ExpressionSpecification {
+  return dark
+    ? ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#1a2228', 24, '#232e36', 65, '#2f3d47', 140, '#3f515e']
+    : ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#d8d2c5', 24, '#e2ddd1', 65, '#ebe6dc', 140, '#f4f0e8'];
+}
+
+export function mapLightConfig(dark: boolean) {
+  return {
+    anchor: 'viewport' as const,
+    color: dark ? '#9ab4cc' : '#fffbf2',
+    intensity: dark ? 0.28 : 0.34,
+    position: (dark ? [1.2, 220, 42] : [1.35, 135, 32]) as [number, number, number],
+  };
+}
+
+export function nlscRasterPaint(dark: boolean) {
+  return {
+    'raster-brightness-max': dark ? 0.52 : 0.96,
+    'raster-saturation': dark ? -0.42 : -0.12,
+    'raster-contrast': dark ? 0.14 : 0.04,
+    'raster-fade-duration': 200,
+  };
+}
+
+/** 國土測繪中心臺灣通用電子地圖（WMTS 點陣圖磚），文字標籤繼續沿用 OpenFreeMap 字型檔。 */
+export function nlscStyle(dark: boolean): StyleSpecification {
+  return {
+    version: 8,
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      'nlsc-emap': {
+        type: 'raster',
+        tiles: ['https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}'],
+        tileSize: 256,
+        maxzoom: 18,
+        attribution: '© 內政部國土測繪中心',
+      },
+    },
+    layers: [
+      { id: 'nlsc-background', type: 'background', paint: { 'background-color': dark ? DARK_MAP.land : LIGHT_MAP.land } },
+      { id: 'nlsc-emap', type: 'raster', source: 'nlsc-emap', paint: nlscRasterPaint(dark) },
+    ],
+  };
+}
 
 export type MapColorProperty = 'background-color' | 'fill-color' | 'fill-outline-color' | 'line-color' | 'text-color' | 'text-halo-color';
 export type MapColor = AllPaintProperties[MapColorProperty];
