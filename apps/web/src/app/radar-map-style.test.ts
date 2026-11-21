@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import {
   BASEMAP_STYLES,
   FLAT_FLOW_LAYERS,
+  TERRAIN_TILES,
   arcGeometry,
   buildingExtrusionColor,
   dotColor,
   dotFill,
   isBasemapStyleId,
   mapLightConfig,
+  mapSkyConfig,
   networkDotColor,
   nlscRasterPaint,
   nlscStyle,
@@ -102,4 +104,17 @@ test('multi-basemap switcher helpers validate IDs and build NLSC raster style', 
   const styleDark = nlscStyle(true);
   assert.equal(styleDark.version, 8);
   assert.equal(styleDark.layers[1]?.id, 'nlsc-emap');
+});
+
+test('detailed 3D terrain, sky haze, lighting, and skyscraper color ramps', () => {
+  assert.ok(TERRAIN_TILES.includes('terrarium'));
+  const detailedLight = buildingExtrusionColor(false, true) as unknown[];
+  const detailedDark = buildingExtrusionColor(true, true) as unknown[];
+  assert.equal(detailedLight[12], '#c9dceb');
+  assert.equal(detailedDark[12], '#56768f');
+  assert.ok(mapLightConfig(false, true).intensity > mapLightConfig(false, false).intensity);
+  const skyLight = mapSkyConfig(false);
+  const skyDark = mapSkyConfig(true);
+  assert.equal(skyLight['sky-color'], '#c9d9e6');
+  assert.equal(skyDark['sky-color'], '#0d151d');
 });

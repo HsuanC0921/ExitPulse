@@ -142,7 +142,7 @@
     <button type="button" class="map-reset map-fit-btn" data-tip="回到全線視角" (click)="resetMap()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg><span>全圖</span>
     </button>
-    <button type="button" class="map-reset tower-switch" aria-label="立體" [attr.data-tip]="tower3d() ? '切回平面' : '立體地圖與人流'" [attr.aria-pressed]="tower3d()" (click)="toggleTower3d()">
+    <button type="button" class="map-reset tower-switch" aria-label="立體" [disabled]="!supports3d()" [attr.data-tip]="!supports3d() ? '臺灣地圖僅支援平面，切回簡潔或詳圖即可開啟立體' : tower3d() ? '切回平面' : '立體地圖與人流'" [attr.aria-pressed]="tower3d()" (click)="toggleTower3d()">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg><span>立體</span>
     </button>
     <button type="button" class="theme-switch" [attr.aria-pressed]="theme() === 'dark'"
@@ -169,7 +169,7 @@
       <div class="layer-options">
         <button type="button" class="sheet-close" aria-label="關閉地圖工具" (click)="closeMenus(true)"><span>地圖工具</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         <label class="mobile-only-row">深色模式<input type="checkbox" role="switch" [checked]="theme() === 'dark'" (change)="setTheme(theme() === 'dark' ? 'light' : 'dark')"></label>
-        <label class="mobile-only-row">立體地圖與人流<input type="checkbox" role="switch" [checked]="tower3d()" (change)="toggleTower3d()"></label>
+        <label class="mobile-only-row">立體地圖與人流<input type="checkbox" role="switch" [disabled]="!supports3d()" [checked]="tower3d()" (change)="toggleTower3d()"></label>
         <label>減少動態效果<input type="checkbox" role="switch" [checked]="motion.enabled()" (change)="motion.set($any($event.target).checked)"></label>
         @if (view() === 'network' && !tower3d()) {
         <label class="range-row">圓圈淡化<input type="range" min="0" max="80" step="10" [value]="dotTransparency()" (input)="setDotTransparency($any($event.target).value)" aria-valuetext="{{ dotTransparency() }}%"><output>{{ dotTransparency() }}%</output></label>
@@ -185,6 +185,11 @@
             <button type="button" [attr.aria-pressed]="basemapStyle() === 'liberty'" (click)="setBasemapStyle('liberty')">詳圖</button>
             <button type="button" [attr.aria-pressed]="basemapStyle() === 'nlsc'" (click)="setBasemapStyle('nlsc')">臺灣地圖</button>
           </div>
+          @if (!supports3d()) {
+            <p class="basemap-note">臺灣地圖為平面圖資，立體 3D 請切換簡潔或詳圖。</p>
+          } @else if (basemapStyle() === 'liberty') {
+            <p class="basemap-note">詳圖開啟立體時將顯示 3D 山脈地形與細緻高樓。</p>
+          }
           <label>更多地名與地點<input type="checkbox" role="switch" [checked]="showPlaces()" (change)="toggleMapOption('places')"></label>
           <label>街道與建物<input type="checkbox" role="switch" [checked]="showRoads()" (change)="toggleMapOption('roads')"></label>
           <label>水系與綠地<input type="checkbox" role="switch" [checked]="showNature()" (change)="toggleMapOption('nature')"></label>

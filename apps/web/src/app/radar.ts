@@ -24,9 +24,9 @@ import { buildCsv, downloadCsv, exportBasis } from './csv-export';
 import { exportPairCard } from './card-export';
 import {
   BANDS, BASEMAP_STYLES, DARK_MAP, DOT, EMPTY, FLAT_FLOW_LAYERS, FLOW, LIGHT_MAP, LINES, LOCAL_MAP, LOW_PITCH, MIN_TOWER_PITCH, NB,
-  NIGHT_STATION, OVERVIEW_PAIRS, PAGE, PHONE_STREET_PITCH, PHONE_STREET_ZOOM, PHONE_TOWER_PITCH, STREET_ZOOM, STYLE,
+  NIGHT_STATION, OVERVIEW_PAIRS, PAGE, PHONE_STREET_PITCH, PHONE_STREET_ZOOM, PHONE_TOWER_PITCH, STREET_ZOOM, STYLE, TERRAIN_TILES,
   TOWER_PITCH, TRAVERSE_MS, TYPES, WEBGL_RESTORE_TIMEOUT, arcGeometry, buildingExtrusionColor, dotColor, dotFill,
-  isBasemapStyleId, lineRingElement, mapLightConfig, networkDotColor, nlscRasterPaint, nlscStyle, roadNightColor,
+  isBasemapStyleId, lineRingElement, mapLightConfig, mapSkyConfig, networkDotColor, nlscRasterPaint, nlscStyle, roadNightColor,
   shadedPaint, store, stored, type BasemapStyleId, type MapColorProperty, type MapPaint, type Point,
 } from './radar-map-style';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
@@ -389,6 +389,7 @@ export class Radar implements OnDestroy {
   readonly basemapStyle = signal<BasemapStyleId>(
     (() => { const saved = stored('exitpulse.basemap'); return isBasemapStyleId(saved) ? saved : 'positron'; })(),
   );
+  readonly supports3d = computed(() => BASEMAP_STYLES[this.basemapStyle()].vector);
   readonly timePhase = signal<'baseline' | 'current'>('baseline');
   private readonly pairTowerTotals = httpResource<NetworkAnswer>(() => {
     const data = this.data();
@@ -1266,26 +1267,55 @@ export class Radar implements OnDestroy {
     }
     this.basemapPaint = this.readBasemapPaint(map);
     this.mapLighting = undefined;
+    const detailed3d = this.basemapStyle() === 'liberty';
     if (map.getSource('openmaptiles')) {
       for (const layer of map.getStyle().layers) {
         if (layer.type === 'fill-extrusion' && layer.id !== 'buildings-3d') {
           map.setLayoutProperty(layer.id, 'visibility', 'none');
         }
       }
+      if (detailed3d) {
+        if (!map.getSource('terrain-dem')) {
+          map.addSource('terrain-dem', {
+            type: 'raster-dem',
+            encoding: 'terrarium',
+            tiles: [TERRAIN_TILES],
+            tileSize: 256,
+            maxzoom: 15,
+          });
+        }
+        if (!map.getLayer('terrain-hillshade')) {
+          map.addLayer({
+            id: 'terrain-hillshade',
+            type: 'hillshade',
+            source: 'terrain-dem',
+            layout: { visibility: this.tower3d() ? 'visible' : 'none' },
+            paint: {
+              'hillshade-exaggeration': dark ? 0.24 : 0.34,
+              'hillshade-shadow-color': dark ? '#070b0f' : '#7f786c',
+              'hillshade-highlight-color': dark ? '#2a3945' : '#fdfbf5',
+            },
+          });
+        }
+      }
       if (!map.getLayer('buildings-3d')) {
         map.addLayer({
-          id: 'buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13,
+          id: 'buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: detailed3d ? 12 : 13,
           layout: { visibility: this.tower3d() ? 'visible' : 'none' },
           paint: {
-            'fill-extrusion-color': buildingExtrusionColor(dark),
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_height'], 6]],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_min_height'], 0]],
-            'fill-extrusion-opacity': .74, 'fill-extrusion-vertical-gradient': true,
+            'fill-extrusion-color': buildingExtrusionColor(dark, detailed3d),
+            'fill-extrusion-height': detailed3d
+              ? ['interpolate', ['linear'], ['zoom'], 12, 0, 14.2, ['coalesce', ['get', 'render_height'], 6]]
+              : ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_height'], 6]],
+            'fill-extrusion-base': detailed3d
+              ? ['interpolate', ['linear'], ['zoom'], 12, 0, 14.2, ['coalesce', ['get', 'render_min_height'], 0]]
+              : ['interpolate', ['linear'], ['zoom'], 13, 0, 14.6, ['coalesce', ['get', 'render_min_height'], 0]],
+            'fill-extrusion-opacity': detailed3d ? .88 : .74, 'fill-extrusion-vertical-gradient': true,
           },
         });
       }
     }
-    try { map.setLight(mapLightConfig(dark)); } catch { /* ignore unsupported style light */ }
+    try { map.setLight(mapLightConfig(dark, detailed3d)); } catch { /* ignore unsupported style light */ }
     // 聚焦罩：選了站對或單站時把底圖退到背景，讓人流成為畫面主角
     map.addLayer({ id: 'focus-scrim', type: 'background', paint: { 'background-color': LIGHT_MAP.land, 'background-opacity': 0, 'background-opacity-transition': { duration: 450 } } });
     map.addSource('metro-network', { type: 'geojson', data: 'metro/lines.geojson' });
@@ -1391,6 +1421,7 @@ export class Radar implements OnDestroy {
   }
 
   toggleTower3d() {
+    if (!this.tower3d() && !this.supports3d()) return;
     const map = this.map;
     this.tower3d.update(on => !on);
     if (!map) return;
@@ -1487,6 +1518,31 @@ export class Radar implements OnDestroy {
       map.setPaintProperty('explore-labels', 'text-halo-width', lifted ? 4 : 2);
       map.setPaintProperty('explore-labels', 'text-halo-blur', lifted ? .5 : 0);
     }
+    this.syncTerrainAndSky();
+  }
+
+  /** 詳圖模式進入立體時掛上 3D DEM 山脈地形與漸層霧化天際線，平面模式釋放地形避免誤渲染。 */
+  private syncTerrainAndSky() {
+    const map = this.map;
+    if (!map || !this.layersReady) return;
+    const lifted = this.tower3d(), detailed3d = this.basemapStyle() === 'liberty', dark = this.lighting() >= .5;
+    try {
+      if (lifted && detailed3d && map.getSource('terrain-dem')) {
+        map.setTerrain({ source: 'terrain-dem', exaggeration: 1.35 });
+      } else if (map.getTerrain()) {
+        map.setTerrain(null);
+      }
+    } catch { /* ignore unsupported terrain */ }
+    if (map.getLayer('terrain-hillshade')) {
+      map.setLayoutProperty('terrain-hillshade', 'visibility', lifted && detailed3d ? 'visible' : 'none');
+    }
+    try {
+      map.setSky(lifted ? mapSkyConfig(dark) : {
+        'sky-color': 'rgba(0,0,0,0)', 'sky-horizon-blend': 0,
+        'horizon-color': 'rgba(0,0,0,0)', 'horizon-fog-blend': 0,
+        'fog-color': 'rgba(0,0,0,0)', 'fog-ground-blend': 0,
+      });
+    } catch { /* ignore unsupported sky */ }
   }
 
   private towerAmounts(): [string, number | null][] {
@@ -2031,8 +2087,15 @@ export class Radar implements OnDestroy {
     map.setPaintProperty('explore-circles', 'circle-color', networkDotColor(dark));
     map.setPaintProperty('explore-circles', 'circle-stroke-color', networkDotColor(dark));
     map.setPaintProperty('explore-inner', 'circle-color', dotColor(dark));
-    if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', buildingExtrusionColor(dark));
-    try { map.setLight(mapLightConfig(dark)); } catch { /* ignore unsupported style light */ }
+    const detailed3d = this.basemapStyle() === 'liberty';
+    if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', buildingExtrusionColor(dark, detailed3d));
+    if (map.getLayer('terrain-hillshade')) {
+      map.setPaintProperty('terrain-hillshade', 'hillshade-exaggeration', dark ? 0.24 : 0.34);
+      map.setPaintProperty('terrain-hillshade', 'hillshade-shadow-color', dark ? '#070b0f' : '#7f786c');
+      map.setPaintProperty('terrain-hillshade', 'hillshade-highlight-color', dark ? '#2a3945' : '#fdfbf5');
+    }
+    try { map.setLight(mapLightConfig(dark, detailed3d)); } catch { /* ignore unsupported style light */ }
+    this.syncTerrainAndSky();
     if (map.getLayer('od-streams-casing')) {
       map.setPaintProperty('od-streams-casing', 'line-color', dark ? DARK_MAP.land : LIGHT_MAP.land);
       map.setPaintProperty('od-streams-casing', 'line-opacity', ['*', ['get', 'opacity'], dark ? .62 : .75]);
@@ -2351,6 +2414,7 @@ export class Radar implements OnDestroy {
 
   setBasemapStyle(style: BasemapStyleId) {
     if (this.basemapStyle() === style) return;
+    if (!BASEMAP_STYLES[style].vector && this.tower3d()) this.toggleTower3d();
     this.basemapStyle.set(style);
     store('exitpulse.basemap', style);
     this.basemap.set('loading');

@@ -38,6 +38,8 @@ export function isBasemapStyleId(value: string | null): value is BasemapStyleId 
   return value === 'positron' || value === 'liberty' || value === 'nlsc';
 }
 
+export const TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+
 export const LOCAL_MAP: StyleSpecification = {
   version: 8,
   sources: {},
@@ -119,19 +121,38 @@ export function roadNightColor(layerId: string): string {
   return /motorway|trunk|primary|highway|rail|bridge/i.test(layerId) ? DARK_MAP.roadMajor : DARK_MAP.roadMinor;
 }
 
-/** 3D 建築物依高度分級著色，讓台北 101、信義與南港高層量體自然從低矮街廓裡浮出來。 */
-export function buildingExtrusionColor(dark: boolean): ExpressionSpecification {
+/** 3D 建築物依高度分級著色；詳圖模式拉開塔樓玻璃高光與低矮街廓對比。 */
+export function buildingExtrusionColor(dark: boolean, detailed = false): ExpressionSpecification {
+  if (detailed) {
+    return dark
+      ? ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#1b242b', 18, '#26333d', 45, '#334552', 95, '#425b6e', 180, '#56768f']
+      : ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#d9cfc0', 18, '#e5ddd0', 45, '#efe9df', 95, '#dce6ee', 180, '#c9dceb'];
+  }
   return dark
     ? ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#1a2228', 24, '#232e36', 65, '#2f3d47', 140, '#3f515e']
     : ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#d8d2c5', 24, '#e2ddd1', 65, '#ebe6dc', 140, '#f4f0e8'];
 }
 
-export function mapLightConfig(dark: boolean) {
+export function mapLightConfig(dark: boolean, detailed = false) {
   return {
     anchor: 'viewport' as const,
     color: dark ? '#9ab4cc' : '#fffbf2',
-    intensity: dark ? 0.28 : 0.34,
-    position: (dark ? [1.2, 220, 42] : [1.35, 135, 32]) as [number, number, number],
+    intensity: detailed ? (dark ? 0.36 : 0.44) : (dark ? 0.28 : 0.34),
+    position: (detailed
+      ? (dark ? [1.25, 215, 38] : [1.4, 130, 28])
+      : (dark ? [1.2, 220, 42] : [1.35, 135, 32])) as [number, number, number],
+  };
+}
+
+/** 3D 俯視傾斜時的天際與霧氣漸層，避免遠處地平線生硬切白。 */
+export function mapSkyConfig(dark: boolean) {
+  return {
+    'sky-color': dark ? '#0d151d' : '#c9d9e6',
+    'sky-horizon-blend': 0.55,
+    'horizon-color': dark ? '#1a2630' : '#ece7dc',
+    'horizon-fog-blend': 0.7,
+    'fog-color': dark ? '#141c22' : '#e8e4da',
+    'fog-ground-blend': 0.45,
   };
 }
 

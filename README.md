@@ -1,6 +1,6 @@
 # ExitPulse｜臺北捷運旅次變化雷達
 
-![Version 1.3.0](https://img.shields.io/badge/version-1.3.0-1d2125)
+![Version 1.3.1](https://img.shields.io/badge/version-1.3.1-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3-009688)
