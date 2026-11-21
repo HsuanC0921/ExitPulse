@@ -30,6 +30,12 @@ export class TimePlayer {
   readonly playing = input(false);
   readonly busy = input(false);
   readonly failure = input('');
+  readonly quickHours = [
+    { label: '早尖峰', hour: 8 },
+    { label: '午間', hour: 13 },
+    { label: '晚尖峰', hour: 18 },
+    { label: '夜間', hour: 22 },
+  ] as const;
   readonly unrecorded = input(false);
   readonly previous = input(false);
   readonly next = input(false);

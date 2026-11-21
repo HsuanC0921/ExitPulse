@@ -59,6 +59,10 @@ button:disabled { opacity: .45; cursor: default; }
 .relation-clear svg { width: 16px; height: 16px; }
 .relation-status { margin: 0; color: var(--ink-2); font-size: var(--fs-xs); }
 .relation-status button { text-decoration: underline; }
+.quick-hours { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 2px 0 6px; }
+.quick-hours button { min-height: 32px; padding: 0 4px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel-2); color: var(--ink); font-size: var(--fs-xs); font-weight: var(--weight-action); white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .12s; }
+.quick-hours button:hover:not([aria-pressed='true']) { background: var(--rule); border-color: var(--ink-2); }
+.quick-hours button[aria-pressed='true'] { border-color: var(--ink); background: var(--ink); color: var(--panel); box-shadow: 0 1px 3px rgb(0 0 0 / .16); }
 .track-row { display: flex; align-items: center; gap: var(--sp-tight); margin-inline: -6px; }
 .track-row .time-track { flex: 1; min-width: 0; }
 .hour-step { display: grid; flex: none; place-items: center; width: 28px; height: 40px; border-radius: var(--r-s); color: var(--ink-2); }
@@ -105,6 +109,7 @@ button:disabled { opacity: .45; cursor: default; }
   .time-player { padding: 4px 12px; border-radius: var(--r-l); box-shadow: var(--shadow); }
   .date-stepper { grid-template-columns: 44px minmax(0, 1fr) 44px auto; }
   .date-stepper .icon { width: 44px; }
+  .quick-hours button { min-height: 36px; }
   .time-track { height: 44px; }
   .hour-step { width: 32px; height: 44px; }
   .date-stepper { grid-template-columns: 44px minmax(0, 1fr) 44px auto auto; }

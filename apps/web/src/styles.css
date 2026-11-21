@@ -40,7 +40,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-* { scrollbar-width: thin; scrollbar-color: #a9b3b9 transparent; box-sizing: border-box; }
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink, #1d2125) 22%, transparent) transparent; box-sizing: border-box; }
+body { caret-color: var(--ink, #1d2125); accent-color: var(--ink, #1d2125); }
 button, select, input { font: inherit; color: inherit; }
 select { -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important; background-image: none !important; }
 select::picker-icon { display: none; }
@@ -48,7 +49,7 @@ select::-ms-expand { display: none; }
 details:not([open]) > :not(summary) { display: none !important; }
 .sr-only, .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; text-overflow: ellipsis; }
 
-.maplibregl-ctrl-group { border: 0 !important; border-radius: var(--r-m) !important; box-shadow: 0 1px 2px rgb(29 33 37 / .08), 0 12px 32px -10px rgb(29 33 37 / .28) !important; overflow: hidden; }
+.maplibregl-ctrl-group { border: 1px solid var(--hairline, transparent) !important; border-radius: var(--r-m) !important; box-shadow: var(--shadow, 0 1px 2px rgb(29 33 37 / .08), 0 12px 32px -10px rgb(29 33 37 / .28)) !important; overflow: hidden; }
 app-root[data-theme='dark'] .maplibregl-ctrl-group { background: var(--panel, #1e2327); }
 app-root[data-theme='dark'] .maplibregl-ctrl-group button + button { border-top-color: var(--rule, #343c42); }
 app-root[data-theme='dark'] .maplibregl-ctrl-group .maplibregl-ctrl-icon { filter: invert(1) brightness(1.1); }
@@ -101,7 +102,7 @@ svg[viewBox="0 0 24 24"] :is(path, circle, rect, line) { vector-effect: non-scal
 .chips.line-filter button { min-width: 0; min-height: 36px; padding: 4px 0; gap: var(--sp-1); text-align: center; font-weight: var(--weight-emphasis); }
 .chips.line-filter button::before { width: 6px; height: 6px; }
 @media (pointer: coarse), (max-width: 1100px) { .chips button { min-height: 44px; } }
-.result-tools-toggle { display: flex; align-items: center; gap: var(--sp-1); width: 100%; min-height: 38px; padding: 0; border: 0; background: none; color: var(--ink-2); font-size: var(--type-label); text-align: left; }
+.result-tools-toggle { display: flex; align-items: center; gap: var(--sp-1); width: 100%; min-height: 36px; padding: 0; border: 0; background: none; color: var(--ink-2); font-size: var(--type-label); text-align: left; }
 .result-tools-toggle:hover { color: var(--ink); }
 .result-tools-body .tools { margin-top: 0; }
 .result-tools-body + .list-head, .result-tools-toggle + .list-head { margin-top: 4px; }
@@ -111,10 +112,13 @@ svg[viewBox="0 0 24 24"] :is(path, circle, rect, line) { vector-effect: non-scal
 /* 篩選開關是內容寬度的展開鈕，不像輸入框；欄位標題可點來反轉排序 */
 .result-tools-toggle .chev { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .15s; }
 .result-tools-toggle[aria-expanded='true'] .chev { transform: rotate(180deg); }
-.list-sort-head { display: inline-flex; align-items: center; gap: var(--sp-tight); margin: -4px 0; padding: 4px 0; border: 0; background: none; color: inherit; font: inherit; font-weight: var(--weight-action); cursor: pointer; }
-.list-sort-head:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.list-sort-head { display: inline-flex; align-items: center; gap: var(--sp-tight); min-height: 32px; margin: -4px 0; padding: 4px 6px; border: 0; border-radius: var(--r-s); background: none; color: inherit; font: inherit; font-weight: var(--weight-action); cursor: pointer; transition: background-color .14s, color .14s; }
+.list-sort-head:hover { background: var(--panel-2); color: var(--ink); }
 .list-sort-head svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .15s; }
 .list-sort-head.asc svg { transform: rotate(180deg); }
+@media (pointer: coarse) {
+  .maplibregl-ctrl-group button { width: 38px; height: 38px; }
+}
 @media (pointer: coarse), (max-width: 1100px) {
   .result-quick-bar :is(.result-tools-toggle, .select select) { min-height: 44px; }
   .result-quick-bar .select select { height: 44px; }

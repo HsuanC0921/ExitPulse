@@ -11,8 +11,7 @@ import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/htt
 import { firstValueFrom } from 'rxjs';
 import type * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MapLibreMap, ExpressionSpecification, StyleSpecification } from 'maplibre-gl';
-import type { AllPaintProperties } from '@maplibre/maplibre-gl-style-spec';
-import type { Feature, FeatureCollection } from 'geojson';
+import type { Feature } from 'geojson';
 import { Explore, type ExploreLayer, type ExploreMode, type StationAvailability } from './explore';
 import { MobileShell, type MobileAction, type MobilePage, type MobileSummary } from './mobile-shell';
 import { TimePlayer } from './time-player';
@@ -22,6 +21,13 @@ import { About } from './about';
 import { PairDetail } from './pair-detail';
 import { AnimatedCount } from './animated-count';
 import { buildCsv, downloadCsv, exportBasis } from './csv-export';
+import { exportPairCard } from './card-export';
+import {
+  BANDS, DARK_MAP, DOT, EMPTY, FLAT_FLOW_LAYERS, FLOW, LIGHT_MAP, LINES, LOCAL_MAP, LOW_PITCH, MIN_TOWER_PITCH, NB,
+  NIGHT_STATION, OVERVIEW_PAIRS, PAGE, PHONE_STREET_PITCH, PHONE_STREET_ZOOM, PHONE_TOWER_PITCH, STREET_ZOOM, STYLE,
+  TOWER_PITCH, TRAVERSE_MS, TYPES, WEBGL_RESTORE_TIMEOUT, arcGeometry, dotColor, dotFill, lineRingElement,
+  networkDotColor, shadedPaint, store, stored, type MapColorProperty, type MapPaint, type Point,
+} from './radar-map-style';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
 import { StationHistory } from './station-history';
 import type { StationHistoryLine } from './station-history-model';
@@ -50,67 +56,10 @@ type StationInfo = { retrieved: string; facilities: { label: string; area: strin
   districtPop?: { district: string; period: string; population: number; yoyPct?: number | null } | null;
   catchmentPop?: { districts: string[]; period: string; population: number; yoyPct?: number | null } | null;
   latestStats?: { month: string; period?: string; isDate?: boolean; dailyEntries: number; dailyExits: number; rank: number; totalStations: number; yoyPct?: number | null } };
-type Point = [number, number];
-/** 人流用中性色描邊，避免和路線識別色混在一起。 */
-/** 流線是畫面的主角，用一個不與任何路線色重疊的靛紫色，不再是黑白。基準期維持中性灰，當成對照。 */
-const FLOW = { light: '#292929', dark: '#ededeb' };
-
-const LINES: Record<string, string> = { BL: '板南線', BR: '文湖線', G: '松山新店線', R: '淡水信義線', O: '中和新蘆線', Y: '環狀線' };
-/** 明暗共用同一張底圖，深色只是把燈調暗，樣式不換。 */
-const STYLE = 'https://tiles.openfreemap.org/styles/positron';
-const LOCAL_MAP: StyleSpecification = {
-  version: 8, sources: {}, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
-  layers: [{ id: 'local-background', type: 'background', paint: { 'background-color': '#e8e4da' } }],
-};
-const NB = ' ';
-const BANDS: Record<string, string> = { '7-10': `早上${NB}7${NB}到${NB}10${NB}點`, '10-16': `白天${NB}10${NB}到${NB}16${NB}點`, '16-19': `傍晚${NB}16${NB}到${NB}19${NB}點`, '19-24': `晚上${NB}19${NB}點以後` };
-const TYPES = { all: '全部變化', increase: '比例上升', decrease: '比例下降', reversal: '流向對調' };
-/** 每個點通過整條線的時間相同，所以每秒經過某處的點數正比於每日人次。 */
-const TRAVERSE_MS = 7000;
-const OVERVIEW_PAIRS = 30;
-const PAGE = 30;
-const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-const FLAT_FLOW_LAYERS = ['od-ribbons', 'od-streams', 'od-streams-dashed', 'od-comets-flow', 'od-comets-muted', 'od-particles', 'od-pulse', 'od-flow-labels'];
-const TOWER_PITCH = 66;
-const PHONE_TOWER_PITCH = 50;
-const WEBGL_RESTORE_TIMEOUT = 3000;
-const LOW_PITCH = 82;
-const STREET_ZOOM = 16.4;
-const PHONE_STREET_PITCH = 76;
-const PHONE_STREET_ZOOM = 15.8;
-const MIN_TOWER_PITCH = 20;
-/** 全線圓圈底色：淺底深藍、深底亮青，兩種底圖上都跟灰色路網分得開。圖層資料裡的灰色只是「未選取」的記號。 */
-const DOT = { light: '#23282d', dark: '#f1f4f6' };
-const dotColor = (dark: boolean) => ['case', ['==', ['get', 'color'], '#6f7b85'], dark ? DOT.dark : DOT.light, ['get', 'color']] as never;
-/** 圓圈透明度 k（1 為預設，越小越淡），外環、淡填色與內圓一起縮放 */
-const dotFill = (k: number) => ['case', ['==', ['get', 'inner'], 0], .14 * k, .06 * k] as never;
-const NIGHT_STATION = { regular: '#a6b7c0', ranked: '#e7eef1', rim: '#35454e', rankInk: '#15232b' };
-/** Positron 底圖幾乎全白，這組色票讓陸地、水域、公園與文字有足夠層次，長時間看也不刺眼。 */
-const LIGHT_MAP = { land: '#e8e4da', water: '#b7d0da', park: '#d3dfc8', building: '#dcd7cb', label: '#5e5a51', halo: '#f4f1ea' };
-/** 與淺色同一組層次，燈關掉的版本：陸地最暗，水域與公園保留色相，道路略亮於陸地。 */
-const DARK_MAP = { land: '#111619', water: '#152633', park: '#17221e', building: '#1d252a', label: '#a2acb2', halo: '#0d1215', road: '#303b43', outline: '#252e34' };
-type MapColorProperty = 'background-color' | 'fill-color' | 'fill-outline-color' | 'line-color' | 'text-color' | 'text-halo-color';
-type MapColor = AllPaintProperties[MapColorProperty];
-type MapPaint = { layer: string; property: MapColorProperty; day: MapColor; night: string };
-
-function shadedPaint({ day, night }: MapPaint, shade: number): MapColor {
-  if (shade === 0) return day;
-  if (shade === 1) return night;
-  const mix = (color: string): ExpressionSpecification => ['interpolate', ['linear'], shade, 0, color, 1, night];
-  if (typeof day === 'string') return mix(day);
-  // 逐個縮放級距上色，保留 Positron 隨縮放變化的道路顏色
-  if (Array.isArray(day) && day[0] === 'interpolate' && Array.isArray(day[2]) && day[2][0] === 'zoom') {
-    return day.map((value, i) => i >= 4 && i % 2 === 0 && typeof value === 'string'
-      ? mix(value) : value) as ExpressionSpecification;
-  }
-  return shade >= .5 ? night : day;
-}
-const stored = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
-const store = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode: the choice lasts this visit only */ } };
 
 @Component({
   selector: 'app-root', imports: [DecimalPipe, NgTemplateOutlet, Explore, MobileShell, TimePlayer, Hint, Brand, FirstQuery, StationHistory, About, PairDetail, AnimatedCount],
-  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './station-preview.css', './mobile-map.css', './radar.css', './hour-chart.css', './interface-motion.css'],
+  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './station-preview.css', './mobile-map.css', './radar.css', './radar-responsive.css', './hour-chart.css', './interface-motion.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, host: {
     '[attr.data-theme]': 'theme()',
     '[attr.data-inset]': 'device().inset',
@@ -179,6 +128,13 @@ export class Radar implements OnDestroy {
       lines: this.linesOfStation(name).map(line => ({ code: this.stationCode(line.code, name), line: line.code, color: line.color })),
     }));
   });
+  readonly embed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('embed') === '1';
+  readonly curatedStories = [
+    { label: '南港通勤翻倍', detail: '平日早尖峰', query: '?b=2022-09&c=2026-09&h=7-10&w=0&t=all&m=20&s=share&p=%E5%8D%97%E6%B8%AF%3E%E5%8D%97%E6%B8%AF%E5%B1%95%E8%A6%BD%E9%A4%A8' },
+    { label: '大巨蛋週末人潮', detail: '國父紀念館', query: '?v=station&st=%E5%9C%8B%E7%88%B6%E7%B4%80%E5%BF%B5%E9%A4%A8&d=weekend&h=0-24' },
+    { label: '早尖峰通勤潮汐', detail: '全線淨進出', query: '?v=network&nm=net&h=8-9' },
+    { label: '全線純工作日規模', detail: '排除國定假日', query: '?v=network&d=workday&h=0-24' },
+  ] as const;
   private readonly freshVisit = signal(!location.search);
   readonly pairReady = computed(() => {
     const stations = this.pairStations(), a = this.manualOrigin(), b = this.manualDestination();
@@ -713,7 +669,7 @@ export class Radar implements OnDestroy {
       const period = this.stationPeriod();
       untracked(() => { const name = this.selectedMapStation(); if (name && period !== lastPeriod) this.loadStationInfo(name, false); lastPeriod = period; });
     });
-    effect(() => { const s = this.viewState(); if (this.view() === 'pairs' && this.showResults()) history.replaceState(null, '', writeState(s)); });
+    effect(() => { const s = this.viewState(); if (this.view() === 'pairs' && this.showResults()) { const q = writeState(s); history.replaceState(null, '', this.embed ? `${q}&embed=1` : q); } });
     effect(() => {
       const exits = this.showEntrances() ? this.entrancesAtPeriod() : [];
       this.drawEntrances(exits);
@@ -797,47 +753,14 @@ export class Radar implements OnDestroy {
   async saveCard() {
     const r = this.selected(), d = this.data(), s = this.story();
     if (!r || !d || !s) return;
-    const font = getComputedStyle(document.body).getPropertyValue('--ui-font').trim();
-    await Promise.allSettled([
-      document.fonts.load(`800 40px ${font}`, `ExitPulse　捷運旅次變化雷達 ${r.origin} → ${r.destination} 0123456789,.−+`),
-      document.fonts.load(`700 40px ${font}`, s.headline),
-      document.fonts.load(`400 40px ${font}`, `${s.when} · 納入比較 0123456789 站 · 兩期各有效天數與每日人次 資料：臺北市資料大平臺 臺北捷運每日分時各站 OD 流量統計`),
-    ]);
-    const scale = 2, W = 1200, H = 630, canvas = document.createElement('canvas');
-    canvas.width = W * scale; canvas.height = H * scale;
-    const g = canvas.getContext('2d');
-    if (!g) { this.say('這個瀏覽器無法產生圖片'); return; }
-    g.scale(scale, scale);
-    const ink = '#1d2125', muted = '#5e5a51', paper = '#f4f1ea';
-    const text = (value: string, x: number, y: number, size: number, weight: number, color = ink, align: CanvasTextAlign = 'left') => {
-      g.font = `${weight} ${size}px ${font}`; g.fillStyle = color; g.textAlign = align;
-      // 長站名或長句不會超出右緣，過長時整行等比壓縮
-      if (align === 'left') g.fillText(value, x, y, W - 64 - x); else g.fillText(value, x, y);
-    };
-    g.fillStyle = paper; g.fillRect(0, 0, W, H);
-    const from = this.lineOf(r.origin)?.color ?? ink, to = this.lineOf(r.destination)?.color ?? ink;
-    g.fillStyle = from; g.fillRect(0, 0, W / 2, 14); g.fillStyle = to; g.fillRect(W / 2, 0, W / 2, 14);
-    text('ExitPulse　捷運旅次變化雷達', 64, 84, 26, 800);
-    text(`${r.origin}  →  ${r.destination}`, 64, 192, 68, 800);
-    text(s.headline, 64, 262, 40, 700);
-    const figure = (x: number, label: string, daily: number, color: string) => {
-      text(label, x, 348, 26, 400, muted);
-      text(formatDailyTrips(daily), x, 456, 112, 800, color);
-      text('每日人次', x, 516, 26, 400, muted);
-    };
-    figure(64, d.baseline, r.baselineDaily, muted);
-    text('→', 560, 440, 64, 400, muted, 'center');
-    figure(640, d.current, r.currentDaily, ink);
-    g.fillStyle = ink; g.fillRect(64, 546, W - 128, 2);
-    const days = d.days[0] === d.days[1] ? `兩期各 ${d.days[0]} 天` : `有效天數 ${d.days[0]} 與 ${d.days[1]} 天`;
-    text(`${s.when} · 納入比較 ${d.commonStations} 站 · ${days}`, 64, 580, 22, 400, muted);
-    text('資料：臺北市資料大平臺 臺北捷運每日分時各站 OD 流量統計', 64, 610, 18, 400, muted);
-    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) { this.say('圖片產生失敗，請再試一次'); return; }
-    const url = URL.createObjectURL(blob);
-    Object.assign(document.createElement('a'), { href: url, download: `exitpulse-${r.origin}-${r.destination}-${d.baseline}-${d.current}.png` }).click();
-    URL.revokeObjectURL(url);
-    this.say('已存成圖片');
+    const outcome = await exportPairCard({
+      result: r,
+      data: d,
+      story: s,
+      fromColor: this.lineOf(r.origin)?.color,
+      toColor: this.lineOf(r.destination)?.color,
+    });
+    this.say(outcome.ok ? '已存成圖片' : outcome.reason);
   }
 
   hoverPair(r: Result | null) {
@@ -1330,7 +1253,7 @@ export class Radar implements OnDestroy {
     map.addLayer({ id: 'od-streams-dashed', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], true], layout: { 'line-cap': 'butt', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [1.5, 1.2] } });
     map.addLayer({ id: 'od-streams', type: 'line', source: 'od-streams', filter: ['==', ['get', 'dashed'], false], layout: { 'line-cap': 'round', 'line-sort-key': ['get', 'opacity'] }, paint: { 'line-color': ['get', 'color'], 'line-width': ['max', 0.8, ['*', ['get', 'width'], .24]], 'line-width-transition': { duration: 0 }, 'line-opacity': ['get', 'opacity'] } });
     map.addSource('explore-circles', { type: 'geojson', data: EMPTY });
-    map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', layout: { 'circle-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'circle-radius': zoomScaled(['get', 'radius']), 'circle-color': dotColor(dark), 'circle-opacity': dotFill(1 - this.dotTransparency() / 100), 'circle-stroke-color': dotColor(dark), 'circle-stroke-opacity': 1 - this.dotTransparency() / 100, 'circle-stroke-width': 2.2 } });
+    map.addLayer({ id: 'explore-circles', type: 'circle', source: 'explore-circles', layout: { 'circle-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'circle-radius': zoomScaled(['get', 'radius']), 'circle-color': networkDotColor(dark), 'circle-opacity': dotFill(1 - this.dotTransparency() / 100), 'circle-stroke-color': networkDotColor(dark), 'circle-stroke-opacity': 1 - this.dotTransparency() / 100, 'circle-stroke-width': 2.2 } });
     // 比較模式：外環是本期、實心內圓是對照期，增減一眼看出（內圓比外環大就是減少）
     map.addLayer({ id: 'explore-inner', type: 'circle', source: 'explore-circles', filter: ['>', ['get', 'inner'], 0], layout: { 'circle-sort-key': ['-', 0, ['get', 'radius']] }, paint: { 'circle-radius': zoomScaled(['get', 'inner']), 'circle-color': dotColor(dark), 'circle-opacity': .62 * (1 - this.dotTransparency() / 100) } });
     map.addLayer({ id: 'explore-labels', type: 'symbol', source: 'explore-circles', filter: ['!=', ['get', 'label'], ''], layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-padding': 4, 'symbol-sort-key': ['-', 0, ['get', 'radius']],
@@ -1493,11 +1416,20 @@ export class Radar implements OnDestroy {
       const layout = visible ? 'visible' : 'none';
       if (map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== layout) map.setLayoutProperty(id, 'visibility', layout);
     }
+    if (map.getLayer('explore-labels')) {
+      map.setPaintProperty('explore-labels', 'text-halo-width', lifted ? 3.5 : 2);
+      map.setPaintProperty('explore-labels', 'text-halo-blur', lifted ? .5 : 0);
+    }
   }
 
   private towerAmounts(): [string, number | null][] {
     const explore = this.explore();
-    if (this.view() === 'network') return explore?.networkRows().map(row => [row.station, row.entries]) ?? [];
+    if (this.view() === 'network') {
+      if (explore?.networkMetric() === 'net') {
+        return explore.networkRows().map(row => [row.station, row.exitCovered === false || row.entries == null || row.exits == null ? null : row.exits - row.entries]);
+      }
+      return explore?.networkRows().map(row => [row.station, row.entries]) ?? [];
+    }
     if (this.view() === 'station') {
       const station = explore?.stationAnswer();
       if (!explore || !station) return [];
@@ -1541,10 +1473,12 @@ export class Radar implements OnDestroy {
     }
     this.towerScale.set(this.tower3d() ? ticks.map(({ label, px }) => ({ label, px })) : []);
     const dark = this.lighting() >= .5, ink = FLOW[dark ? 'dark' : 'light'], down = dark ? '#ff7a85' : '#b4232f';
+    const isNet = this.view() === 'network' && this.explore()?.networkMetric() === 'net';
+    const netIn = dark ? '#ff8c42' : '#d95f02', netOut = dark ? '#4db8ff' : '#1f78b4';
     this.elevatedFlow?.setSpikes(amounts.flatMap(([name, amount]) => {
       const at = this.stops.get(name);
       return at && amount && name !== entranceStation
-        ? [{ at, height: Math.max(3, Math.min(1.4, Math.sqrt(Math.abs(amount) / full)) * (this.r3d?.SPIKE_MAX_PX ?? 100)), color: amount < 0 ? down : ink }] : [];
+        ? [{ at, height: Math.max(3, Math.min(1.4, Math.sqrt(Math.abs(amount) / full)) * (this.r3d?.SPIKE_MAX_PX ?? 100)), color: isNet ? (amount > 0 ? netIn : netOut) : (amount < 0 ? down : ink) }] : [];
     }));
   }
 
@@ -1770,7 +1704,7 @@ export class Radar implements OnDestroy {
     this.pickedRing = undefined;
     const map = this.map;
     if (map && this.ml && coordinates && lines.length > 1) {
-      const element = this.lineRingElement(lines.map(l => l.color));
+      const element = lineRingElement(lines.map(l => l.color));
       element.style.width = element.style.height = '33px';
       element.style.setProperty('--ring', '3px');
       this.pickedRing = new this.ml.Marker({ element, anchor: 'center' }).setLngLat(coordinates).addTo(map);
@@ -1778,16 +1712,6 @@ export class Radar implements OnDestroy {
   }
 
   private pickedRing?: maplibregl.Marker;
-
-  /** 依各線顏色等分成色環的 DOM 元素 */
-  private lineRingElement(colors: string[]) {
-    const element = document.createElement('div');
-    element.className = 'focus-ring';
-    element.setAttribute('aria-hidden', 'true');
-    const step = 360 / colors.length;
-    element.style.background = `conic-gradient(${colors.map((c, i) => `${c} ${i * step}deg ${(i + 1) * step}deg`).join(', ')})`;
-    return element;
-  }
 
   locateEntrance(exit: Entrance) {
     this.clearPlace();
@@ -2026,13 +1950,15 @@ export class Radar implements OnDestroy {
       map.setPaintProperty(layer, 'text-color', ink);
       map.setPaintProperty(layer, 'text-halo-color', halo);
     }
+    map.setPaintProperty('explore-labels', 'text-halo-width', this.tower3d() ? 3.5 : 2);
+    map.setPaintProperty('explore-labels', 'text-halo-blur', this.tower3d() ? .5 : 0);
     map.setPaintProperty('od-ranks', 'text-color', dark ? NIGHT_STATION.rankInk : ink);
     map.setPaintProperty('metro-stops', 'circle-color', dark ? NIGHT_STATION.regular : halo);
     this.syncMetroNetworkPaint(shade);
     map.setPaintProperty('metro-stops', 'circle-stroke-color', dark ? NIGHT_STATION.rim : '#8d969c');
     map.setPaintProperty('od-stops', 'circle-color', dark ? NIGHT_STATION.ranked : halo);
-    map.setPaintProperty('explore-circles', 'circle-color', dotColor(dark));
-    map.setPaintProperty('explore-circles', 'circle-stroke-color', dotColor(dark));
+    map.setPaintProperty('explore-circles', 'circle-color', networkDotColor(dark));
+    map.setPaintProperty('explore-circles', 'circle-stroke-color', networkDotColor(dark));
     map.setPaintProperty('explore-inner', 'circle-color', dotColor(dark));
     if (map.getLayer('buildings-3d')) map.setPaintProperty('buildings-3d', 'fill-extrusion-color', dark ? DARK_MAP.building : LIGHT_MAP.building);
     map.setPaintProperty('focus-scrim', 'background-color-transition', { duration });
@@ -2126,11 +2052,29 @@ export class Radar implements OnDestroy {
     }
   }
 
+  private transition(update: () => void) {
+    const doc = document as Document & { startViewTransition?: (cb: () => Promise<void> | void) => unknown };
+    if (this.reducedMotion || !doc.startViewTransition) { update(); return; }
+    try {
+      doc.startViewTransition(() => {
+        update();
+        return new Promise<void>(resolve => {
+          const timer = setTimeout(resolve, 50);
+          afterNextRender(() => { clearTimeout(timer); resolve(); }, { injector: this.injector });
+        });
+      });
+    } catch { update(); }
+  }
+
   choose(result: Result, moveFocus = true) {
     if (document.activeElement instanceof HTMLElement && !this.selected()) this.returnFocus = document.activeElement;
-    this.particleElapsed = 0;
-    this.selected.set(result); this.detailOpen.set(moveFocus || !readFold('panel.detail'));
-    this.mobilePage.set('detail');
+    const opening = !this.selected();
+    const run = () => {
+      this.particleElapsed = 0;
+      this.selected.set(result); this.detailOpen.set(moveFocus || !readFold('panel.detail'));
+      this.mobilePage.set('detail');
+    };
+    if (opening) this.transition(run); else run();
     if (moveFocus) {
       afterNextRender(() => this.detailView()?.focusPanel(), { injector: this.injector });
     }
@@ -2158,10 +2102,12 @@ export class Radar implements OnDestroy {
   }
 
   togglePanelWide() {
-    this.panelOpen.set(true);
-    this.panelWide.update(v => !v);
-    // 左右兩個放大檢視互斥，避免兩張大面板疊在地圖上
-    if (this.panelWide()) this.detailWide.set(false);
+    this.transition(() => {
+      this.panelOpen.set(true);
+      this.panelWide.update(v => !v);
+      // 左右兩個放大檢視互斥，避免兩張大面板疊在地圖上
+      if (this.panelWide()) this.detailWide.set(false);
+    });
   }
 
   toggleFavPair() {
@@ -2205,8 +2151,31 @@ export class Radar implements OnDestroy {
   }
 
   openCollectionItem(item: CollectionItem) {
-    if (item.query === location.search) return;
-    location.assign(location.pathname + item.query);
+    this.openStory(item.query);
+  }
+
+  openStory(query: string) {
+    this.closeMenus();
+    const u = new URL(query, location.origin + location.pathname);
+    if (this.embed) u.searchParams.set('embed', '1');
+    const target = u.pathname + u.search;
+    if (target === location.pathname + location.search) return;
+    location.assign(target);
+  }
+
+  fullUrl() {
+    if (typeof location === 'undefined') return '';
+    const u = new URL(location.href);
+    u.searchParams.delete('embed');
+    return u.pathname + (u.searchParams.size ? '?' + u.searchParams.toString() : '');
+  }
+
+  async copyEmbedCode() {
+    const u = new URL(location.href);
+    u.searchParams.set('embed', '1');
+    const code = `<iframe src="${u.href}" width="100%" height="640" style="border:0;border-radius:12px" loading="lazy" title="ExitPulse 臺北捷運旅次變化雷達"></iframe>`;
+    try { await navigator.clipboard.writeText(code); this.collectionNotice.set('已複製嵌入碼，可貼進網頁或文章。'); }
+    catch { this.collectionNotice.set('複製不了，請直接從網址列複製連結加上 embed=1'); }
   }
 
   exportCollection() {
@@ -2282,9 +2251,11 @@ export class Radar implements OnDestroy {
   }
 
   closeDetail() {
-    this.detailWide.set(false);
-    this.selected.set(null); this.profile.set(null); this.profileRequest++;
-    this.mobilePage.set('list');
+    this.transition(() => {
+      this.detailWide.set(false);
+      this.selected.set(null); this.profile.set(null); this.profileRequest++;
+      this.mobilePage.set('list');
+    });
     const target = this.returnFocus;
     this.returnFocus = undefined;
     if (target?.isConnected) afterNextRender(() => target.focus({ preventScroll: true }), { injector: this.injector });
@@ -2292,15 +2263,6 @@ export class Radar implements OnDestroy {
   }
 
   private stop() { if (this.frame != null) cancelAnimationFrame(this.frame); this.frame = undefined; }
-
-  /** 從 a 到 b 的弧線，彎向由行進方向決定，所以 A→B 與 B→A 會分開。 */
-  private arc(a: Point, b: Point, bend: number): Point[] {
-    const dx = b[0] - a[0], dy = b[1] - a[1];
-    return Array.from({ length: 49 }, (_, i) => {
-      const t = i / 48, lift = bend * Math.sin(Math.PI * t);
-      return [a[0] + dx * t - dy * lift, a[1] + dy * t + dx * lift] as Point;
-    });
-  }
 
   private padding() {
     const narrow = innerWidth <= 720, mid = innerWidth <= 960;
@@ -2372,10 +2334,18 @@ export class Radar implements OnDestroy {
     this.explore()?.stopPlayback();
     this.showMobileList();
     if (view === this.view()) return;
-    this.explore()?.focusRelation(null);
-    this.closeDetail(); this.view.set(view); this.exploreLayer.set(null); this.lastFocus = undefined;
-    this.showMobileList();
-    if (view === 'pairs') history.replaceState(null, '', this.showResults() ? writeState(this.viewState()) : location.pathname);
+    this.transition(() => {
+      this.explore()?.focusRelation(null);
+      this.detailWide.set(false);
+      this.selected.set(null); this.profile.set(null); this.profileRequest++;
+      this.returnFocus = undefined;
+      this.view.set(view); this.exploreLayer.set(null); this.lastFocus = undefined;
+      this.showMobileList();
+    });
+    if (view === 'pairs') {
+      const target = this.showResults() ? writeState(this.viewState()) : location.pathname;
+      history.replaceState(null, '', this.embed ? (target.includes('?') ? `${target}&embed=1` : `${target}?embed=1`) : target);
+    }
     this.redraw(true);
   }
 
@@ -2437,7 +2407,7 @@ export class Radar implements OnDestroy {
     const from = flow && this.stops.get(flow.from), to = flow && this.stops.get(flow.to);
     const ink = FLOW[this.lighting() >= .5 ? 'dark' : 'light'];
     drawRankLink(this.map, station, station ? this.stops.get(station) : undefined, ink,
-      station !== null && station === explorer?.selectedRank(), from && to ? this.arc(from, to, -.14) : undefined, flow?.dashed,
+      station !== null && station === explorer?.selectedRank(), from && to ? arcGeometry(from, to, -.14) : undefined, flow?.dashed,
       this.exploreLayer()?.circles.find(c => c.station === station)?.radius);
   }
 
@@ -2490,14 +2460,14 @@ export class Radar implements OnDestroy {
         const key = `${selected.origin}>${selected.destination}`;
         const reverseDaily = selected.reverseCurrent / d.days[1];
         streams = this.mode() === 'volume' ? [
-          { key, label: d.baseline, daily: selected.baselineDaily, color: muted, dashed: true, path: this.arc(a, b, .16) },
-          { key, label: d.current, daily: selected.currentDaily, color: flow, dashed: false, path: this.arc(a, b, -.16) },
+          { key, label: d.baseline, daily: selected.baselineDaily, color: muted, dashed: true, path: arcGeometry(a, b, .16) },
+          { key, label: d.current, daily: selected.currentDaily, color: flow, dashed: false, path: arcGeometry(a, b, -.16) },
         ] : this.mode() === 'direction' ? [
-          { key, label: `${selected.origin} → ${selected.destination}`, daily: selected.currentDaily, color: flow, dashed: false, path: this.arc(a, b, -.16) },
-          { key, label: `${selected.destination} → ${selected.origin}`, daily: reverseDaily, color: reverse, dashed: false, path: this.arc(b, a, -.16) },
+          { key, label: `${selected.origin} → ${selected.destination}`, daily: selected.currentDaily, color: flow, dashed: false, path: arcGeometry(a, b, -.16) },
+          { key, label: `${selected.destination} → ${selected.origin}`, daily: reverseDaily, color: reverse, dashed: false, path: arcGeometry(b, a, -.16) },
         ] : [
-          { key, label: d.baseline, daily: selected.baselineDaily, color: muted, dashed: false, path: this.arc(a, b, -.14) },
-          { key, label: d.current, daily: selected.currentDaily, color: flow, dashed: false, path: this.arc(a, b, -.14) },
+          { key, label: d.baseline, daily: selected.baselineDaily, color: muted, dashed: false, path: arcGeometry(a, b, -.14) },
+          { key, label: d.current, daily: selected.currentDaily, color: flow, dashed: false, path: arcGeometry(a, b, -.14) },
         ];
         stops = [[a, selected.origin, originColor], [b, selected.destination, destColor]];
       }
@@ -2508,7 +2478,7 @@ export class Radar implements OnDestroy {
         const a = this.stops.get(r.origin), b = this.stops.get(r.destination);
         const key = `${r.origin}>${r.destination}`;
         const emphasis = this.hoveredKey ? (key === this.hoveredKey ? 1 : .2) : ambient ? .5 : undefined;
-        if (a && b) streams.push({ key, label: '', daily: r.currentDaily, color: FLOW[this.theme()], dashed: false, emphasis, path: this.arc(a, b, -.14) });
+        if (a && b) streams.push({ key, label: '', daily: r.currentDaily, color: FLOW[this.theme()], dashed: false, emphasis, path: arcGeometry(a, b, -.14) });
       }
     }
     this.streams.set(selected ? streams : []);
@@ -2574,7 +2544,7 @@ export class Radar implements OnDestroy {
     }
     if (!this.focusRing || this.focusRing.station !== station) {
       this.focusRing?.marker.remove();
-      const element = this.lineRingElement(lines.map(l => l.color));
+      const element = lineRingElement(lines.map(l => l.color));
       this.focusRing = { marker: new this.ml.Marker({ element, anchor: 'center' }).setLngLat(at).addTo(map), radius: circle.radius, station };
     }
     this.focusRing.radius = circle.radius;
@@ -2602,11 +2572,11 @@ export class Radar implements OnDestroy {
       const from = at(a.from), to = at(a.to);
       const emphasis = selected ? (a.from === selected || a.to === selected ? 1 : .14) : a.emphasis;
       if (from && to) streams.push({ key: `${a.from}>${a.to}`, label: '', daily: a.daily,
-        color: flow, dashed: a.dashed, emphasis, path: this.arc(from, to, -.14) });
+        color: flow, dashed: a.dashed, emphasis, path: arcGeometry(from, to, -.14) });
     }
     const station = this.view() === 'station';
     const circles = station ? this.visibleStationCircles() : (layer?.circles ?? []);
-    const point = (c: ExploreLayer['circles'][number]) => { const p = at(c.station); return p ? [{ type: 'Feature' as const, properties: { name: c.station, label: c.label, count: c.count ?? '', rank: c.rank ?? 0, color: c.color, radius: c.radius, inner: c.innerRadius ?? 0, hollow: c.hollow, active: c.station === selected }, geometry: { type: 'Point' as const, coordinates: p } }] : []; };
+    const point = (c: ExploreLayer['circles'][number]) => { const p = at(c.station); return p ? [{ type: 'Feature' as const, properties: { name: c.station, label: c.label, count: c.count ?? '', rank: c.rank ?? 0, color: c.color, tone: c.tone ?? '', radius: c.radius, inner: c.innerRadius ?? 0, hollow: c.hollow, active: c.station === selected }, geometry: { type: 'Point' as const, coordinates: p } }] : []; };
     this.drawStreams(streams);
     (map.getSource('od-stops') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? circles.flatMap(point) : [] });
     (map.getSource('explore-circles') as GeoJSONSource).setData({ type: 'FeatureCollection', features: station ? [] : circles.filter(c => c.radius > 0).flatMap(point) });

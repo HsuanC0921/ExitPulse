@@ -6,7 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "node --test src/app/radar-model.test.ts src/app/explore-model.test.ts src/app/station-history-model.test.ts src/app/csv-export.test.ts src/app/collection.test.ts"
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/app/radar-model.test.ts src/app/radar-map-style.test.ts src/app/explore-model.test.ts src/app/station-history-model.test.ts src/app/csv-export.test.ts src/app/collection.test.ts"
   },
   "private": true,
   "packageManager": "npm@11.20.0",

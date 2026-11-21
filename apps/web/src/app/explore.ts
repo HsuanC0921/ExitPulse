@@ -27,8 +27,8 @@ type ExploreAnswer = StationAnswer | NetworkAnswer;
 export type ExploreLayer = {
   /** dashed = fewer trips than the comparison period. Colour is chosen by the map, never by the line. */
   arcs: { from: string; to: string; daily: number; dashed: boolean; emphasis: number }[];
-  /** color = the station's line. hollow = fewer trips than the comparison period. */
-  circles: { station: string; radius: number; innerRadius?: number; color: string; label: string; count?: string; rank?: number; hollow: boolean }[];
+  /** color = the station's line. hollow = fewer trips than the comparison period. tone = net tide in/out. */
+  circles: { station: string; radius: number; innerRadius?: number; color: string; tone?: 'in' | 'out'; label: string; count?: string; rank?: number; hollow: boolean }[];
   focus: string | null;
   /** Counterpart selected in the single-station view. */
   focusedRelation?: string | null;
@@ -176,8 +176,11 @@ export class Explore implements OnDestroy {
   readonly sizeRef = computed(() => {
     const a = this.networkAnswer();
     if (!a) return null;
-    const largest = this.activeHour() != null ? 30000 : Math.max(...a.stations.map(r => r.entries ?? 0));
-    const value = [1000, 2000, 5000, 10000, 20000, 50000, 100000].filter(v => v <= largest * .6).pop();
+    const isNet = this.networkMetric() === 'net';
+    const largest = this.activeHour() != null ? (isNet ? 15000 : 30000) : Math.max(1, ...a.stations.map(r => isNet
+      ? ((r.exitCovered === false || r.entries == null || r.exits == null) ? 0 : Math.abs(r.exits - r.entries))
+      : (r.entries ?? 0)));
+    const value = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000].filter(v => v <= largest * .6).pop();
     return value ? { value: formatDailyTrips(value), size: Math.round(stationRadius(value, largest) * 2) } : null;
   });
   readonly trend = signal<TrendAnswer | null>(null);
@@ -240,6 +243,7 @@ export class Explore implements OnDestroy {
   readonly unavailable = computed(() => this.mode() === 'station' && this.stationUnavailable(this.station()));
   readonly unrecorded = signal(false);
   readonly mapMetric = signal<'volume' | 'change'>('volume');
+  readonly networkMetric = signal<'entries' | 'net'>('entries');
   readonly isComparing = computed(() => !!this.comparePeriod());
   readonly sameAsCompare = computed(() => this.comparePeriod() === this.period());
   readonly sections = computed(() => this.mode() === 'station'
@@ -1296,9 +1300,34 @@ export class Explore implements OnDestroy {
     }
     const a = this.networkAnswer();
     if (!a) return { arcs: [], circles: [], focus: null };
+    const rows = this.networkRows(), focus = this.focusedStation();
+    if (this.networkMetric() === 'net') {
+      const netOf = (r: (typeof rows)[number]) => (r.exitCovered === false || r.entries == null || r.exits == null) ? null : r.exits - r.entries;
+      const largest = this.activeHour() != null ? 15000 : Math.max(1, ...rows.map(r => Math.abs(netOf(r) ?? 0)));
+      const top = new Set([...rows].map(r => ({ station: r.station, abs: Math.abs(netOf(r) ?? 0), has: netOf(r) != null }))
+        .filter(r => r.has && r.abs > 0).sort((x, y) => y.abs - x.abs).slice(0, 10).map(r => r.station));
+      return {
+        arcs: [],
+        circles: rows.map(r => {
+          const net = netOf(r);
+          const absNet = net == null ? 0 : Math.abs(net);
+          const signedNet = net != null && net !== 0 ? `${net > 0 ? '+' : '−'}${formatDailyTrips(absNet)}` : '';
+          return {
+            station: r.station,
+            radius: net == null || net === 0 ? 0 : stationRadius(absNet, largest),
+            innerRadius: 0,
+            color: focus === r.station ? color(r.station) : '#6f7b85',
+            tone: net == null || net === 0 ? undefined : (net > 0 ? 'in' : 'out'),
+            label: top.has(r.station) || focus === r.station ? (signedNet ? `${r.station}\n${signedNet}` : r.station) : '',
+            hollow: false,
+          };
+        }),
+        focus: focus && rows.some(r => r.station === focus) ? focus : null,
+      };
+    }
     // Hourly frames share one size scale: 30,000 entries always maps to a 22px circle.
-    const rows = this.networkRows(), largest = this.activeHour() != null ? 30000 : Math.max(...a.stations.map(r => r.entries ?? 0));
-    const cmp = !!a.compare, top = new Set(sortNetwork(rows, this.networkSort()).slice(0, 10).map(r => r.station)), focus = this.focusedStation();
+    const largest = this.activeHour() != null ? 30000 : Math.max(...a.stations.map(r => r.entries ?? 0));
+    const cmp = !!a.compare, top = new Set(sortNetwork(rows, this.networkSort()).slice(0, 10).map(r => r.station));
     return {
       arcs: [],
       circles: rows.map(r => ({ station: r.station, radius: stationRadius(r.entries, largest), innerRadius: cmp ? stationRadius(r.compareEntries ?? null, largest) : 0,
@@ -1317,11 +1346,14 @@ ${formatDailyTrips(r.entries)}` : r.station) : '',
       p.set('dir', this.direction());
       const peer = this.focusedRelation();
       if (peer) p.set('peer', peer);
+    } else if (this.networkMetric() === 'net') {
+      p.set('nm', 'net');
     }
     if (this.lineFilter()) p.set('ln', this.lineFilter());
     if (this.query().trim()) p.set('q', this.query().trim());
     const c = this.comparePeriod();
     if (c) p.set('cp', c);
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('embed') === '1') p.set('embed', '1');
     return '?' + p.toString();
   }
 
@@ -1340,6 +1372,7 @@ ${formatDailyTrips(r.entries)}` : r.station) : '',
     if (station && station.length <= 20) this.station.set(station);
     const peer = p.get('peer')?.trim();
     this.focusRelation(p.get('v') === 'station' && peer && peer.length <= 20 && peer !== this.station() ? peer : null);
+    if (p.get('v') === 'network' && p.get('nm') === 'net') this.networkMetric.set('net');
     const line = p.get('ln');
     if (line && this.lineCodes.includes(line)) this.lineFilter.set(line);
     const query = p.get('q');
