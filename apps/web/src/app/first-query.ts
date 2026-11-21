@@ -1,6 +1,7 @@
 // 首次查詢面板：輸入站名或站碼找車站，找不到時改搜地點。
 import { readFold, writeFold } from './fold-preference';
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { normalizeStationKey } from './station-match';
 
 export interface FirstQueryStation {
   name: string;
@@ -31,7 +32,7 @@ const DEFAULT_PRESETS: FirstQueryPreset[] = [
 ];
 
 // 搜尋比對鍵：全形轉半形、「臺」統一為「台」、不分大小寫
-const searchKey = (value: string) => value.trim().normalize('NFKC').replaceAll('臺', '台').toLowerCase();
+const searchKey = normalizeStationKey;
 
 @Component({
   selector: 'app-first-query',
@@ -40,6 +41,8 @@ const searchKey = (value: string) => value.trim().normalize('NFKC').replaceAll('
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FirstQuery {
+  private readonly injector = inject(Injector);
+  private readonly stationInput = viewChild<ElementRef<HTMLInputElement>>('stationInput');
   readonly stations = input<FirstQueryStation[]>([]);
   readonly latestMonth = input<string>('');
   readonly chooseStation = output<string>();
@@ -48,6 +51,7 @@ export class FirstQuery {
   readonly choosePreset = output<FirstQueryPreset>();
   readonly presets = DEFAULT_PRESETS;
   readonly query = signal('');
+  readonly activeIndex = signal(0);
   readonly collapsed = signal(readFold('panel.first-query'));
   toggleCollapsed() { this.collapsed.update(value => !value); writeFold('panel.first-query', this.collapsed()); }
 
@@ -60,6 +64,44 @@ export class FirstQuery {
       .slice(0, 6);
   });
 
+  onInput(value: string) {
+    this.query.set(value);
+    this.activeIndex.set(0);
+  }
+
+  onKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
+    const matches = this.matches();
+    if (e.key === 'ArrowDown' && matches.length) {
+      e.preventDefault();
+      const next = (this.activeIndex() + 1) % matches.length;
+      this.activeIndex.set(next);
+      document.getElementById('fq-opt-' + next)?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'ArrowUp' && matches.length) {
+      e.preventDefault();
+      const next = (this.activeIndex() - 1 + matches.length) % matches.length;
+      this.activeIndex.set(next);
+      document.getElementById('fq-opt-' + next)?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'Escape' && this.query()) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.query.set('');
+      this.activeIndex.set(0);
+    }
+  }
+
+  focusInput() {
+    if (this.collapsed()) {
+      this.collapsed.set(false);
+      writeFold('panel.first-query', false);
+    }
+    afterNextRender(() => this.stationInput()?.nativeElement.focus({ preventScroll: true }), { injector: this.injector });
+  }
+
   select(station: FirstQueryStation) {
     this.chooseStation.emit(station.name);
   }
@@ -68,13 +110,17 @@ export class FirstQuery {
     this.findPlace.emit(this.query().trim());
   }
 
-  // Enter 送出：完全相符或唯一候選直接選站，無候選才當地點搜尋
+  // Enter 送出：有高亮或精準相符直接選站，無候選才當地點搜尋
   submit() {
     const matches = this.matches();
     const query = searchKey(this.query());
-    const exact = matches.find(station => searchKey(station.name) === query
-      || station.lines?.some(line => searchKey(line.code) === query));
-    if (exact || matches.length === 1) this.select(exact ?? matches[0]);
-    else if (query && !matches.length) this.searchPlace();
+    if (matches.length) {
+      const idx = Math.min(this.activeIndex(), matches.length - 1);
+      const exact = idx === 0 ? matches.find(station => searchKey(station.name) === query
+        || station.lines?.some(line => searchKey(line.code) === query)) : undefined;
+      this.select(exact ?? matches[idx]);
+      return;
+    }
+    if (query) this.searchPlace();
   }
 }

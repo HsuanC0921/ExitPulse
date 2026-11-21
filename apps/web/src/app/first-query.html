@@ -16,21 +16,36 @@
   <form class="first-query-search" (submit)="$event.preventDefault(); submit()">
   <label class="first-query-label" for="first-query-station">搜尋車站名稱或代號</label>
   <input
+    #stationInput
     id="first-query-station"
     type="search"
     autocomplete="off"
     maxlength="40"
     placeholder="輸入站名或代號，例如台北車站、BL12"
+    role="combobox"
+    aria-autocomplete="list"
+    [attr.aria-expanded]="matches().length > 0"
+    aria-controls="first-query-matches"
+    [attr.aria-activedescendant]="matches().length ? 'fq-opt-' + (activeIndex() < matches().length ? activeIndex() : 0) : null"
     [value]="query()"
-    (input)="query.set($any($event.target).value)"
+    (input)="onInput($any($event.target).value)"
+    (keydown)="onKeydown($event)"
   >
   </form>
 
   @if (matches().length) {
-    <ul id="first-query-matches" class="first-query-matches" aria-label="符合的車站">
-      @for (station of matches(); track station.name) {
+    <ul id="first-query-matches" class="first-query-matches" role="listbox" aria-label="符合的車站">
+      @for (station of matches(); track station.name; let i = $index) {
         <li>
-          <button type="button" (click)="select(station)">
+          <button
+            type="button"
+            role="option"
+            [id]="'fq-opt-' + i"
+            [attr.aria-selected]="i === (activeIndex() < matches().length ? activeIndex() : 0)"
+            [class.active]="i === (activeIndex() < matches().length ? activeIndex() : 0)"
+            (mouseenter)="activeIndex.set(i)"
+            (click)="select(station)"
+          >
             <span class="first-query-station-name">{{ station.name }}</span>
             @if (station.lines?.length) {
               <span class="first-query-lines" aria-label="路線代號">

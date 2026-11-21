@@ -104,6 +104,8 @@ app-root[data-layout='compact'] { --tabbar: var(--safe-bottom); --mobile-top: ca
   .icon-button { width: 44px; height: 44px; }
   .chips button { min-height: 44px; min-width: 44px; }
   .select select, .select input, .search input { height: 44px; min-height: 44px; }
+  .direct-pair-row { grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); }
+  .pair-swap-btn { width: 44px; height: 44px; }
   :is(.view-tabs.segmented button, .section-toggle, .direct-pair summary, .direct-submit, .tools input, .tools select, .list-actions button, .pair-actions button, .more, .section-tabs button, .flowbar .segmented button, .fav-chip) { min-height: 44px; }
 }
 

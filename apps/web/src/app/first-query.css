@@ -95,8 +95,8 @@
   transition: background-color .15s, border-color .15s, transform .14s cubic-bezier(.22, 1, .36, 1);
 }
 
-.first-query-matches button:hover { background: var(--panel-2, #f0f2f1); }
-.first-query-matches button:hover svg { transform: translateX(3px); }
+.first-query-matches button:hover, .first-query-matches button.active { background: var(--panel-2, #f0f2f1); border-color: var(--ink-2, #5d666c); }
+.first-query-matches button:hover svg, .first-query-matches button.active svg { transform: translateX(3px); }
 .first-query-matches button:active, .first-query-place:active, .first-query-compare:active { transform: scale(.985); }
 .first-query-station-name { flex: 1; min-width: 0; font-weight: var(--weight-action); overflow-wrap: break-word; }
 .first-query-lines { display: flex; flex-wrap: wrap; gap: var(--sp-1); }

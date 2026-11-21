@@ -17,6 +17,7 @@ import { AnimatedCount } from './animated-count';
 import { RankChart, type RankChartData } from './rank-chart';
 import { MotionPreference } from './motion-preference';
 import { revealRankRow } from './rank-scroll';
+import { resolveStationInput } from './station-match';
 
 export type ExploreMode = 'station' | 'network';
 export type StationLine = { code: string; name: string; color: string };
@@ -145,11 +146,13 @@ export class Explore implements OnDestroy {
   readonly focusedRelation = signal<string | null>(null);
   readonly lineFilter = signal('');
   readonly query = signal('');
+  readonly stationSearchError = signal('');
   readonly shown = signal(PAGE);
   /** Only one condition is edited at a time, so the panel stays short. */
   readonly editing = signal<'station' | 'time' | 'compare' | 'peer' | null>(null);
   readonly conditionsOpen = signal(false);
   readonly toolsOpen = signal(false);
+  private readonly pendingSearchFocus = signal(false);
   readonly hourTableOpen = signal(false);
   readonly wideView = signal(false);
   private wideOpener: HTMLElement | null = null;
@@ -822,6 +825,14 @@ export class Explore implements OnDestroy {
     // Comparing is about differences, so the lists switch to "biggest change first" and back.
     effect(() => { const c = this.isComparing(); untracked(() => { this.relationSort.set(c ? 'change' : 'daily'); this.networkSort.set(c ? 'change' : 'entries'); }); });
     effect(() => { if (this.mode()) history.replaceState(null, '', this.url()); });
+    effect(() => {
+      if (!this.pendingSearchFocus()) return;
+      if (this.mode() !== 'network') { this.pendingSearchFocus.set(false); return; }
+      if (this.activeSection() === 'list' && this.networkAnswer() && !this.listCollapsed() && this.toolsOpen()) {
+        this.pendingSearchFocus.set(false);
+        afterNextRender(() => this.host.querySelector<HTMLInputElement>('.tools input[type="search"]')?.focus({ preventScroll: true }), { injector: this.injector });
+      }
+    });
   }
 
   // ----- Query plumbing -----
@@ -1093,6 +1104,7 @@ export class Explore implements OnDestroy {
     this.peerStation.set(prev);
     this.focusedStation.set(prev);
     this.focusedRelation.set(prev);
+    if (this.editing() === 'peer') this.editing.set(null);
   }
   /** 收藏面板用的預設名稱 */
   saveName() {
@@ -1128,6 +1140,46 @@ export class Explore implements OnDestroy {
   readonly dateNote = computed(() => this.calendar()?.dates.find(d => d.date === this.date())?.note ?? '');
 
   toggle(part: 'station' | 'time' | 'compare' | 'peer') { this.editing.set(this.editing() === part ? null : part); }
+  pickPeer(name: string | null) { this.focusRelation(name); if (this.editing() === 'peer') this.editing.set(null); }
+  onStationSearchEnter(event: Event) {
+    if (event instanceof KeyboardEvent && event.isComposing) return;
+    event.preventDefault();
+    if (event.target instanceof HTMLInputElement) this.submitStationSearch(event.target.value, event.target, true);
+  }
+  submitStationSearch(raw: string, inputEl: HTMLInputElement, pickFirstOnMulti = false) {
+    if (!raw.trim()) { this.stationSearchError.set(''); return; }
+    const available = this.allStations().filter(s => !this.stationUnavailable(s));
+    const res = resolveStationInput(raw, available, this.stationCodes());
+    const chosen = res.match ?? (pickFirstOnMulti && res.candidates.length ? res.candidates[0] : null);
+    if (chosen) {
+      this.pickStation(chosen);
+      inputEl.value = '';
+      this.stationSearchError.set('');
+    } else if (pickFirstOnMulti) {
+      this.stationSearchError.set('找不到符合的車站');
+    }
+  }
+  focusSearch() {
+    if (this.mode() === 'station') {
+      this.conditionsOpen.set(true);
+      this.editing.set('station');
+      this.stationSearchError.set('');
+      afterNextRender(() => this.host.querySelector<HTMLInputElement>('#editor-station input[type="search"]')?.focus({ preventScroll: true }), { injector: this.injector });
+      return;
+    }
+    if (this.section() === 'coverage') {
+      afterNextRender(() => this.host.querySelector<HTMLInputElement>('.coverage-search input[type="search"]')?.focus({ preventScroll: true }), { injector: this.injector });
+      return;
+    }
+    if (this.section() !== 'list') this.section.set('list');
+    this.listCollapsed.set(false);
+    this.toolsOpen.set(true);
+    if (this.networkAnswer()) {
+      afterNextRender(() => this.host.querySelector<HTMLInputElement>('.tools input[type="search"]')?.focus({ preventScroll: true }), { injector: this.injector });
+    } else {
+      this.pendingSearchFocus.set(true);
+    }
+  }
   setCompare(spec: string | null) {
     if (spec == null) { this.comparing.set(false); if (this.editing() === 'compare') this.editing.set(null); return; }
     this.comparing.set(true); this.compareUnit.set(spec.length === 10 ? 'date' : 'month'); this.compareMonth.set(spec.slice(0, 7));
@@ -1139,6 +1191,7 @@ export class Explore implements OnDestroy {
     if (this.stationUnavailable(name)) return;
     if (name !== this.station()) this.focusRelation(null);
     this.station.set(name); this.query.set(''); this.lineFilter.set('');
+    this.stationSearchError.set('');
     this.availabilityNotice.set('');
     if (this.editing() === 'station') this.editing.set(null);
   }

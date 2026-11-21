@@ -164,9 +164,15 @@ button { cursor: pointer; }
 .direct-pair summary::-webkit-details-marker { display: none; }
 .direct-pair[open] summary svg { rotate: 180deg; }
 .direct-fields { display: grid; gap: var(--sp-2); padding: 12px; border-top: 1px solid var(--rule); }
+.direct-pair-row { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); align-items: end; gap: var(--sp-1); }
+.pair-swap-btn { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink-2); cursor: pointer; transition: border-color .15s, color .15s, background-color .15s; }
+.pair-swap-btn:hover:not(:disabled) { border-color: var(--ink-2); color: var(--ink); background: var(--panel-2); }
+.pair-swap-btn:disabled { opacity: .45; cursor: default; }
+.pair-swap-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .direct-submit { min-height: 36px; padding: 0 12px; border: 1px solid var(--rule); border-radius: var(--r-m); background: var(--panel); color: var(--ink); font-weight: var(--weight-action); }
 .direct-submit:disabled { opacity: .55; cursor: default; }
 .direct-feedback { margin: 0; color: var(--down); font-size: var(--type-label); }
+.direct-feedback.is-hint { color: var(--ink-2); }
 .primary svg { width: 16px; height: 16px; stroke-width: 2; }
 .status { margin: 12px 0 0; color: var(--ink-2); font-size: var(--fs-xs); }
 .initial-state { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 44px; }

@@ -14,8 +14,12 @@
       @if (editing() === 'station') {
         <div class="editor" id="editor-station">
           <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
-            <input type="search" list="all-stations" placeholder="搜尋站名或直接選線" aria-label="輸入站名" (change)="allStations().includes($any($event.target).value) && pickStation($any($event.target).value); $any($event.target).value = ''">
+            <input type="search" list="all-stations" placeholder="輸入站名或代號（如 BL12）" aria-label="輸入站名或代號"
+              (input)="stationSearchError.set('')"
+              (change)="submitStationSearch($any($event.target).value, $any($event.target), false)"
+              (keydown.enter)="onStationSearchEnter($event)">
           </label>
+          @if (stationSearchError()) { <p class="hint" role="status">{{ stationSearchError() }}</p> }
           <datalist id="all-stations">@for (s of allStations(); track s) { <option [value]="s"></option> }</datalist>
           <div class="chips picker-lines" role="group" aria-label="選擇路線">
             @for (code of lineCodes; track code) {
@@ -109,7 +113,7 @@
       @if (editing() === 'peer') {
         <div class="editor" id="editor-peer">
           <div class="peer-picker">
-            <label class="field"><span>選擇對照車站</span><span class="select"><select (change)="focusRelation($any($event.target).value || null)">
+            <label class="field"><span>選擇對照車站</span><span class="select"><select (change)="pickPeer($any($event.target).value || null)">
               <option value="" [selected]="!peerStation()">不比對</option>
               @for (s of allStations(); track s) { <option [value]="s" [selected]="peerStation() === s" [disabled]="s === station() || stationUnavailable(s)">{{ s }}</option> }
             </select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>

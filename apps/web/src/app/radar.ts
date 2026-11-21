@@ -31,6 +31,7 @@ import {
   type MapColorProperty, type MapPaint, type Point,
 } from './radar-map-style';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
+import { resolveStationInput } from './station-match';
 import { StationHistory } from './station-history';
 import type { StationHistoryLine } from './station-history-model';
 import { daylightAt } from './daylight';
@@ -138,14 +139,26 @@ export class Radar implements OnDestroy {
     { label: '全線純工作日規模', detail: '排除國定假日', query: '?v=network&d=workday&h=0-24' },
   ] as const;
   private readonly freshVisit = signal(!location.search);
-  readonly pairReady = computed(() => {
-    const stations = this.pairStations(), a = this.manualOrigin(), b = this.manualDestination();
-    return a !== b && stations.includes(a) && stations.includes(b);
-  });
   readonly manualOrigin = signal('');
   readonly manualDestination = signal('');
   readonly manualError = signal('');
   readonly manualLoading = signal(false);
+  readonly resolvedManualOrigin = computed(() => resolveStationInput(this.manualOrigin(), this.pairStations(), this.stationCodes()));
+  readonly resolvedManualDestination = computed(() => resolveStationInput(this.manualDestination(), this.pairStations(), this.stationCodes()));
+  readonly pairReady = computed(() => {
+    const a = this.resolvedManualOrigin().match, b = this.resolvedManualDestination().match;
+    return !!a && !!b && a !== b;
+  });
+  readonly manualHint = computed(() => {
+    const oRaw = this.manualOrigin().trim(), dRaw = this.manualDestination().trim();
+    const o = this.resolvedManualOrigin(), d = this.resolvedManualDestination();
+    if (o.match && d.match && o.match === d.match) return '起站與迄站不能相同';
+    const notes = [
+      oRaw && !o.match ? (o.candidates.length ? `起站符合多站（${o.candidates.slice(0, 3).join('、')}）` : '起站找不到此站') : '',
+      dRaw && !d.match ? (d.candidates.length ? `迄站符合多站（${d.candidates.slice(0, 3).join('、')}）` : '迄站找不到此站') : '',
+    ].filter(Boolean);
+    return notes.join('，');
+  });
   // 收藏只存在這台瀏覽器；localStorage 被封鎖時改用一個寫入必失敗的空殼，畫面照常運作
   private readonly store: StorageLike = (() => { try { return localStorage; } catch { return { getItem: () => null, setItem: () => { throw new Error('blocked'); } }; } })();
   readonly collection = signal<CollectionItem[]>(loadCollection(this.store));
@@ -166,7 +179,9 @@ export class Radar implements OnDestroy {
   });
   readonly manualSuggestedMonths = computed<{ baseline: string; current: string } | null>(() => {
     if (!this.manualError()) return null;
-    const avail = this.availability(), o = this.manualOrigin(), d = this.manualDestination();
+    const avail = this.availability();
+    const o = this.resolvedManualOrigin().match ?? this.manualOrigin();
+    const d = this.resolvedManualDestination().match ?? this.manualDestination();
     if (!avail || !o || !d) return null;
     const mo = avail[o]?.months ?? [], md = new Set(avail[d]?.months ?? []);
     const common = mo.filter(m => md.has(m)).sort();
@@ -336,6 +351,9 @@ export class Radar implements OnDestroy {
     return { entryPct, exitPct, label };
   });
   private stationInfoRequest = 0;
+  private autoFindTimer: ReturnType<typeof setTimeout> | undefined;
+  private findSeq = 0;
+  private pendingAutoFind = false;
   /** 使用者正在看的月份或日期，車站資訊卡要對應這個期間。 */
   readonly stationPeriod = computed(() => this.view() === 'pairs' ? this.current() : this.explore()?.period());
   private entrancePins = new Map<Entrance, maplibregl.Marker>();
@@ -742,7 +760,8 @@ export class Radar implements OnDestroy {
 
   private readonly onKey = (e: KeyboardEvent) => {
     if (document.querySelector('dialog[open]')) return; // 對話框開著時，鍵盤交給對話框
-    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || !!target?.isContentEditable;
     if (e.key === 'Escape' && this.mapFullscreen()) {
       if (!document.fullscreenElement) { e.preventDefault(); void this.toggleMapFullscreen(); }
       return;
@@ -753,10 +772,46 @@ export class Radar implements OnDestroy {
     if (e.key === 'Escape' && this.selectedMapStation()) { e.preventDefault(); this.closeStationPreview(); return; }
     if (e.key === 'Escape' && this.selected()) { e.preventDefault(); this.closeDetail(); return; }
     if (e.key === 'Escape' && this.phone() && this.mobilePage() === 'conditions') { this.showResults() ? this.showMobileList() : this.showMobileMap(); return; }
-    if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.isComposing || typing || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '[' && !this.phone()) { e.preventDefault(); this.togglePanelOpen(); return; }
-    if (this.view() !== 'pairs') return;
-    if (e.key === '/' && this.view() === 'pairs' && this.showResults()) { e.preventDefault(); this.panelOpen.set(true); this.toolsOpen.set(true); setTimeout(() => this.searchInput()?.nativeElement.focus()); return; }
+    if (e.key === '/') {
+      e.preventDefault();
+      this.panelOpen.set(true);
+      if (this.view() === 'pairs') {
+        if (this.showFirstQuery()) { this.firstQuery()?.focusInput(); return; }
+        if (this.showResults()) {
+          this.toolsOpen.set(true);
+          afterNextRender(() => this.searchInput()?.nativeElement.focus({ preventScroll: true }), { injector: this.injector });
+        }
+        return;
+      }
+      this.explore()?.focusSearch();
+      return;
+    }
+    if (this.view() !== 'pairs') {
+      if (!this.openMenu() && !this.selectedMapStation() && !this.mapOnly()) {
+        const explorer = this.explore();
+        if (explorer?.unit() === 'date') {
+          const onInteractive = !!target?.closest('button, a, summary, [role="button"], [role="slider"], [role="tab"], [role="menuitem"]');
+          const onMap = !!target?.closest('.maplibregl-canvas, .maplibregl-map, .map');
+          if (e.key === ' ' && !onInteractive) {
+            e.preventDefault();
+            explorer.togglePlayback();
+            return;
+          }
+          if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !onInteractive && !onMap) {
+            e.preventDefault();
+            const cur = explorer.activeHour();
+            const next = cur == null
+              ? (e.key === 'ArrowRight' ? 7 : 22)
+              : e.key === 'ArrowRight' ? Math.min(23, cur + 1) : Math.max(0, cur - 1);
+            explorer.setHour(next);
+            return;
+          }
+        }
+      }
+      return;
+    }
     if ((e.key === 'j' || e.key === 'k') && this.results().length) {
       const list = this.results(), at = list.indexOf(this.selected()!);
       const next = list[Math.min(list.length - 1, Math.max(0, at + (e.key === 'j' ? 1 : -1)))];
@@ -1600,7 +1655,10 @@ export class Radar implements OnDestroy {
   }
 
   resetMap() {
+    this.beforeLowAngle = undefined;
+    this.lowAngle.set(false);
     this.map?.easeTo({ center: [121.53, 25.05], zoom: 10.6, bearing: 0,
+      pitch: this.tower3d() ? this.towerPitch() : 0,
       duration: this.reducedMotion ? 0 : 400 });
   }
 
@@ -2095,36 +2153,74 @@ export class Radar implements OnDestroy {
       || this.datasetDayType(d) !== this.dayType() || (d.minimum ?? 20) !== this.minimum() || (d.type ?? 'all') !== this.changeType());
   });
 
-  filtersChanged() { this.queryError.set(''); if (this.selected()) this.closeDetail(); }
+  filtersChanged() {
+    this.queryError.set('');
+    this.suggestedBand.set('');
+    if (this.selected()) this.closeDetail();
+    clearTimeout(this.autoFindTimer);
+    this.autoFindTimer = undefined;
+    if (!this.showResults() || !this.apiAvailable() || this.view() !== 'pairs') return;
+    if (this.baseline() === this.current()) {
+      this.queryError.set('基準與比較請選不同月份。');
+      return;
+    }
+    this.autoFindTimer = setTimeout(() => {
+      this.autoFindTimer = undefined;
+      if (this.conditionsChanged()) void this.find(false);
+    }, 220);
+  }
 
   setSort(key: SortKey) { this.sortKey.set(key); this.shown.set(PAGE); this.redraw(false); }
   setQuery(text: string) { this.query.set(text); this.shown.set(PAGE); this.redraw(false); }
   setLine(code: string) { this.lineFilter.set(this.lineFilter() === code ? '' : code); this.shown.set(PAGE); this.redraw(false); }
 
-  async find() {
-    if (this.loading()) return;
+  async find(collapseConditions = true) {
+    clearTimeout(this.autoFindTimer);
+    this.autoFindTimer = undefined;
+    if (this.loading()) {
+      if (!collapseConditions) this.pendingAutoFind = true;
+      return;
+    }
     if (this.baseline() === this.current()) { this.queryError.set('基準與比較請選不同月份。'); return; }
-    this.queryError.set(''); this.suggestedBand.set(''); this.closeDetail();
+    const seq = ++this.findSeq;
+    this.pendingAutoFind = false;
+    this.queryError.set(''); this.suggestedBand.set('');
+    if (this.selected()) this.closeDetail();
     this.query.set(''); this.lineFilter.set(''); this.shown.set(PAGE);
-    if (!this.apiAvailable()) { this.showResults.set(true); this.conditionsOpen.set(false); this.mobilePage.set('list'); this.redraw(true); return; }
+    if (!this.apiAvailable()) {
+      this.showResults.set(true);
+      if (collapseConditions) { this.conditionsOpen.set(false); this.mobilePage.set('list'); }
+      this.redraw(true);
+      return;
+    }
     this.loading.set(true);
     const [start, end] = this.hours().split('-');
     try {
       const params = { baseline: this.baseline(), current: this.current(), start, end, ...this.dayTypeParams(this.dayType()), minimum: this.minimum(), type: this.changeType() };
-      this.data.set(await this.getRadar(params));
+      const result = await this.getRadar(params);
+      if (seq !== this.findSeq) return;
+      this.data.set(result);
       this.showResults.set(true);
       if (this.view() === 'pairs') {
-        this.conditionsOpen.set(false);
-        this.mobilePage.set('list');
+        if (collapseConditions) { this.conditionsOpen.set(false); this.mobilePage.set('list'); }
         this.redraw(true);
       }
     } catch (error) {
+      if (seq !== this.findSeq) return;
       const e = error instanceof HttpErrorResponse ? error : null;
       const sug: number[] | null = e?.status === 422 && e.error?.code === 'hours_mismatch' ? e.error.suggested : null;
       if (sug && `${sug[0]}-${sug[1]}` in BANDS) this.suggestedBand.set(`${sug[0]}-${sug[1]}`);
       this.queryError.set(e?.status === 422 && e.error?.error ? e.error.error + (sug && !this.suggestedBand() ? `可比較的時段是 ${sug[0]}–${sug[1]} 時。` : '')
         : e && [0, 502, 503, 504].includes(e.status) ? '資料服務暫時沒有回應，請稍後再試。' : '比較失敗，請再試一次。');
-    } finally { this.loading.set(false); }
+    } finally {
+      if (seq === this.findSeq) this.loading.set(false);
+      if (this.pendingAutoFind && !this.loading() && this.view() === 'pairs' && this.baseline() !== this.current() && this.conditionsChanged()) {
+        this.pendingAutoFind = false;
+        void this.find(false);
+      } else {
+        this.pendingAutoFind = false;
+      }
+    }
   }
 
   /** 首屏的一鍵範例：依範例型態切換到兩站比較、單站分析或全線潮汐。 */
@@ -2170,8 +2266,20 @@ export class Radar implements OnDestroy {
     }
   }
 
-  async findPair(origin = this.manualOrigin(), destination = this.manualDestination(), moveFocus = true) {
+  swapManualPair() {
+    const o = this.manualOrigin(), d = this.manualDestination();
+    this.manualOrigin.set(d);
+    this.manualDestination.set(o);
+    this.manualError.set('');
+  }
+
+  async findPair(rawOrigin = this.manualOrigin(), rawDestination = this.manualDestination(), moveFocus = true) {
+    const stations = this.pairStations(), codes = this.stationCodes();
+    const origin = resolveStationInput(rawOrigin, stations, codes).match ?? rawOrigin;
+    const destination = resolveStationInput(rawDestination, stations, codes).match ?? rawDestination;
     if (!this.apiAvailable() || this.manualLoading() || !origin || !destination || origin === destination) return;
+    if (stations.includes(origin) && this.manualOrigin() !== origin) this.manualOrigin.set(origin);
+    if (stations.includes(destination) && this.manualDestination() !== destination) this.manualDestination.set(destination);
     this.manualError.set('');
     this.manualLoading.set(true);
     try {
@@ -2216,6 +2324,10 @@ export class Radar implements OnDestroy {
   choose(result: Result, moveFocus = true) {
     if (document.activeElement instanceof HTMLElement && !this.selected()) this.returnFocus = document.activeElement;
     const opening = !this.selected();
+    if (this.tower3d() && this.lowAngle()) {
+      this.beforeLowAngle = undefined;
+      this.lowAngle.set(false);
+    }
     const run = () => {
       this.particleElapsed = 0;
       this.selected.set(result); this.detailOpen.set(moveFocus || !readFold('panel.detail'));
@@ -2661,7 +2773,8 @@ export class Radar implements OnDestroy {
     else if (fly && streams.length && this.ml) {
       const bounds = new this.ml.LngLatBounds(streams[0].path[0], streams[0].path[0]);
       for (const s of streams) { bounds.extend(s.path[0]); bounds.extend(s.path[s.path.length - 1]); }
-      map.fitBounds(bounds, { padding: this.padding(), maxZoom: 14.5, bearing: map.getBearing(), duration: this.reducedMotion ? 0 : 1100 });
+      map.fitBounds(bounds, { padding: this.padding(), maxZoom: 14.5, bearing: map.getBearing(),
+        pitch: this.tower3d() ? this.towerPitch() : 0, duration: this.reducedMotion ? 0 : 1100 });
     }
     // 首屏的背景人流也讓箭頭動起來，一打開就有「正在流動」的感覺
     this.animate(streams, time, selected != null || (!this.showResults() && this.showFirstQuery()));
@@ -2977,5 +3090,5 @@ export class Radar implements OnDestroy {
     if (res.outcome === 'accepted') this.installPrompt.set(null);
   }
 
-  ngOnDestroy() { removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); this.map?.remove(); }
+  ngOnDestroy() { clearTimeout(this.autoFindTimer); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); this.map?.remove(); }
 }

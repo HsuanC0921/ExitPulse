@@ -585,7 +585,7 @@
             <span>{{ loading() ? '正在比較…' : '找出變化最大的兩站' }}</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
           </button>
-          <p class="radar-feedback" role="status">{{ queryError() || (showResults() && conditionsChanged() ? '條件已變更，請重新比較。' : '') }}</p>
+          <p class="radar-feedback" role="status">{{ queryError() || (showResults() && conditionsChanged() ? (loading() ? '正在依新條件比較…' : '條件已變更，將自動更新…') : '') }}</p>
         } @else if (queryError()) {
           <p class="radar-feedback" role="status">{{ queryError() }}</p>
         }
@@ -595,13 +595,16 @@
           <details class="direct-pair">
             <summary><span>手選兩站</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
             <form (submit)="$event.preventDefault(); findPair()" class="direct-fields">
-              <div class="grid">
-                <label class="field"><span>起站</span><span class="select"><input type="text" list="pair-stations" autocomplete="off" placeholder="輸入站名" aria-label="起站" [value]="manualOrigin()" (input)="manualOrigin.set($any($event.target).value.trim())"></span></label>
-                <label class="field"><span>迄站</span><span class="select"><input type="text" list="pair-stations" autocomplete="off" placeholder="輸入站名" aria-label="迄站" [value]="manualDestination()" (input)="manualDestination.set($any($event.target).value.trim())"></span></label>
+              <div class="direct-pair-row">
+                <label class="field"><span>起站</span><span class="select"><input type="text" list="pair-stations" autocomplete="off" placeholder="站名或代號" aria-label="起站" [value]="manualOrigin()" (input)="manualOrigin.set($any($event.target).value.trim()); manualError.set('')"></span></label>
+                <button type="button" class="pair-swap-btn" (click)="swapManualPair()" [disabled]="!manualOrigin() && !manualDestination()" aria-label="對調起訖站" title="對調起訖站">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+                </button>
+                <label class="field"><span>迄站</span><span class="select"><input type="text" list="pair-stations" autocomplete="off" placeholder="站名或代號" aria-label="迄站" [value]="manualDestination()" (input)="manualDestination.set($any($event.target).value.trim()); manualError.set('')"></span></label>
                 <datalist id="pair-stations">@for (name of pairStations(); track name) { <option [value]="name"></option> }</datalist>
               </div>
               <button class="direct-submit" type="submit" [disabled]="!pairReady() || manualLoading() || loading()">{{ manualLoading() ? '查詢中…' : '查看這兩站' }}</button>
-              <p class="direct-feedback" role="status">{{ manualError() }}</p>
+              <p class="direct-feedback" [class.is-hint]="!manualError() && !!manualHint()" role="status">{{ manualError() || manualHint() }}</p>
               @if (manualSuggestedMonths(); as sug) {
                 <button type="button" class="link-button" (click)="useSuggestedPairMonths()">改查兩站共同有資料的 {{ sug.baseline }} 與 {{ sug.current }}</button>
               }
