@@ -13,10 +13,9 @@
 | 重複執行 | `import_od_range.py` 已匯入的月份會略過 | 排程重跑是安全的 |
 | API 讀取 | 常駐程序，目錄查詢快取 5 秒，查詢結果快取 120 秒 | 新月份發布後 5 秒內可見，不必重啟 API |
 
-缺口只有三個：
-1. `tools/setup.py` 的 `LATEST_MONTH` 寫死為 2026-09，需改成讀索引取得最新月份。
-2. 沒有假日曆防呆：`build_ref.py` 讀取 `tools/holidays/{年}.json`（目前只到 2026），跨年若缺新年度檔案，國定假日會靜默被當成平日計算。
-3. 沒有告警、`pg_dump` 備份，以及新通車車站缺座標（`unplaced`）時的阻斷機制。
+截至 `v1.4.0` 的補齊狀況與後續保留項：
+1. **已補齊**：`tools/setup.py` 已改為動態查詢索引取得最新月份與自動建庫、`tools/update_auxiliary.py` 自動檢查當年與隔年假日曆並保留 `--with-metro-map`、圖資更新腳本 `tools/fetch-metro-osm.mjs` 加入 90% 站數下限防護與 `.bak` 備份，並已建立 `deploy/update-all.sh` 搭配 `tools/notify.py` 於更新失敗時發送 Webhook／Telegram 告警。
+2. **後續保留項**：待日後補入的僅剩發布前 `pg_dump` 自動輪轉備份，以及新通車車站缺座標（`unplaced`）時的硬性阻斷條件。
 
 ## 一、資料自動更新（每月）
 

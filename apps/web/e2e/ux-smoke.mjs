@@ -39,11 +39,13 @@ function startStaticWithProxy() {
   if (!fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
     throw new Error(`找不到編譯輸出 ${DIST_DIR}，請先執行 npm run build。`);
   }
+  const proxyAgent = new https.Agent({ keepAlive: false });
   return new Promise(resolve => {
     const server = http.createServer((req, res) => {
       const urlPath = (req.url || '/').split('?')[0];
       if (urlPath.startsWith('/api/')) {
         const proxyReq = https.request(API_ORIGIN + req.url, {
+          agent: proxyAgent,
           method: req.method,
           headers: { accept: req.headers.accept || '*/*' },
         }, proxyRes => {
@@ -69,7 +71,7 @@ function startStaticWithProxy() {
     });
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address();
-      resolve({ server, baseUrl: `http://127.0.0.1:${addr.port}` });
+      resolve({ server, proxyAgent, baseUrl: `http://127.0.0.1:${addr.port}` });
     });
   });
 }
@@ -292,6 +294,7 @@ function assert(cond, msg) {
     console.log('ALL_E2E_SMOKE_PASSED (0 console/page errors)');
   } finally {
     await browser.close();
+    local?.proxyAgent.destroy();
     local?.server.closeAllConnections?.();
     local?.server.close();
   }

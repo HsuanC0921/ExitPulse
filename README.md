@@ -1,6 +1,6 @@
 # ExitPulse｜臺北捷運旅次變化雷達
 
-![Version 1.3.1](https://img.shields.io/badge/version-1.3.1-1d2125)
+![Version 1.4.0](https://img.shields.io/badge/version-1.4.0-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3-009688)
@@ -26,17 +26,18 @@
 
 | 檢視模式 | 看什麼 | 能做什麼 |
 | --- | --- | --- |
-| **兩站比較** | 兩個期間之間，哪幾對車站的往來變化最大 | 依占比變化、人次增減或成長率排行，點排行表頭就能切換由大到小或由小到大，清單也能收合並顯示真實名次。可篩選日型、時段、路線、變化類型與最低人次，或點「手選兩站」查榜外組合、對調去回程、匯出 CSV 與 `1200×630` 結論圖卡 |
-| **單站往來** | 這一站的人大多從哪來、往哪去 | 點六條捷運路線色塊從站碼清單選站，或直接輸入站名、站碼搜尋。「往來車站」清單可切換列表、資料表（點欄位標題排序）與路線分組，也能反轉排序或收合，並同時顯示占比與進出站人次。另附 24 小時環形指紋、逐時進出站、站型判讀與依據、距離分段、爆量日與歷年通車里程碑走勢 |
-| **全線人次** | 整個路網的人潮集中在哪裡 | 支援「進站量」與「淨進出」雙視角。進站量用空心環面積標出各站規模（比較模式以外環為本期、實心內圓為對照期，內圓比外環大即減少），淨進出則以橘、藍雙色空心環對照淨流入（出站＞進站）與淨流出（進站＞出站），轉乘站選取時依各線分段上色，前 10 大站旁直接標出人次。分頁包含「各站」、「每天」、「歷年」、「互搭表」、「榜單」與「紀錄」，可看各站進出排行、參考比例圓圖例、熱門站對互搭矩陣、兩組站群或路線彙總比較，以及全網最忙與增減前 10 名榜單 |
+| **兩站比較** | 兩個期間之間，哪幾對車站的往來變化最大 | 依占比變化、人次增減或成長率排行，點排行表頭可反轉排序，清單也可收合。支援篩選日型、時段、路線、變化類型與最低人次，變更條件後會自動重新查詢。點開「手選兩站」可用站名片段或站代號查榜外組合、對調起迄方向，並匯出 CSV 與 `1200×630` 結論圖卡 |
+| **單站往來** | 這一站的人大多從哪來、往哪去 | 點六條路線色塊選站，或輸入站名、站代號如 `BL12`、`R10` 按 Enter 切站。「比站」選完後會自動收合並列出兩站並排曲線。結果區附 24 小時環形指紋、逐時進出、站型判讀依據、距離分段、爆量日、城市重大事件註記與歷年走勢，並可一鍵下載單站 `1200×630` 分享圖卡與 CSV |
+| **全線人次** | 整個路網的人潮集中在哪裡 | 切換「進站量」與「淨進出」雙視角。進站量用空心圓面積代表當期進站規模，比較模式下實心內圓則標出對照期水量。淨進出以橘色與藍色分別區分淨流入與淨流出，前 10 大站旁直接標出人次。內含「各站」、「每天」、「歷年」、「互搭表」、「榜單」與「紀錄」六個分頁，可查線別彙總與匯出全線 `1200×630` 圖卡或 CSV |
 
 ### 地圖操作與輔助功能
 
-- **地圖工具列、收藏與精選觀察**：右上角工具列可以收合，並新增「只看地圖」一鍵收起浮層（再按一次或按 `Esc` 還原）。桌機版包含找地點（用 Photon 查 OpenStreetMap 地名並算附近捷運站直線距離）、收藏（附「精選觀察」四組指標案例與「複製嵌入碼」）、定位、全圖、3D 立體尖塔與弧線（高度取平方根並附對照刻度）、深淺主題、「地圖工具」與「關於」，手機版則精簡為找地點、收藏、工具與收合（定位移進找地點，立體與深色模式移進工具面板）。地圖工具內可調整全線「圓圈淡化（0–80%）」、「減少動態效果」、個別開關道路／水系／捷運路網／比例尺／流向動畫與人流圖例，並可從主畫面安裝或全螢幕檢視地圖。
-- **時間軸與日夜底圖**：時間軸固定在面板底部，拖到沒有紀錄的小時也不會跟著移位。長條兩側加了前一小時、後一小時按鈕與「早尖峰／午間／晚尖峰／夜間」四顆快跳鈕，拉桿有看得見的把手，播放、暫停、全天三顆按鈕換成同一套線條圖示，暫停後暫停鈕會反白。播放時會依日期估算臺北日出日落時間自動切換底圖明暗。
-- **車站詳情與出口沿革**：點選任一車站可檢視站碼、首次通車日、中文維基百科站區簡介、6 公里生活圈現住人口、雙北 YouBike 2.0 站點、周邊商場／大學／醫院／客運轉運站與景點距離，以及出入口清單。展開出口可於地圖標出圖釘，查得官方公告者附上啟用與重開日期，其餘標示為「現況座標，年代待查」。指標旁附帶 `?` 說明浮窗，點擊即可查看定義。原始資料出處：[車站資料服務](https://data.taipei/dataset/detail?id=1eefa68d-7c8d-491b-8e75-66a161947426)、[出口座標](https://data.taipei/dataset/detail?id=cfa4778c-62c1-497b-b704-756231de348b)、[設施資訊](https://data.gov.tw/dataset/128453)、[觀光署景點](https://data.gov.tw/dataset/7777)。
-- **資料判讀、空狀態與中文斷行**：結論句把期間獨立成上一行，假日只列名稱（例如「中秋節、教師節」），並一併列出人次、有效天數與實際有紀錄的時段（`recordedHours`），分開標示零人次、出站資料不足、尚未通車與查詢失敗。選到車站尚未通車的月份時，面板會顯示該站通車日期，並提供一鍵跳轉至最早有紀錄的月份。沒有旅次紀錄或查無車站時，改成置中的圖示加一句說明。全站中文只在標點或空白處換行，數字和單位不拆開，「台北101/世貿」這類站名也不會斷在斜線後。
-- **網址同步、嵌入模式、快捷鍵與匯出**：網址列即時保存檢視模式、期間、篩選條件、排序、搜尋字串與選中站對，複製網址即可重現同一畫面，也可加上 `?embed=1`（或從收藏面板「複製嵌入碼」）以精簡視圖嵌入網頁。鍵盤可按 `/` 跳至搜尋框、`[` 收合左側面板、`J` 與 `K` 切換上下組站對、`Esc` 關閉細節或放大檢視。各表格皆可匯出 Excel 相容 CSV（UTF-8 BOM + CRLF），無基準期資料的成長率欄位留白不補 0。
+- **多底圖切換與 3D 立體視角**：地圖工具內的「圖層」支援「簡潔」（OpenFreeMap Positron）、「詳圖」（OpenFreeMap Liberty）與「臺灣地圖」（國土測繪中心 WMTS）即時切換。開啟「立體」時會依距離四段過濾遠景低矮平房並保留地標細部 `building:part` 結構，將人流柱體高度取平方根並附上對照刻度。若從「臺灣地圖」點選「立體」，會自動切回上一個向量底圖並進入 3D。點擊「全圖」或跨區兩站組合時，若原本開著 72° 低視角會自動退回標準俯瞰角度。
+- **地圖工具列、收藏與精選觀察**：右上角工具列可收合，也可按「只看地圖」收起全部浮層再按 `Esc` 還原。桌機版整合了找地點（Photon 查詢地名並計算周邊車站直線距離）、收藏（「精選觀察」案例與嵌入碼）、定位、全圖、深淺色切換、全線圓圈淡化（0–80%）與獨立圖層開關，手機版則把常用次要開關折進工具抽屜以讓出視野。
+- **時間軸與日夜底圖**：時間軸固定在面板底部，提供前一小時／後一小時鈕與早尖峰、午間、晚尖峰、夜間四個快跳時段。自動播放逐時人流時會依日期估算臺北日出日落時刻，平滑調整底圖明暗與街道路網對比。
+- **車站詳情與出口沿革**：點選車站會開啟獨立預覽卡，顯示當期進出站比例、周邊設施／景點／YouBike 步行時間、6 公里生活圈現住人口與各年代啟閉的出入口清單。展開出口可於地圖標出圖釘，官方有公告紀錄者附上日期與來源連結，指標旁另附 `?` 說明卡片。原始資料出處：[車站資料服務](https://data.taipei/dataset/detail?id=1eefa68d-7c8d-491b-8e75-66a161947426)、[出口座標](https://data.taipei/dataset/detail?id=cfa4778c-62c1-497b-b704-756231de348b)、[設施資訊](https://data.gov.tw/dataset/128453)、[觀光署景點](https://data.gov.tw/dataset/7777)。
+- **資料判讀與中文斷行**：結論句獨立標明有效天數與實際有紀錄的小時（`recordedHours`），清楚區分「零人次」、「出站資料不足」、「尚未通車」與「查詢失敗」。遇未通車月份會提示該站通車日並提供一鍵跳轉至首個有紀錄的月份。全站中文只在標點或空白處換行，保持數字、單位與「台北101/世貿」這類複合站名完整不斷行。
+- **網址同步、嵌入模式、快捷鍵與匯出**：網址列即時保存當前檢視模式、期間、篩選條件、排序與選中站對，加上 `?embed=1` 可作為嵌入視圖。鍵盤按 `/` 在三種檢視模式都能直接跳到對應搜尋欄，`[` 收合左側面板，`J`／`K` 切換上下組站對，`Esc` 關閉浮層。在單日時間軸且焦點不在按鈕、輸入框、滑桿或地圖畫布上時，按 `Space` 可播放／暫停、`←`／`→` 逐小時切換。各表格皆可匯出 UTF-8 BOM 相容 Excel 的 CSV。
 
 <details>
 <summary>實測範例：預設條件「南港 → 南港展覽館」（平日 07:00–10:00，兩期各 22 天，納入 104 站）</summary>
@@ -123,7 +124,10 @@ python tools/setup.py --all
 python -m unittest discover -s tests
 npm --prefix apps/web test
 npm --prefix apps/web run build
+npm --prefix apps/web run test:e2e
 ```
+
+`test:e2e` 會直接啟動 `apps/web/e2e/ux-smoke.mjs` 驗證編譯產物的首頁鍵盤搜尋、站碼解析、單站與全線快捷鍵、兩站自動重查、3D 低視角歸位以及零 Console 錯誤。
 
 API 啟動後可跑連通測試與併發壓測：
 
@@ -147,48 +151,62 @@ flowchart LR
   subgraph src["資料來源"]
     A["臺北市資料大平臺<br/>OD 分時 CSV"]
     B["OpenStreetMap<br/>路線與車站"]
-    C["政府公開資料與 Wikidata<br/>通車日、出口、景點、設施"]
+    C["政府公開資料與 Wikidata<br/>通車日、出口、景點、設施、假日曆"]
   end
-  subgraph etl["匯入（tools/）"]
-    D["import_od_range.py<br/>import_od.py"]
-    E["build_ref.py<br/>station_info.py"]
+  subgraph ops["自動排程與告警"]
+    S["systemd 定時排程<br/>deploy/update-all.sh"]
+    N["tools/notify.py<br/>Webhook / Telegram 失敗告警"]
+  end
+  subgraph etl["匯入與更新（tools/）"]
+    D["setup.py / update_monthly.py<br/>import_od_range.py、import_od.py"]
+    E["update_auxiliary.py<br/>build_ref.py、station_info.py"]
+    J["fetch-metro-osm.mjs"]
   end
   DB[("PostgreSQL 18<br/>每月一個 schema<br/>加上 exitpulse_ref")]
   subgraph api["FastAPI（apps/api）"]
     F["/api/v1/od/*<br/>快取與請求合併"]
     G["分析行程池<br/>query_od.py、analyze_od.py、leaders.py"]
   end
-  H["Angular 22 與 MapLibre GL JS<br/>（apps/web）"]
+  H["Angular 22 與 MapLibre GL JS<br/>（apps/web：radar / explore / station-preview / explore-coverage）"]
+  M["OpenFreeMap Positron / Liberty 3D<br/>國土測繪中心 WMTS · Photon 地點搜尋"]
   A --> D --> DB
   C --> E --> DB
+  S --> D
+  S --> E
+  S --> J
+  S -. "ERR trap 失敗告警" .-> N
   DB --> G --> F --> H
-  B -. "靜態檔 public/metro" .-> H
-  M["OpenFreeMap 3D 底圖<br/>Photon 地點搜尋"] -. 瀏覽器直接取用 .-> H
+  B --> J -. "靜態檔 metro / releases" .-> H
+  M -. 瀏覽器直接取用 .-> H
 ```
 
-- **匯入**：每月資料通過日期、時段與矩陣完整度驗證後，於單一交易內寫入才開放查詢。跨月站名對照與行事曆存於 `exitpulse_ref`。
+- **匯入與排程**：每月資料通過日期、時段與矩陣完整度驗證後，於單一交易內寫入才開放查詢。跨月站名對照與行事曆存於 `exitpulse_ref`，排程統一由 `deploy/update-all.sh` 呼叫並在任一步驟失敗時經 `tools/notify.py` 發出通知。
 - **查詢**：API 透過常駐 Python 行程池執行分析（預設 2 個行程，各自持有 `od_postgres.ConnectionPool`），同鍵併發合併計算並以 gzip 回傳，排隊滿載回 `429`，逾時回 `504`。
-- **前端**：地圖與面板共用查詢狀態並同步至網址列，重新整理或分享連結都能回到相同畫面。查詢失敗時會隔 5、10、20、40 秒自動重試，之後每 60 秒重試一次（分頁在背景時暫停，回到前景或恢復連線時立刻重試），App 回到前景或每 5 分鐘也會檢查是否有新版部署並自動清除快取重載。遇到 WebGL context 丟失或底圖暫時斷線時也會自動重建畫布並保留原查詢與視角。
+- **前端**：地圖與面板共用查詢狀態並同步至網址列，預覽資訊卡（`station-preview`）與紀錄總覽（`explore-coverage`）各自獨立元件，分享圖卡可由兩站比較、單站往來與全線人次匯出。查詢失敗時會依退避排程自動重試，App 回到前景或每 5 分鐘亦會檢查新版部署並自動清除快取重載。遇到 WebGL context 丟失或底圖暫時斷線時會自動重建畫布並保留原查詢與視角。
 
 ```
 apps/
-  api/            FastAPI 應用（路由、分析行程池、地點搜尋）
-  web/            Angular 22 前端（地圖、面板、時間軸、探索頁）
+  api/                  FastAPI 應用（路由、分析行程池、地點搜尋）
+  web/                  Angular 22 前端（radar、explore、station-preview、explore-coverage、time-player 等）
+    e2e/ux-smoke.mjs    瀏覽器端互動與零 Console 錯誤煙霧測試
 tools/
-  setup.py        一鍵初始化（下載、匯入、車站資訊、驗證）
-  import_od*.py   單月與區間 OD 匯入工具
-  pack_trips.py   逐時旅次分組壓縮與無損切換工具
-  query_od.py     單站、全網、矩陣、趨勢查詢模組
-  analyze_od.py   站對比較與排行榜分析模組
-  leaders.py      全網最忙與增減榜單模組
-  station_info.py 車站通車日、出口、YouBike、人口與周邊設施匯入
-  smoke.py        API 基本連通驗證
-  stress_api.py   併發壓力測試
-  ui-smoke.mjs    多視口版面與 Console 煙霧測試
-tests/            Python 單元與資料庫合約測試
-deploy/           正式部署設定（Dockerfile、Compose、Caddyfile、systemd 範本）
-docs/             交接紀錄、架構決策、API 效能、自動更新與截圖
-docker-compose.yml  本機 PostgreSQL 設定
+  setup.py              一鍵建庫與初始化（下載、匯入、車站資訊、驗證）
+  update_monthly.py     每月新月份偵測、對帳與原子發布
+  update_auxiliary.py   跨年度假日曆、人口、出口與周邊資料更新
+  fetch-metro-osm.mjs   OSM 路網與車站擷取（含 90% 站數防呆與備份）
+  notify.py             排程失敗 Webhook／Telegram 通知
+  import_od*.py         單月與區間 OD 匯入工具
+  pack_trips.py         逐時旅次分組壓縮與無損切換工具
+  query_od.py           單站、全網、矩陣、趨勢查詢模組
+  analyze_od.py         站對比較與排行榜分析模組
+  leaders.py            全網最忙與增減榜單模組
+  station_info.py       車站通車日、出口、YouBike、人口與周邊設施匯入
+  smoke.py / stress_api.py  API 基本連通驗證與併發壓測
+  ui-smoke.mjs          多視口版面與截圖檢查
+tests/                  Python 單元與資料庫合約測試
+deploy/                 正式部署設定（install.sh、update-all.sh、Compose、Caddyfile、systemd 範本）
+docs/                   交接紀錄、架構決策、API 效能、自動更新與截圖
+docker-compose.yml      本機 PostgreSQL 設定
 ```
 
 ## 分析方法與資料限制
@@ -226,7 +244,7 @@ docker-compose.yml  本機 PostgreSQL 設定
 
 - **閘門統計層級**：OD 資料與出入口座標分屬不同資料集，旅次統計僅到車站閘門層級，無法還原中途轉乘路線或單一出口進出人數。車站分段通車與出口異動日期的來源 URL 皆記錄於 `tools/station_info.py`。
 - **周邊設施涵蓋範圍**：站卡周邊設施整合 Wikidata 與政府開放清冊，不保證完整收錄所有地標（例如台北 101 購物中心因 Wikidata 分類為摩天大樓而未列入商場清單），未收錄項目於介面會明確標示。
-- **瀏覽器與前端載入**：地圖需支援 WebGL 2 的瀏覽器。前端已將 `maplibre-gl`（6.19.0）與 3D 繪圖拆為延遲載入，Initial bundle 約 `869 kB`（零預算警告）。
+- **瀏覽器與前端載入**：地圖需支援 WebGL 2 的瀏覽器。前端已將 `maplibre-gl`（6.19.0）與 3D 繪圖拆為延遲載入，Initial bundle 約 `918 kB`（gzip 預估傳輸約 `200 kB`，零預算警告）。
 - **後端逾時與測試邊界**：查詢逾時回傳 `504` 後，背景分析行程仍會跑完該次查詢才釋放（單一 SQL 敘述則受 PostgreSQL `statement_timeout` 限制，排隊中的請求在用戶端提前斷線時會即時取消）。尚未執行真人受測的使用者測試。
 
 ### 待辦
@@ -239,7 +257,7 @@ docker-compose.yml  本機 PostgreSQL 設定
 旅次資料取自臺北市資料大平臺的「[臺北捷運每日分時各站 OD 流量統計](https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d)」，欄位涵蓋日期、進站時段、進站、出站與人次，官方索引自 2017 年 1 月起算，實際可查範圍以 API 回報為準。
 
 - PostgreSQL 存放月總量、分組壓縮後的每日逐時表（`trip_groups` 與相容檢視表 `trips`）及跨月參考資料。下載的原始 CSV 快取放在 `data/` 目錄並由 Git 忽略。
-- 捷運路線與車站幾何由 `tools/fetch-metro-osm.mjs` 自 OpenStreetMap 抓取，存於 `apps/web/public/metro/`。底圖採用 OpenFreeMap 的 positron 向量樣式（含 3D 建築圖層）。
+- 捷運路線與車站幾何由 `tools/fetch-metro-osm.mjs` 自 OpenStreetMap 抓取，存於 `apps/web/public/metro/`。向量底圖採用 OpenFreeMap（Positron 簡潔與 Liberty 詳圖，含 3D 建築圖層），並提供內政部國土測繪中心臺灣通用電子地圖（WMTS）切換。
 - `apps/web/public/od/default.json` 存放離線備援資料，就算後端未啟動，打開首頁也能直接操作預設比較範例。
 - 系統規則與資料語意細節寫在 [CONTRIBUTING.md](CONTRIBUTING.md)，服務配置與交接細節見 [docs/HANDOFF.md](docs/HANDOFF.md)，排程自動更新見 [docs/AUTO_UPDATE.md](docs/AUTO_UPDATE.md)。
 
@@ -249,7 +267,8 @@ docker-compose.yml  本機 PostgreSQL 設定
 | --- | --- | --- |
 | [臺北捷運 OD 流量統計](https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d) | 旅次資料 | 政府資料開放授權條款－第 1 版（依[同系列資料集](https://data.gov.tw/dataset/128506)標示，實際以資料集頁面為準） |
 | OpenStreetMap | 捷運路線、車站與底圖資料 | © OpenStreetMap contributors，[ODbL](https://www.openstreetmap.org/copyright) |
-| [OpenFreeMap](https://openfreemap.org/) | 向量圖磚與 positron 底圖樣式 | 見網站授權說明 |
+| [OpenFreeMap](https://openfreemap.org/) | 向量圖磚與 Positron／Liberty 底圖樣式 | 見網站授權說明 |
+| [內政部國土測繪中心](https://maps.nlsc.gov.tw/) | 臺灣通用電子地圖（WMTS 點陣圖磚） | 政府資料開放授權條款／依中心服務規範 |
 | [Photon](https://photon.komoot.io/) | 地點搜尋 | 資料源自 OpenStreetMap，使用規範見網站說明 |
 | [TaiwanCalendar](https://github.com/ruyut/TaiwanCalendar) | 國定假日與補班日 | 見儲存庫授權 |
 | 觀光署景點、出口座標、設施與雙北 YouBike 2.0 | 車站資訊與周邊導覽 | 依各資料集頁面標示為準 |
