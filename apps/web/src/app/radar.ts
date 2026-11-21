@@ -20,7 +20,6 @@ import { Brand } from './brand';
 import { About } from './about';
 import { PairDetail } from './pair-detail';
 import { buildCsv, downloadCsv, exportBasis } from './csv-export';
-import { exportPairCard } from './card-export';
 import {
   BANDS, BASEMAP_STYLES, DARK_MAP, DOT, EMPTY, FLAT_FLOW_LAYERS, FLOW, LIGHT_MAP, LINES, LOCAL_MAP, LOW_PITCH, MIN_TOWER_PITCH, NB,
   NIGHT_STATION, OVERVIEW_PAIRS, PAGE, PHONE_STREET_PITCH, PHONE_STREET_ZOOM, PHONE_TOWER_PITCH, STREET_ZOOM, STYLE,
@@ -602,6 +601,8 @@ export class Radar implements OnDestroy {
   private remountNotBefore = 0;
   private savedMapCamera?: { center: Point; zoom: number; pitch: number; bearing: number };
   private mapGuard?: ReturnType<typeof setInterval>;
+  private lastActivity = typeof performance !== 'undefined' ? performance.now() : 0;
+  private readonly markActive = () => { this.lastActivity = performance.now(); };
   readonly motion = inject(MotionPreference);
   get reducedMotion() { return this.motion.reduced(); }
 
@@ -709,12 +710,16 @@ export class Radar implements OnDestroy {
       });
     });
     addEventListener('keydown', this.onKey);
+    addEventListener('pointermove', this.markActive, { passive: true });
+    addEventListener('wheel', this.markActive, { passive: true });
+    addEventListener('touchstart', this.markActive, { passive: true });
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
     addEventListener('beforeinstallprompt', this.onBeforeInstall);
     addEventListener('appinstalled', this.onAppInstalled);
   }
 
   private readonly onKey = (e: KeyboardEvent) => {
+    this.markActive();
     if (document.querySelector('dialog[open]')) return; // 對話框開著時，鍵盤交給對話框
     const target = e.target instanceof HTMLElement ? e.target : null;
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || !!target?.isContentEditable;
@@ -800,6 +805,7 @@ export class Radar implements OnDestroy {
     const r = this.selected(), d = this.data(), s = this.story();
     if (!r || !d || !s) return;
     const originLine = this.lineOf(r.origin), destLine = this.lineOf(r.destination);
+    const { exportPairCard } = await import('./card-export');
     const outcome = await exportPairCard({
       result: r,
       data: d,
@@ -902,8 +908,11 @@ export class Radar implements OnDestroy {
     if (!this.data() || document.hidden) return;
     const container = this.mapElement()?.nativeElement;
     if (!container) return;
-    if (!this.mountingMap && Date.now() >= this.remountNotBefore &&
-        (!this.map || this.map.getContainer() !== container || !container.querySelector('canvas.maplibregl-canvas'))) {
+    if (this.map && this.map.getContainer() === container && container.querySelector('canvas.maplibregl-canvas')) {
+      if (this.mapGuard !== undefined) { clearInterval(this.mapGuard); this.mapGuard = undefined; }
+      return;
+    }
+    if (!this.mountingMap && Date.now() >= this.remountNotBefore) {
       void this.mountMap();
     }
   }
@@ -1068,7 +1077,7 @@ export class Radar implements OnDestroy {
     let busy: ReturnType<typeof setTimeout> | undefined;
     let contextTimer: ReturnType<typeof setTimeout> | undefined;
     let contextLostAt = 0;
-    let attempts = 0, sourceFailed = false, hasTile = false, contextLost = false, disposed = false;
+    let attempts = 0, sourceFailed = false, hasTile = false, vectorVerified = false, contextLost = false, disposed = false;
     let fetching: AbortController | undefined;
     const schedule = () => {
       if (retry !== undefined || disposed || contextLost) return;
@@ -1126,6 +1135,7 @@ export class Radar implements OnDestroy {
         this.mapLighting = undefined;
         failedTiles.clear();
         sourceFailed = false;
+        vectorVerified = false;
         map.setStyle(style, { diff: false });
         startTimeout();
       } catch {
@@ -1155,6 +1165,7 @@ export class Radar implements OnDestroy {
         return;
       }
       if (sourceId !== sid) return;
+      vectorVerified = false;
       if (tile) failedTiles.set(tileKey(tile.tileID.canonical), tile.tileID.canonical);
       else sourceFailed = true;
       if (!hasTile) confirmFailure();
@@ -1208,6 +1219,7 @@ export class Radar implements OnDestroy {
       this.basemap.set('loading');
       contextTimer = setTimeout(rebuildIfLost, WEBGL_RESTORE_TIMEOUT);
     });
+    map.on('style.load', () => { vectorVerified = false; });
     map.on('webglcontextrestored', () => {
       clearTimeout(contextTimer);
       contextLost = false;
@@ -1215,6 +1227,7 @@ export class Radar implements OnDestroy {
       this.mapLighting = undefined;
       failedTiles.clear();
       sourceFailed = false;
+      vectorVerified = false;
       startTimeout();
       schedule();
     });
@@ -1228,11 +1241,13 @@ export class Radar implements OnDestroy {
         if (timeout === undefined) schedule();
         return;
       }
-      if (spec.vector && map.loaded() && map.isSourceLoaded(spec.sourceId)) {
+      if (spec.vector && !vectorVerified && map.loaded() && map.isSourceLoaded(spec.sourceId)) {
         const probeLayers = ['water', 'landcover', 'landuse', 'building', 'transportation', 'park'].filter(id => !!map.getLayer(id));
         if (!probeLayers.length || (map.querySourceFeatures(spec.sourceId).length === 0 && map.queryRenderedFeatures(undefined, { layers: probeLayers }).length === 0)) {
           hasTile = false;
           schedule();
+        } else {
+          vectorVerified = true;
         }
       }
     };
@@ -2947,8 +2962,9 @@ export class Radar implements OnDestroy {
     let previous = performance.now(), rendered = this.particleElapsed;
     const loop = (now: number) => {
       if (!document.hidden && (!this.phone() || this.mobilePage() === 'map')) {
+        const idle = now - this.lastActivity > 45_000;
         this.particleElapsed += Math.min(now - previous, 50);
-        if (this.particleElapsed - rendered >= (this.map?.isMoving() ? 50 : 32)) {
+        if (this.particleElapsed - rendered >= (this.map?.isMoving() ? 50 : idle ? 140 : 32)) {
           render(this.particleElapsed);
           rendered = this.particleElapsed;
         }
@@ -3011,5 +3027,5 @@ export class Radar implements OnDestroy {
     if (res.outcome === 'accepted') this.installPrompt.set(null);
   }
 
-  ngOnDestroy() { clearTimeout(this.autoFindTimer); removeEventListener('keydown', this.onKey); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); this.map?.remove(); }
+  ngOnDestroy() { clearTimeout(this.autoFindTimer); removeEventListener('keydown', this.onKey); removeEventListener('pointermove', this.markActive); removeEventListener('wheel', this.markActive); removeEventListener('touchstart', this.markActive); document.removeEventListener('fullscreenchange', this.onFullscreenChange); removeEventListener('beforeinstallprompt', this.onBeforeInstall); removeEventListener('appinstalled', this.onAppInstalled); clearInterval(this.mapGuard); this.stop(); this.map?.remove(); }
 }

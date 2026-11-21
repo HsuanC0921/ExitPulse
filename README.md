@@ -1,6 +1,6 @@
 # ExitPulse｜臺北捷運旅次變化雷達
 
-![Version 1.4.0](https://img.shields.io/badge/version-1.4.0-1d2125)
+![Version 1.4.1](https://img.shields.io/badge/version-1.4.1-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3-009688)
@@ -244,7 +244,7 @@ docker-compose.yml      本機 PostgreSQL 設定
 
 - **閘門統計層級**：OD 資料與出入口座標分屬不同資料集，旅次統計僅到車站閘門層級，無法還原中途轉乘路線或單一出口進出人數。車站分段通車與出口異動日期的來源 URL 皆記錄於 `tools/station_info.py`。
 - **周邊設施涵蓋範圍**：站卡周邊設施整合 Wikidata 與政府開放清冊，不保證完整收錄所有地標（例如台北 101 購物中心因 Wikidata 分類為摩天大樓而未列入商場清單），未收錄項目於介面會明確標示。
-- **瀏覽器與前端載入**：地圖需支援 WebGL 2 的瀏覽器。前端已將 `maplibre-gl`（6.19.0）與 3D 繪圖拆為延遲載入，Initial bundle 約 `918 kB`（gzip 預估傳輸約 `200 kB`，零預算警告）。
+- **瀏覽器與前端載入**：地圖需支援 WebGL 2 的瀏覽器。前端已將 `maplibre-gl`（6.19.0）、3D 繪圖、圖卡匯出與月曆／矩陣／資料紀錄元件拆為延遲載入，Initial bundle 為 `925.18 kB`（估算傳輸 `197.60 kB`，零預算警告）。
 - **後端逾時與測試邊界**：查詢逾時回傳 `504` 後，背景分析行程仍會跑完該次查詢才釋放（單一 SQL 敘述則受 PostgreSQL `statement_timeout` 限制，排隊中的請求在用戶端提前斷線時會即時取消）。尚未執行真人受測的使用者測試。
 
 ### 待辦

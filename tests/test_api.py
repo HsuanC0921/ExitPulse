@@ -141,8 +141,10 @@ class Contract(unittest.TestCase):
 
     def test_radar_builds_the_same_arguments_as_before(self):
         calls = stub()
-        self.client.get('/api/v1/od/radar', params={'baseline': '2022-09', 'current': '2026-09', 'start': 7, 'end': 10,
-                                                    'weekend': 'true', 'minimum': 20.5, 'origin': 'a', 'destination': 'b'})
+        response = self.client.get('/api/v1/od/radar', params={'baseline': '2022-09', 'current': '2026-09', 'start': 7, 'end': 10,
+                                                               'weekend': 'true', 'minimum': 20.5, 'origin': 'a', 'destination': 'b'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('cache-control'), 'public, max-age=300, stale-while-revalidate=600')
         self.assertEqual(calls[0][1], ['2022-09', '2026-09', '--start', '7', '--end', '10', '--minimum', '20.5', '--type',
                                        'all', '--limit', '500', '--direct', 'a', 'b', '--weekend'])
 
@@ -284,6 +286,21 @@ class Runner(unittest.IsolatedAsyncioTestCase):
             finally:
                 finish.set()
                 self.assertEqual((await queued)['output'], 'queued')
+
+    async def test_catalog_change_evicts_stale_analysis_cache(self):
+        engine = runner_module.Runner()
+        engine._store(('query_od.py', ('2026-09',)), {'exitCode': 0, 'output': 'cached', 'error': ''}, 1800)
+        engine._store(('od_postgres.py', ()), {'exitCode': 0, 'output': '["2026-09"]', 'error': ''}, 5)
+        self.assertIn(('query_od.py', ('2026-09',)), engine.cache)
+
+        # 目錄字串未變，應保留分析快取
+        engine._store(('od_postgres.py', ()), {'exitCode': 0, 'output': '["2026-09"]', 'error': ''}, 5)
+        self.assertIn(('query_od.py', ('2026-09',)), engine.cache)
+
+        # 一旦目錄出現新月份，立即清掉舊分析快取
+        engine._store(('od_postgres.py', ()), {'exitCode': 0, 'output': '["2026-09","2026-10"]', 'error': ''}, 5)
+        self.assertNotIn(('query_od.py', ('2026-09',)), engine.cache)
+        self.assertIn(('od_postgres.py', ()), engine.cache)
 
 
 if __name__ == '__main__':

@@ -123,7 +123,11 @@ async def analyse(script, arguments):
         return bad('旅次資料暫時無法載入。', 504)
     code = reply['exitCode']
     if code == 0:
-        return Response(reply['output'], media_type='application/json; charset=utf-8')
+        return Response(
+            reply['output'],
+            media_type='application/json; charset=utf-8',
+            headers={'Cache-Control': 'public, max-age=300, stale-while-revalidate=600'},
+        )
     log.warning('OD analysis failed (%s): %s', code, reply['error'])
     if code == 2:
         # 查詢的車站在所選期間沒有紀錄（例如尚未通車），訊息要講清楚，不要和時段無法比較混在一起
@@ -260,7 +264,8 @@ def flag_truncated(reply):
         body['truncated'] = body.get('total', 0) > len(body.get('results', []))
     except (ValueError, AttributeError, TypeError):
         return reply
-    return Response(json.dumps(body, ensure_ascii=False), media_type='application/json; charset=utf-8')
+    headers = {'Cache-Control': cc} if (cc := reply.headers.get('cache-control')) else None
+    return Response(json.dumps(body, ensure_ascii=False), media_type='application/json; charset=utf-8', headers=headers)
 
 
 # 單一站對的兩期比較

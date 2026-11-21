@@ -358,7 +358,11 @@
   }
 
   @if (activeSection() === 'days' && calendarChart(); as c) {
-    <app-month-calendar animate.enter="content-arrive" [chart]="c" [month]="month()" [firstDate]="firstDate()" [wideView]="wideView()" [selected]="unit() === 'date' ? date() : null" (pick)="pickDate($event)" />
+    @defer (on immediate) {
+      <app-month-calendar animate.enter="content-arrive" [chart]="c" [month]="month()" [firstDate]="firstDate()" [wideView]="wideView()" [selected]="unit() === 'date' ? date() : null" (pick)="pickDate($event)" />
+    } @placeholder {
+      <p class="status" role="status">正在載入月曆元件…</p>
+    }
   }
 
   @if (activeSection() === 'years' && trendChart(); as t) {
@@ -704,7 +708,11 @@
     @else if (matrix(); as m) {
       <div class="block-head"><span class="head-title"><h2>車站互搭表（前 {{ m.stations.length }} 大站）</h2><app-hint label="車站互搭表" [alignToPanel]="true" [entries]="hints['matrix']" /></span><span class="section-period">直欄迄站 · 橫列起站</span></div>
       <p class="hint">對角線灰格是同站進出旅次（不計入色階最大值）。</p>
-      <app-od-matrix animate.enter="content-arrive" [matrix]="m" [max]="matrixMax()" [days]="days()" [compare]="comparePeriod()" (station)="openStation.emit($event)" (pair)="openPair.emit({ origin: $event.origin, destination: $event.destination, period: period(), weekend: days() === 'weekend', hours: band() })" />
+      @defer (on immediate) {
+        <app-od-matrix animate.enter="content-arrive" [matrix]="m" [max]="matrixMax()" [days]="days()" [compare]="comparePeriod()" (station)="openStation.emit($event)" (pair)="openPair.emit({ origin: $event.origin, destination: $event.destination, period: period(), weekend: days() === 'weekend', hours: band() })" />
+      } @placeholder {
+        <p class="status" role="status">正在載入互搭表元件…</p>
+      }
     }
   }
 
@@ -777,21 +785,25 @@
 
   @if (activeSection() === 'coverage') {
 
-    <app-explore-coverage
-      [loading]="catalogLoading()"
-      [failure]="catalogFailure()"
-      [catalog]="catalog()"
-      [tab]="coverageTab()"
-      [query]="coverageQuery()"
-      [stations]="catalogStations()"
-      [months]="catalogMonths()"
-      [hintEntries]="hints['coverage']"
-      (tabChange)="coverageTab.set($event)"
-      (queryChange)="coverageQuery.set($event)"
-      (stationSelect)="openFromCoverageStation($event)"
-      (monthSelect)="openFromCoverageMonth($event)"
-      (retry)="retryCatalog()"
-    />
+    @defer (on immediate) {
+      <app-explore-coverage
+        [loading]="catalogLoading()"
+        [failure]="catalogFailure()"
+        [catalog]="catalog()"
+        [tab]="coverageTab()"
+        [query]="coverageQuery()"
+        [stations]="catalogStations()"
+        [months]="catalogMonths()"
+        [hintEntries]="hints['coverage']"
+        (tabChange)="coverageTab.set($event)"
+        (queryChange)="coverageQuery.set($event)"
+        (stationSelect)="openFromCoverageStation($event)"
+        (monthSelect)="openFromCoverageMonth($event)"
+        (retry)="retryCatalog()"
+      />
+    } @placeholder {
+      <p class="status" role="status">正在載入資料紀錄元件…</p>
+    }
   }
 
   </div>

@@ -30,8 +30,13 @@ http://:80 {
 		rewrite @navigation /index.html
 
 		@hashed path_regexp ^/(?:[^/]+/)*[^/]+-[A-Za-z0-9]{8}\.(?:js|css|woff2?)$
-		@revalidate not path_regexp ^/(?:[^/]+/)*[^/]+-[A-Za-z0-9]{8}\.(?:js|css|woff2?)$
+		@fonts path /fonts/*
+		@revalidate {
+			not path_regexp ^/(?:[^/]+/)*[^/]+-[A-Za-z0-9]{8}\.(?:js|css|woff2?)$
+			not path /fonts/*
+		}
 		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		header @fonts Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
 		header @revalidate Cache-Control "no-cache, must-revalidate"
 		file_server
 	}

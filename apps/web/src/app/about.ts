@@ -6,7 +6,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, viewChild } from '@angu
   template: `
     <dialog #dialog aria-labelledby="about-title" (click)="backdrop($event)">
       <header>
-        <h2 id="about-title">關於 ExitPulse <small class="ver">v1.4.0</small></h2>
+        <h2 id="about-title">關於 ExitPulse <small class="ver">v1.4.1</small></h2>
         <button type="button" class="close" aria-label="關閉" (click)="close()">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>

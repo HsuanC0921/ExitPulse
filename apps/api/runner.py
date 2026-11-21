@@ -17,7 +17,7 @@ WORKERS = int(os.environ.get('EXITPULSE_WORKERS', 2))
 QUEUE = int(os.environ.get('EXITPULSE_QUEUE_LIMIT', 40))
 TIMEOUT = float(os.environ.get('EXITPULSE_TIMEOUT_SECONDS', 30))
 SQL_TIMEOUT = float(os.environ.get('EXITPULSE_SQL_TIMEOUT_SECONDS', TIMEOUT))
-CATALOG_TTL, ANSWER_TTL, CACHE_LIMIT = 5, 120, 1024
+CATALOG_TTL, ANSWER_TTL, CACHE_LIMIT = 5, 1800, 1024
 
 
 class Busy(Exception):
@@ -54,6 +54,7 @@ class Runner:
     def __init__(self):
         self.pool = None
         self.cache = {}
+        self._dir_sigs = {}
         self.inflight = {}
         self.admitted = 0
         self.worker_slots = asyncio.Semaphore(WORKERS)
@@ -131,8 +132,14 @@ class Runner:
             self._store(key, reply, CATALOG_TTL if script == 'od_postgres.py' else ANSWER_TTL)
         return reply
 
-    # 寫入快取，滿了先清掉過期項目，仍滿就不再新增
+    # 寫入快取，滿了先清掉過期項目，仍滿就不再新增；目錄變化時清掉舊分析快取
     def _store(self, key, reply, ttl):
+        if key[0] == 'od_postgres.py':
+            sig = reply.get('output')
+            prev = self._dir_sigs.get(key)
+            if prev is not None and sig != prev:
+                self.cache = {k: v for k, v in self.cache.items() if k[0] == 'od_postgres.py'}
+            self._dir_sigs[key] = sig
         now = time.monotonic()
         if len(self.cache) >= CACHE_LIMIT:
             self.cache = {k: v for k, v in self.cache.items() if v[1] > now}

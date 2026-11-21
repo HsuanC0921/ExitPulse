@@ -10,7 +10,6 @@ import {
 } from './explore-model';
 import { formatDailyTrips, lineWidth, glue } from './radar-model';
 import { buildCsv, downloadCsv, exportBasis, type CsvCell } from './csv-export';
-import { exportNetworkCard, exportStationCard } from './card-export';
 import { ExploreCoverage } from './explore-coverage';
 import { Hint, type HintEntry } from './hint';
 import { MonthCalendar } from './month-calendar';
@@ -952,31 +951,58 @@ export class Explore implements OnDestroy {
   }
 
   private sideSerial = 0;
-  private async loadSide(station: string, month: string) {
+  private sideSub?: Subscription;
+  private trendSerial = 0;
+  private trendSub?: Subscription;
+  private matrixSerial = 0;
+  private matrixSub?: Subscription;
+  private leadersSerial = 0;
+  private leadersSub?: Subscription;
+  private peerSerial = 0;
+  private peerSub?: Subscription;
+
+  private subscribeQuery<T>(
+    slot: 'sideSub' | 'trendSub' | 'matrixSub' | 'leadersSub' | 'peerSub',
+    req$: Observable<T>,
+    onData: (value: T) => void,
+    onError: () => void,
+    onDone: () => void,
+  ) {
+    this[slot]?.unsubscribe();
+    this[slot] = req$.subscribe({
+      next: value => { onDone(); onData(value); },
+      error: () => { onDone(); onError(); },
+    });
+  }
+
+  private loadSide(station: string, month: string) {
     const id = ++this.sideSerial;
     this.calendarLoading.set(true); this.calendarFailure.set(false);
     this.calendar.set(null);
-    try {
-      const params: Record<string, string> = { month };
-      if (station) params['name'] = station;
-      const c = await firstValueFrom(this.http.get<CalendarAnswer>('/api/v1/od/calendar', { params }));
-      if (id === this.sideSerial) this.calendar.set(c);
-    } catch { if (id === this.sideSerial) { this.calendar.set(null); this.calendarFailure.set(true); } }
-    finally { if (id === this.sideSerial) this.calendarLoading.set(false); }
+    const params: Record<string, string> = { month };
+    if (station) params['name'] = station;
+    this.subscribeQuery(
+      'sideSub',
+      this.http.get<CalendarAnswer>('/api/v1/od/calendar', { params }),
+      c => { if (id === this.sideSerial) this.calendar.set(c); },
+      () => { if (id === this.sideSerial) { this.calendar.set(null); this.calendarFailure.set(true); } },
+      () => { if (id === this.sideSerial) this.calendarLoading.set(false); },
+    );
   }
 
-  private trendSerial = 0;
-  private async loadTrend(station: string, days: DayType) {
+  private loadTrend(station: string, days: DayType) {
     const id = ++this.trendSerial;
     this.trendLoading.set(true); this.trendFailure.set(false);
     this.trend.set(null);
-    try {
-      const params: Record<string, string> = { days };
-      if (station) params['name'] = station;
-      const t = await firstValueFrom(this.http.get<TrendAnswer>('/api/v1/od/trend', { params }));
-      if (id === this.trendSerial) this.trend.set(t);
-    } catch { if (id === this.trendSerial) { this.trend.set(null); this.trendFailure.set(true); } }
-    finally { if (id === this.trendSerial) this.trendLoading.set(false); }
+    const params: Record<string, string> = { days };
+    if (station) params['name'] = station;
+    this.subscribeQuery(
+      'trendSub',
+      this.http.get<TrendAnswer>('/api/v1/od/trend', { params }),
+      t => { if (id === this.trendSerial) this.trend.set(t); },
+      () => { if (id === this.trendSerial) { this.trend.set(null); this.trendFailure.set(true); } },
+      () => { if (id === this.trendSerial) this.trendLoading.set(false); },
+    );
   }
 
   private catalogSerial = 0;
@@ -990,37 +1016,40 @@ export class Explore implements OnDestroy {
     finally { if (id === this.catalogSerial) this.catalogLoading.set(false); }
   }
 
-  private matrixSerial = 0;
-  private async loadMatrix(params: Record<string, string>) {
+  private loadMatrix(params: Record<string, string>) {
     const id = ++this.matrixSerial;
     this.matrixLoading.set(true); this.matrixFailure.set(false);
-    try {
-      const m = await firstValueFrom(this.http.get<MatrixAnswer>('/api/v1/od/matrix', { params }));
-      if (id === this.matrixSerial) this.matrix.set(m);
-    } catch { if (id === this.matrixSerial) { this.matrix.set(null); this.matrixFailure.set(true); } }
-    finally { if (id === this.matrixSerial) this.matrixLoading.set(false); }
+    this.subscribeQuery(
+      'matrixSub',
+      this.http.get<MatrixAnswer>('/api/v1/od/matrix', { params }),
+      m => { if (id === this.matrixSerial) this.matrix.set(m); },
+      () => { if (id === this.matrixSerial) { this.matrix.set(null); this.matrixFailure.set(true); } },
+      () => { if (id === this.matrixSerial) this.matrixLoading.set(false); },
+    );
   }
 
-  private leadersSerial = 0;
-  private async loadLeaders(params: Record<string, string>) {
+  private loadLeaders(params: Record<string, string>) {
     const id = ++this.leadersSerial;
     this.leadersLoading.set(true); this.leadersFailure.set(false);
-    try {
-      const l = await firstValueFrom(this.http.get<LeadersAnswer>('/api/v1/od/leaders', { params }));
-      if (id === this.leadersSerial) this.leaders.set(l);
-    } catch { if (id === this.leadersSerial) { this.leaders.set(null); this.leadersFailure.set(true); } }
-    finally { if (id === this.leadersSerial) this.leadersLoading.set(false); }
+    this.subscribeQuery(
+      'leadersSub',
+      this.http.get<LeadersAnswer>('/api/v1/od/leaders', { params }),
+      l => { if (id === this.leadersSerial) this.leaders.set(l); },
+      () => { if (id === this.leadersSerial) { this.leaders.set(null); this.leadersFailure.set(true); } },
+      () => { if (id === this.leadersSerial) this.leadersLoading.set(false); },
+    );
   }
 
-  private peerSerial = 0;
-  private async loadPeer(params: Record<string, string>) {
+  private loadPeer(params: Record<string, string>) {
     const id = ++this.peerSerial;
     this.peerLoading.set(true);
-    try {
-      const a = await firstValueFrom(this.http.get<StationAnswer>('/api/v1/od/station', { params }));
-      if (id === this.peerSerial) this.peerAnswer.set(a);
-    } catch { if (id === this.peerSerial) this.peerAnswer.set(null); }
-    finally { if (id === this.peerSerial) this.peerLoading.set(false); }
+    this.subscribeQuery(
+      'peerSub',
+      this.http.get<StationAnswer>('/api/v1/od/station', { params }),
+      a => { if (id === this.peerSerial) this.peerAnswer.set(a); },
+      () => { if (id === this.peerSerial) this.peerAnswer.set(null); },
+      () => { if (id === this.peerSerial) this.peerLoading.set(false); },
+    );
   }
 
   private describe(spec: string) { return periodLabel(spec, this.days()) + (this.band() !== '0-24' ? ` ${this.band().replace('-', '–')} 點` : ''); }
@@ -1231,7 +1260,15 @@ export class Explore implements OnDestroy {
     }, 1600);
   }
   stopPlayback() { if (this.playback != null) clearInterval(this.playback); this.playback = undefined; this.playing.set(false); this.clearPrefetch(); }
-  ngOnDestroy() { this.stopPlayback(); this.activeRequest?.unsubscribe(); }
+  ngOnDestroy() {
+    this.stopPlayback();
+    this.activeRequest?.unsubscribe();
+    this.sideSub?.unsubscribe();
+    this.trendSub?.unsubscribe();
+    this.matrixSub?.unsubscribe();
+    this.leadersSub?.unsubscribe();
+    this.peerSub?.unsubscribe();
+  }
   /** Swap the two periods so the earlier one is the baseline, or simply look from the other side. */
   swap() {
     const [u, m, d] = [this.unit(), this.month(), this.date()];
@@ -1336,6 +1373,7 @@ export class Explore implements OnDestroy {
     const hoursText = this.hoursText();
     const compareLabel = this.comparePeriod() ? this.compareText() : null;
     this.cardNotice.set('正在產生圖卡…');
+    const { exportNetworkCard, exportStationCard } = await import('./card-export');
     let res: { ok: true } | { ok: false; reason: string };
     if (this.mode() === 'station') {
       const a = this.stationAnswer();
