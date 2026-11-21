@@ -1,5 +1,5 @@
 <!-- 兩站比較主畫面：條件、排行、站對詳情、地圖與三種檢視的切換 -->
-<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()" [class.map-only]="mapOnly()" [class.bar-hidden]="barHidden()" [class.moving]="mapMoving()">
+<main class="workspace" [attr.data-basemap]="basemap()" [attr.data-mobile-page]="mobilePage()" [class.map-active]="mapActive()" [class.low-angle]="lowAngle()" [class.map-fullscreen]="mapFullscreen()" [class.map-only]="mapOnly()" [class.bar-hidden]="barHidden()" [class.moving]="mapMoving()" [class.embed]="embed">
   <div #map class="map" role="application" aria-label="臺北捷運旅次地圖"></div>
   <div class="device-status-area" aria-hidden="true">
     @if (device().inset !== 'none') {
@@ -43,7 +43,7 @@
     [focusedStation]="lowAngle() ? pairStreetStation() : null" (stationFocus)="focusPairStreetStation($event)"
     (action)="mobileAction($event)" (viewChange)="setView($event)" [barHidden]="barHidden()" (barToggle)="toggleBar()" (viewMenuOpened)="closeMenus()" />
 
-  @if (openMenu()) { <div class="sheet-scrim" (click)="closeMenus()"></div> }
+  @if (openMenu()) { <div class="sheet-scrim" aria-hidden="true" (click)="closeMenus()"></div> }
   <div class="map-tools" [attr.inert]="mapOnly() ? '' : null" [class.collapsed]="toolsCollapsed()" role="group" aria-label="地圖設定">
     <details #placeMenu class="place-menu" (toggle)="placeMenu.open && (layerMenu.open = collectionMenu.open = false); setMenu('place', placeMenu.open)" (keydown.escape)="closeMenus(true); $event.stopPropagation()">
       <summary data-tip="找地點、地址或店名"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><span>找地點</span></summary>
@@ -124,7 +124,14 @@
           <button type="button" [disabled]="!collection().length" (click)="exportCollection()">存成檔案</button>
           <button type="button" (click)="collectionFile.click()">從檔案讀入</button>
           <button type="button" [disabled]="!collection().length" (click)="copyCollectionLinks()">複製連結清單</button>
+          <button type="button" (click)="copyEmbedCode()">複製嵌入碼</button>
           <input #collectionFile type="file" accept="application/json,.json" hidden (change)="importCollectionFile($event)">
+        </div>
+        <h3>精選觀察</h3>
+        <div class="curated-stories">
+          @for (story of curatedStories; track story.label) {
+            <button type="button" [title]="story.detail" (click)="openStory(story.query)">{{ story.label }}</button>
+          }
         </div>
         <p class="place-tip" role="status">{{ collectionNotice() || '收藏只存在這個瀏覽器，換電腦時用檔案或連結帶過去。' }}</p>
       </div>
@@ -164,8 +171,8 @@
         <label class="mobile-only-row">深色模式<input type="checkbox" role="switch" [checked]="theme() === 'dark'" (change)="setTheme(theme() === 'dark' ? 'light' : 'dark')"></label>
         <label class="mobile-only-row">立體地圖與人流<input type="checkbox" role="switch" [checked]="tower3d()" (change)="toggleTower3d()"></label>
         <label>減少動態效果<input type="checkbox" role="switch" [checked]="motion.enabled()" (change)="motion.set($any($event.target).checked)"></label>
-        @if (!tower3d()) {
-        <label class="range-row">圓圈透明度<input type="range" min="0" max="80" step="10" [value]="dotTransparency()" (input)="setDotTransparency($any($event.target).value)" aria-valuetext="{{ dotTransparency() }}%"><output>{{ dotTransparency() }}%</output></label>
+        @if (view() === 'network' && !tower3d()) {
+        <label class="range-row">圓圈淡化<input type="range" min="0" max="80" step="10" [value]="dotTransparency()" (input)="setDotTransparency($any($event.target).value)" aria-valuetext="{{ dotTransparency() }}%"><output>{{ dotTransparency() }}%</output></label>
         }
         <div class="map-view-actions">
           <button type="button" class="map-fit-action" (click)="resetMap(); closeMenus(true)">回到全圖</button>
@@ -184,7 +191,12 @@
           <summary>人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
           <label>流向動畫<input type="checkbox" role="switch" [checked]="!reducedMotion && !paused()" [disabled]="reducedMotion" (change)="togglePause()"></label>
           <label>人流圖例<input type="checkbox" role="switch" [checked]="showLegend()" (change)="toggleMapOption('legend')"></label>
-          @if (view() === 'station' && explore()?.isComparing()) {
+          @if (view() === 'network') {
+            <div class="map-metric segmented" role="group" aria-label="全線呈現方式">
+              <button type="button" [attr.aria-pressed]="explore()?.networkMetric() !== 'net'" (click)="explore()?.networkMetric?.set('entries')">進站量</button>
+              <button type="button" [attr.aria-pressed]="explore()?.networkMetric() === 'net'" (click)="explore()?.networkMetric?.set('net')">淨進出</button>
+            </div>
+          } @else if (view() === 'station' && explore()?.isComparing()) {
             <div class="map-metric segmented" role="group" aria-label="人流呈現方式">
               <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'volume'" (click)="explore()?.mapMetric?.set('volume')">人次</button>
               <button type="button" [attr.aria-pressed]="explore()?.mapMetric() === 'change'" (click)="explore()?.mapMetric?.set('change')">人次增減</button>
@@ -193,12 +205,17 @@
           @if (showLegend()) {
             <div class="layer-key">
               @if (tower3d()) {
-                <p>{{ view() === 'pairs' || view() === 'network' ? '站塔越高，進站人次越多。高度取平方根，大站不會把小站壓扁。' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
+                <p>{{ view() === 'pairs' ? '站塔越高，進站人次越多。高度取平方根，大站不會把小站壓扁。' : view() === 'network' ? (explore()?.networkMetric() === 'net' ? '站塔越高，淨進出差額越大。橘色為淨流入（出站＞進站），藍色為淨流出（進站＞出站）。' : '站塔越高，進站人次越多。高度取平方根，大站不會把小站壓扁。') : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站塔越高，人次增減幅度越大。' : '站塔越高，往來人次越多。' }}</p>
                 @if (towerScale().length) { <div class="spike-scale" aria-label="站塔高度對照"><span class="spike-scale-title">對照</span>@for (tick of towerScale(); track tick.label) { <span><i [style.height.px]="tick.px"></i>{{ tick.label }}</span> }</div> }
                 @if (view() !== 'network') { <p>弧線越寬，這兩站之間的人次越多。箭頭朝向目的站。</p> }
               } @else if (view() === 'network') {
-                <p><i class="sw dot"></i>圓越大，進站人次越多</p>
-                @if (explore()?.isComparing()) { <p><i class="sw ring"></i>比對照期少</p> }
+                @if (explore()?.networkMetric() === 'net') {
+                  <p><i class="sw net-in"></i>淨流入（出站＞進站）</p>
+                  <p><i class="sw net-out"></i>淨流出（進站＞出站）</p>
+                } @else {
+                  <p><i class="sw dot"></i>圓越大，進站人次越多</p>
+                  @if (explore()?.isComparing()) { <p><i class="sw ring"></i>比對照期少</p> }
+                }
               } @else {
                 <p>{{ view() === 'station' && explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '線寬代表增減幅度（人次）' : '線寬對照（人次）' }}</p>
                 <div class="scale-samples">@for (sample of scaleSamples; track sample.trips) {
@@ -237,7 +254,7 @@
       @if (showLegend() && !selectedMapStation()) {
         <svg viewBox="0 0 25 20" aria-hidden="true"><path d="M1 18l3-6 3 6M9 18l3.5-12 3.5 12M18 18l3.5-16 3.5 16"/></svg>
         <span class="tower-key-caption">
-          <strong>{{ view() !== 'station' ? '進站人次' : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站間人次增減' : '站間人次' }}</strong>
+          <strong>{{ view() === 'pairs' ? '進站人次' : view() === 'network' ? (explore()?.networkMetric() === 'net' ? '淨進出（出站 − 進站）' : '進站人次') : explore()?.isComparing() && explore()?.mapMetric() === 'change' ? '站間人次增減' : '站間人次' }}</strong>
           @if (towerPeak(); as peak) { <span>最高 {{ peak | number }}</span> }
         </span>
       }
@@ -702,4 +719,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="folded ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg>
     </button>
   </ng-template>
+  @if (embed) {
+    <a class="embed-link" [href]="fullUrl()" target="_blank" rel="noopener">在 ExitPulse 開啟完整版 ↗</a>
+  }
 </main>

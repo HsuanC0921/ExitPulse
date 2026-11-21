@@ -62,6 +62,11 @@
         <span>{{ top.count | number }} 人次</span>
       </button>
     }
+    <div class="quick-hours" role="group" aria-label="快速切換時段">
+      @for (q of quickHours; track q.hour) {
+        <button type="button" [attr.aria-pressed]="hour() === q.hour" (click)="hourChange.emit(q.hour)">{{ q.label }}</button>
+      }
+    </div>
     <div class="track-row">
       <button type="button" class="hour-step" aria-label="前一小時" [disabled]="(hour() ?? 24) <= 0" (click)="hourChange.emit((hour() ?? 24) - 1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="time-track" [class.has-profile]="counterpart() ? relationHours().length : profile().length">

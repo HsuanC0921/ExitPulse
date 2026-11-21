@@ -541,6 +541,10 @@
       <button type="button" class="list-title-toggle" [attr.aria-expanded]="!listCollapsed()" (click)="listCollapsed.set(!listCollapsed())" [title]="listCollapsed() ? '展開排行' : '收合排行'"><h2>各站進出</h2><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="listCollapsed() ? 'm6 9 6 6 6-6' : 'm18 15-6-6-6 6'"/></svg></button>
       <div class="head-controls">
         <span class="count">{{ networkRows().length }} 站</span>
+        <div class="segmented inline small" role="group" aria-label="地圖指標">
+          <button type="button" [attr.aria-pressed]="networkMetric() === 'entries'" (click)="networkMetric.set('entries')">進站量</button>
+          <button type="button" [attr.aria-pressed]="networkMetric() === 'net'" (click)="networkMetric.set('net')">淨進出</button>
+        </div>
         <div class="segmented inline small" role="group" aria-label="顯示樣式">
           <button type="button" [attr.aria-pressed]="listStyle() === 'cards'" (click)="listStyle.set('cards')">列表</button>
           <button type="button" [attr.aria-pressed]="listStyle() === 'table'" (click)="listStyle.set('table')">資料表</button>
@@ -549,9 +553,15 @@
       </div>
     </div>
     <p class="explore-legend map-key" aria-hidden="true">
-      <span><i class="swatch dot"></i>地圖上圓點越大，進站越多</span>
-      @if (sizeRef(); as ref) { <span><i class="swatch ref" [style.width.px]="ref.size" [style.height.px]="ref.size"></i>約每日 {{ ref.value }} 人次</span> }
-      @if (a.compare) { <span><i class="swatch hollow"></i>外環為本期，實心為對照期</span> }
+      @if (networkMetric() === 'net') {
+        <span><i class="swatch dot net-in"></i>淨流入（出站＞進站）</span>
+        <span><i class="swatch dot net-out"></i>淨流出（進站＞出站）</span>
+        @if (sizeRef(); as ref) { <span><i class="swatch ref" [style.width.px]="ref.size" [style.height.px]="ref.size"></i>約每日 {{ ref.value }} 人次差額</span> }
+      } @else {
+        <span><i class="swatch dot"></i>地圖上圓點越大，進站越多</span>
+        @if (sizeRef(); as ref) { <span><i class="swatch ref" [style.width.px]="ref.size" [style.height.px]="ref.size"></i>約每日 {{ ref.value }} 人次</span> }
+        @if (a.compare) { <span><i class="swatch hollow"></i>外環為本期，實心為對照期</span> }
+      }
     </p>
     @if (!listCollapsed()) {
     @if (listStyle() !== 'lines' && rankChart(); as chart) {
@@ -781,7 +791,7 @@
             <tbody>
               @for (s of catalogStations(); track s.name) {
                 <tr (click)="openFromCoverageStation(s.name)">
-                  <td>{{ s.name }}</td>
+                  <td><button type="button" class="link-cell" (click)="$event.stopPropagation(); openFromCoverageStation(s.name)">{{ s.name }}</button></td>
                   <td>{{ s.officialOpening ?? '—' }}</td>
                   <td>{{ s.firstDate ?? '—' }}</td>
                   <td>{{ s.lastDate ?? '—' }}</td>
@@ -798,7 +808,7 @@
             <tbody>
               @for (m of catalogMonths(); track m.month) {
                 <tr (click)="openFromCoverageMonth(m.month)">
-                  <td>{{ m.month }}</td>
+                  <td><button type="button" class="link-cell" (click)="$event.stopPropagation(); openFromCoverageMonth(m.month)">{{ m.month }}</button></td>
                   <td class="num">{{ m.days }}/{{ m.expectedDays }}</td>
                   <td class="num">{{ m.stationCount }}</td>
                   <td class="num">{{ m.missingDates.length }}</td>

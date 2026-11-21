@@ -1,3 +1,33 @@
+/* Motion tokens and shared transition primitives */
+app-root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-snappy: cubic-bezier(.16, 1, .3, 1);
+  --dur-fast: 140ms;
+  --dur-mid: 220ms;
+  --dur-slow: 320ms;
+}
+
+@keyframes surface-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(.985); }
+}
+
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+}
+
+.station-preview, .flow-preview, .detail:not(.closed) {
+  animation: card-rise var(--dur-mid) var(--ease-out);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .station-preview, .flow-preview {
+    background: var(--surface-glass, var(--panel));
+    border: 1px solid var(--hairline, var(--rule));
+    backdrop-filter: blur(14px) saturate(1.25);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  }
+}
+
 /* Selection moves independently of the controls and their hit areas. */
 .motion-tabs {
   --tab-count: 3;
@@ -18,7 +48,7 @@
   pointer-events: none;
   z-index: -1;
   transform: translateX(calc(var(--tab-index, 0) * (100% + var(--tab-gap))));
-  transition: transform .24s cubic-bezier(.22, 1, .36, 1), opacity .12s;
+  transition: transform var(--dur-mid) var(--ease-out), opacity .12s;
 }
 .motion-tabs:not(:has(> [aria-pressed='true'], > [aria-current='page']))::before { opacity: 0; }
 .motion-tabs.mobile-nav { --tab-color: var(--on-band); }
@@ -43,11 +73,26 @@
   .hours .hour b:not(.unrecorded) { transform: scaleY(0) !important; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .motion-tabs::before { transition: none; }
+@media (min-width: 721px) {
+  .workspace:not(.map-only, .map-fullscreen) .panel { view-transition-name: ep-panel; }
+  .workspace:not(.map-only, .map-fullscreen) .detail:not(.closed) { view-transition-name: ep-detail; }
+  ::view-transition-group(ep-panel), ::view-transition-group(ep-detail) {
+    animation-duration: var(--dur-mid, 220ms);
+    animation-timing-function: var(--ease-snappy, cubic-bezier(.16, 1, .3, 1));
+  }
+  ::view-transition-old(ep-detail), ::view-transition-new(ep-detail) {
+    animation-duration: var(--dur-mid, 220ms);
+    animation-timing-function: var(--ease-snappy, cubic-bezier(.16, 1, .3, 1));
+  }
 }
 
-html[data-reduced-motion] *, html[data-reduced-motion] *::before, html[data-reduced-motion] *::after {
+@media (prefers-reduced-motion: reduce) {
+  .motion-tabs::before { transition: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+html[data-reduced-motion] *, html[data-reduced-motion] *::before, html[data-reduced-motion] *::after,
+html[data-reduced-motion] ::view-transition-group(*), html[data-reduced-motion] ::view-transition-old(*), html[data-reduced-motion] ::view-transition-new(*) {
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
