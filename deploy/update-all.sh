@@ -18,6 +18,22 @@ if [ -z "$CMD" ]; then
 fi
 shift
 
+notify_failure() {
+  local code="${1:-1}" cmd="${2:-unknown}" py=""
+  [ "$code" -eq 0 ] && return 0
+  if [ -x "$ROOT/.venv/bin/python" ]; then
+    py="$ROOT/.venv/bin/python"
+  elif command -v python3 >/dev/null 2>&1; then
+    py="python3"
+  elif command -v python >/dev/null 2>&1; then
+    py="python"
+  fi
+  if [ -n "$py" ] && [ -f "$ROOT/tools/notify.py" ]; then
+    "$py" "$ROOT/tools/notify.py" --title "ExitPulse 自動任務失敗（${CMD}）" --message "失敗指令：${cmd}（exit ${code}）" >/dev/null 2>&1 || true
+  fi
+}
+trap 'notify_failure "$?" "$BASH_COMMAND"' ERR
+
 RELEASES="${EXITPULSE_WEB_RELEASES:-/srv/exitpulse/releases}"
 if [ -z "${EXITPULSE_DEFAULT_JSON:-}" ] && [ -d "$RELEASES/current/od" ]; then
   export EXITPULSE_DEFAULT_JSON="$RELEASES/current/od/default.json"

@@ -6,7 +6,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, viewChild } from '@angu
   template: `
     <dialog #dialog aria-labelledby="about-title" (click)="backdrop($event)">
       <header>
-        <h2 id="about-title">關於 ExitPulse</h2>
+        <h2 id="about-title">關於 ExitPulse <small class="ver">v1.4.0</small></h2>
         <button type="button" class="close" aria-label="關閉" (click)="close()">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
@@ -42,7 +42,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, viewChild } from '@angu
           <h3>地圖與圖資</h3>
           <ul>
             <li>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>，依 ODbL 授權。</li>
-            <li>底圖樣式與向量圖磚由 <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> 提供，© <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>。</li>
+            <li>向量底圖與樣式由 <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> 提供，© <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>；臺灣通用電子地圖（WMTS）來自<a href="https://maps.nlsc.gov.tw/" target="_blank" rel="noopener">內政部國土測繪中心</a>。</li>
             <li>地點搜尋使用 <a href="https://photon.komoot.io/" target="_blank" rel="noopener">Photon</a>。</li>
             <li>地圖引擎為 MapLibre GL JS，圖示為 <a href="https://lucide.dev/" target="_blank" rel="noopener">Lucide</a>。</li>
             <li>圖磚與地點搜尋由這些第三方服務直接提供，你的瀏覽器會向它們發出請求。</li>

@@ -57,6 +57,9 @@ chmod 600 .env
 | `EXITPULSE_WEB_RELEASES` | `/srv/exitpulse/releases` | 主機存放前端建置產物與 `current` 符號連結的目錄 |
 | `EXITPULSE_WORKERS` | `2` | API 分析行程池大小 |
 | `EXITPULSE_PLACES_ENDPOINT` | `https://photon.komoot.io/api/` | 地點搜尋上游 API 端點 |
+| `EXITPULSE_ALERT_WEBHOOK` | （選填） | `update-all.sh` 執行失敗時發送 JSON 告警（相容 Discord / Slack） |
+| `EXITPULSE_TELEGRAM_BOT_TOKEN` | （選填） | Telegram Bot Token（需搭配下方 Chat ID 使用） |
+| `EXITPULSE_TELEGRAM_CHAT_ID` | （選填） | 接收自動更新失敗通知的 Telegram 對話 ID |
 
 > 正式 Compose 使用獨立命名的資料卷 `exitpulse-pg18` 掛載 PostgreSQL 18，若主機已有其他版本的 PostgreSQL 容器，請勿共用舊資料卷。
 

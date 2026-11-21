@@ -1,0 +1,208 @@
+<div class="station-preview-head">
+  <div class="station-preview-title">
+    <h2>{{ station() }}</h2>
+    <div class="station-badges">
+      @for (l of lines(); track l.code) { <b class="badge" [attr.data-code]="l.code" [style.--line]="l.color" [title]="l.name">{{ stationCodeFn()(l.code, station()) }}</b> }
+    </div>
+  </div>
+  <button type="button" class="overlay-fold" [attr.aria-expanded]="!folded()" [attr.aria-label]="(folded() ? '展開' : '收合') + '車站資訊'" (click)="toggleFold.emit()">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="folded() ? 'M6 9l6 6 6-6' : 'M18 15l-6-6-6 6'"/></svg>
+  </button>
+  <button type="button" class="icon-button" aria-label="關閉車站資訊" title="關閉（也可按 Esc、再點一次車站或點地圖空白處）" (click)="close.emit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+</div>
+@if (info(); as info) {
+  <app-station-history [stationName]="station()" [opening]="info.opening ?? null" [lines]="info.lines ?? []" [entrances]="info.entrances"
+    [selectedPeriod]="entranceCurrent()" [availableMonths]="availableMonths()"
+    (periodChange)="openHistory.emit($event)" />
+  @if (snapshot(); as snap) {
+    <div class="preview-kpis" aria-label="當期旅次快照">
+      <div class="preview-kpis-head">
+        <span>{{ snap.periodLabel }}</span>
+        @if (snap.diffPct != null) {
+          <b class="kpi-diff" [class.down]="snap.diffPct < 0"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="snap.diffPct >= 0 ? 'M5 12l7-7 7 7M12 19V5' : 'M12 5v14M19 12l-7 7-7-7'"/></svg>{{ snap.diffPct >= 0 ? '+' : '−' }}{{ (snap.diffPct < 0 ? -snap.diffPct : snap.diffPct) | number:'1.1-1' }}% <small>{{ snap.diffLabel }}</small></b>
+        }
+      </div>
+      <div class="preview-kpis-grid">
+        <div><small>進站</small><strong><app-animated-count [value]="snap.entries" /></strong></div>
+        <div><small>出站</small><strong><app-animated-count [value]="snap.exits ?? null" empty="資料不足" /></strong></div>
+        @if (snap.rank) {
+          <div><small>全線排名</small><strong>第 {{ snap.rank }} 名<small> / {{ snap.totalStations }}</small></strong></div>
+        }
+      </div>
+      @if (snapshotBalance(); as bal) {
+        <div class="kpi-balance">
+          <div class="kpi-balance-bar" aria-hidden="true">
+            <i [style.flex-grow]="bal.entryPct"></i>
+            <i class="exit" [style.flex-grow]="bal.exitPct"></i>
+          </div>
+          <p><span>進站 {{ bal.entryPct }}% · 出站 {{ bal.exitPct }}%</span><b>{{ bal.label }}</b></p>
+        </div>
+      }
+    </div>
+  }
+  @if (cleanNote() || info.nearby?.length || info.hubs?.length || info.youbike?.length || info.districtPop || info.catchmentPop || info.addresses?.length) {
+    <section class="station-intro" aria-label="站區介紹">
+      @if (cleanNote(); as note) {
+        <p class="station-lead">{{ note }} @if (info.story?.source; as src) { <a class="ext-link" [href]="src" target="_blank" rel="noopener">{{ info.story?.sourceLabel || '來源' }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a> }</p>
+      }
+      @if (info.addresses?.length) {
+        <p class="station-facts">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+          <span>{{ info.addresses![0] }}</span>
+        </p>
+      }
+      @if (info.districtPop || info.catchmentPop) {
+        <div class="pop-strip" [class.single]="!info.districtPop || !info.catchmentPop" aria-label="周邊人口規模">
+          @if (info.districtPop; as dp) {
+            <div>
+              <small>{{ dp.district }}人口</small>
+              <strong>{{ dp.population | number }}</strong>
+              @if (dp.yoyPct != null) { <em [class.down]="dp.yoyPct < 0">年 {{ dp.yoyPct >= 0 ? '+' : '−' }}{{ (dp.yoyPct < 0 ? -dp.yoyPct : dp.yoyPct) | number:'1.1-1' }}%</em> }
+            </div>
+          }
+          @if (info.catchmentPop; as cp) {
+            <div>
+              <small title="{{ cp.districts.join('、') }}">6 公里生活圈（{{ cp.districts.length }} 區）</small>
+              <strong>{{ cp.population | number }}</strong>
+              @if (cp.yoyPct != null) { <em [class.down]="cp.yoyPct < 0">年 {{ cp.yoyPct >= 0 ? '+' : '−' }}{{ (cp.yoyPct < 0 ? -cp.yoyPct : cp.yoyPct) | number:'1.1-1' }}%</em> }
+            </div>
+          }
+        </div>
+      }
+      @if (!info.hubs?.length && !info.nearby?.length && !info.youbike?.length) {
+        <p class="poi-empty">尚未收錄周邊設施、景點與 YouBike 資料</p>
+      } @else {
+        @let activeTab = nearbyTab();
+        <div class="nearby-tabs" role="tablist" aria-label="周邊設施與接駁">
+          <button type="button" role="tab" [attr.aria-selected]="activeTab === 'hubs'" (click)="nearbyTab.set('hubs')">重要設施@if (info.hubs?.length) { <b>{{ info.hubs!.length }}</b> }</button>
+          <button type="button" role="tab" [attr.aria-selected]="activeTab === 'nearby'" (click)="nearbyTab.set('nearby')">景點@if (info.nearby?.length) { <b>{{ info.nearby!.length }}</b> }</button>
+          <button type="button" role="tab" [attr.aria-selected]="activeTab === 'youbike'" (click)="nearbyTab.set('youbike')">YouBike@if (info.youbike?.length) { <b>{{ info.youbike!.length }}</b> }</button>
+        </div>
+        @if (activeTab === 'hubs') {
+          @if (info.hubs?.length) {
+            <ul class="station-nearby" aria-label="周邊重要設施">
+              @for (hub of info.hubs; track hub.name) {
+                <li class="station-hub"><button type="button" [title]="hub.officialName || hub.sourceLabel || ''" (click)="focusPoi.emit({ name: hub.name, category: hub.kind, lng: hub.lng, lat: hub.lat })"><strong>{{ hub.name }}（{{ hub.kind }}）</strong><span>{{ hub.distance | number }}m · 約 {{ walkMinutes(hub.distance) }} 分</span></button></li>
+              }
+            </ul>
+            @if (hubSources().length) {
+              <p class="nearby-sources">來源：@for (src of hubSources(); track src.label; let last = $last) {@if (src.url) {<a [href]="src.url" target="_blank" rel="noopener">{{ src.label }}</a>} @else {<span>{{ src.label }}</span>}@if (!last) {、}}</p>
+            }
+          } @else {
+            <p class="poi-empty">700 公尺內暫無已收錄的設施</p>
+          }
+        } @else if (activeTab === 'nearby') {
+          @if (info.nearby?.length) {
+            <div class="nearby-head">
+              <small>直線距離與預估步行</small>
+              <a class="source-pill" href="https://data.gov.tw/dataset/7777" target="_blank" rel="noopener" title="觀光署景點資料">觀光署<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+            </div>
+            <ul class="station-nearby" aria-label="附近景點">
+              @for (place of info.nearby; track place.name) {
+                <li><button type="button" [title]="place.summary || ''" (click)="focusPoi.emit({ name: place.name, category: '景點', lng: place.lng, lat: place.lat })"><strong>{{ place.name }}</strong><span>{{ place.distance | number }}m · 約 {{ walkMinutes(place.distance) }} 分</span></button></li>
+              }
+            </ul>
+          } @else {
+            <p class="poi-empty">700 公尺內未收錄觀光署景點</p>
+          }
+        } @else {
+          @if (info.youbike?.length) {
+            @let yb = youbikeSummary();
+            <div class="nearby-head">
+              <small>周邊 {{ yb.count }} 站 · 共 {{ yb.totalDocks | number }} 柱</small>
+              <a class="source-pill" href="https://data.taipei/" target="_blank" rel="noopener" title="雙北開放資料">雙北交通<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+            </div>
+            <ul class="station-nearby" aria-label="周邊 YouBike 2.0 場站">
+              @for (bike of info.youbike; track bike.name) {
+                <li><button type="button" [title]="bike.address || ''" (click)="focusPoi.emit({ name: bike.name, category: 'YouBike 2.0', lng: bike.lng, lat: bike.lat })"><strong>{{ bike.name }}@if (bike.capacity > 0) {（{{ bike.capacity }} 柱）}</strong><span>{{ bike.distance | number }}m · 約 {{ walkMinutes(bike.distance) }} 分</span></button></li>
+              }
+            </ul>
+          } @else {
+            <p class="poi-empty">450 公尺內未收錄 YouBike 2.0 場站</p>
+          }
+        }
+      }
+    </section>
+  }
+  <details class="station-info" [open]="showEntrances()" (toggle)="toggleEntrances.emit($any($event.target).open)">
+    <summary>
+      <span>出入口與設施</span>
+      <span class="exit-summary-badges">
+        <b>{{ entrancesAtPeriod().length }} 出口</b>
+        @if (accessibleExitCount(); as acc) { <b class="acc-pill" title="無障礙出口"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="16" cy="4" r="1"/><path d="m18 19 1-7-6 1"/><path d="m5 8 3-3 5.5 3-2.36 3.5"/><path d="M4.24 14.5a5 5 0 0 0 6.88 6"/><path d="M13.76 17.5a5 5 0 0 0-6.88-6"/></svg>{{ acc }}</b> }
+      </span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <div class="station-info-body" tabindex="0" aria-label="出入口與設施清單">
+    @if (hasEntranceHistory()) {
+      @if (entranceBaseline(); as baseline) {
+        <div class="entrance-period" role="group" aria-label="出口年代">
+          <button type="button" [attr.aria-pressed]="compareEntrances()" (click)="compareEntrancesChange.emit(true)">{{ baseline }}</button>
+          <button type="button" [attr.aria-pressed]="!compareEntrances()" (click)="compareEntrancesChange.emit(false)">{{ entranceCurrent() }}</button>
+        </div>
+      } @else { <p class="station-address">{{ entrancePeriod() }} 已啟用出口</p> }
+    }
+    @if (activeEntrance(); as exit) {
+      @if (entranceEvents(exit).length) {
+        <p class="station-address"><strong>{{ shortExitName(station(), exit.name) }}</strong>
+          @for (event of entranceEvents(exit); track event.date) {
+            <a class="ext-link" [href]="event.source" target="_blank" rel="noopener">{{ event.date }} {{ event.label }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+          }
+        </p>
+      }
+    }
+    @if (entrancesAtPeriod().length) {
+      @if (hasEntranceHistory()) { <p class="exit-key"><span><i></i>有年代紀錄</span></p> }
+      <ul class="entrances">
+        @for (exit of entrancesAtPeriod(); track $index) {
+          <li><button type="button" [attr.aria-label]="'在地圖上標出' + exit.name + (exit.accessible ? '（無障礙）' : '')" [attr.aria-pressed]="activeEntrance() === exit" (click)="locateEntrance.emit(exit)">
+            <span>{{ shortExitName(station(), exit.name) }}</span>
+            @if (exit.history?.opened || exit.history?.reopened; as date) { <small>{{ date }} {{ exit.history?.opened ? '啟用' : '重開' }}</small> }
+            @else if (exit.accessible) { <small class="acc-tag">無障礙</small> }
+          </button></li>
+        }
+      </ul>
+    } @else {
+      <p class="station-address">{{ entrancePeriod() }} 無可顯示的出口</p>
+    }
+    @for (exit of info.entrances; track $index) {
+      @if (exit.history && !entrancesAtPeriod().includes(exit)) {
+        <p class="station-address"><strong>{{ shortExitName(station(), exit.name) }} · 此期未開放</strong>
+          @for (event of entranceEvents(exit); track event.date) {
+            <a class="ext-link" [href]="event.source" target="_blank" rel="noopener">{{ event.date }} {{ event.label }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+          }
+        </p>
+      }
+    }
+    @if (info.facilities.length) {
+      <dl class="facility-list">
+        @for (facility of info.facilities; track $index) {
+          <dt>
+            <span class="fac-icon" aria-hidden="true"><svg viewBox="0 0 24 24">
+              @if (facility.label.includes('電梯')) { <path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/> }
+              @else if (facility.label.includes('廁')) { <path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/> }
+              @else if (facility.label.includes('乳')) { <path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M15 12h.01"/><path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/><path d="M9 12h.01"/> }
+              @else { <circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/> }
+            </svg></span>
+            {{ facility.label }}@if (facility.area) { <span>（{{ facility.area }}）</span> }
+          </dt>
+          @for (line of facilityLines(facility.value); track $index) {
+            <dd>{{ line }}</dd>
+          }
+        }
+      </dl>
+    }
+    <div class="source-row">
+      <a class="source-pill" href="https://data.gov.tw/dataset/128453" target="_blank" rel="noopener">設施資料<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+      <a class="source-pill" href="https://data.taipei/dataset/detail?id=cfa4778c-62c1-497b-b704-756231de348b" target="_blank" rel="noopener">出口資料<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+    </div>
+    </div>
+  </details>
+} @else if (infoStatus() === 'loading') { <p class="preview-status" role="status">載入車站資料…</p> }
+@else if (infoStatus() === 'failed') { <p class="preview-status" role="status">暫時讀不到車站資料</p> }
+@if (hasData()) {
+  <div class="station-preview-actions">
+    @if (showRankLink()) { <button type="button" class="preview-rank-link" (click)="rankLink.emit()">看排行</button> }
+    <button type="button" class="view-station" (click)="viewStation.emit()">看本站人流<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+  </div>
+} @else { <div class="empty-state compact" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><p>這站尚無旅次資料</p></div> }

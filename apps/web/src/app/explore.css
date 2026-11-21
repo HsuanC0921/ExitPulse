@@ -69,7 +69,8 @@ app-explore .chips button { min-width: 0; padding-inline: 6px; }
 .retry { border: 1px solid var(--ink); background: var(--panel); color: var(--ink); font-weight: var(--weight-action); }
 .retry:hover:not(:disabled) { background: var(--panel-2); }
 .export, .stepper button { border: 1px solid var(--rule); background: var(--panel); color: var(--ink); }
-app-explore .tools { grid-template-columns: minmax(0, 1fr) auto; }
+app-explore .tools { grid-template-columns: minmax(0, 1fr) auto auto; }
+app-explore .tools .notice { grid-column: 1 / -1; }
 .editor .chips { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; }
 .editor .chips button { min-width: 0; padding: 7px 4px; text-align: center; white-space: nowrap; }
 .station { display: inline-flex; align-items: center; gap: var(--sp-1); min-width: 0; }
@@ -111,7 +112,7 @@ app-explore .tools { grid-template-columns: minmax(0, 1fr) auto; }
 .explore-basis summary > span { display: inline-flex; align-items: center; gap: var(--sp-1); flex-wrap: wrap; }
 .explore-basis[open] summary svg { rotate: 180deg; }
 .personality-pill { margin-inline-start: 6px; padding: 1px 7px; border: 1px solid var(--rule); border-radius: var(--r-pill); background: var(--panel-2); color: var(--ink); font-size: var(--fs-xs); font-weight: var(--weight-action); }
-.metrics-strip, .peer-card, .coverage-summary div { border: 1px solid var(--hairline, var(--rule)); border-radius: var(--r-m); background: var(--panel-2); box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.metrics-strip, .peer-card { border: 1px solid var(--hairline, var(--rule)); border-radius: var(--r-m); background: var(--panel-2); box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
 .metrics-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-1); margin-bottom: 8px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
 .metrics-strip small { display: block; color: var(--ink-2); font-size: var(--fs-xs); }
 .metrics-strip b { font-size: var(--fs-xs); }
@@ -236,11 +237,6 @@ app-explore .relations .delta.plain { color: var(--ink); }
   .head-controls { gap: var(--sp-1); }
   .head-controls .segmented.small button { padding-inline: 8px; }
 }
-.coverage-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); margin: 12px 0; }
-.coverage-summary div { padding: 8px 10px; }
-.coverage-summary small { display: block; color: var(--ink-2); font-size: var(--fs-xs); }
-.coverage-summary b { font-size: var(--fs-m); font-variant-numeric: tabular-nums; }
-.coverage-search { margin: 8px 0 4px; }
 @media (pointer: coarse), (max-width: 1100px) {
   app-explore button:not(.day,.m-cell), .result-quick-bar .result-tools-toggle, .explore-basis summary, .search input, .select select { min-height: 44px; }
   app-explore .select select { -webkit-appearance: none; appearance: none; height: 44px; padding-block: 0; line-height: 42px; }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { amount, baselineIndex2017, change, classifyStationPersonality, computeStationMetrics, diff, exploreErrorMessage, growth, hourlySvgPoints, periodLabel, radialClockPoints, resolveAvailablePeriod, signed, sortNetwork, sortNetworkTable, sortRelationTable, sortRelations, stationRadius, summarizeByLine, maskUncoveredExits, distanceBands, distanceKm, stationRole, unusualDays, type Relation } from './explore-model.ts';
+import { amount, baselineIndex2017, change, classifyStationPersonality, computeStationMetrics, diff, exploreErrorMessage, growth, hourlySvgPoints, periodLabel, radialClockPoints, resolveAvailablePeriod, signed, sortNetwork, sortNetworkTable, sortRelationTable, sortRelations, stationRadius, summarizeByLine, maskUncoveredExits, matchingEvents, NETWORK_EVENTS, distanceBands, distanceKm, stationRole, unusualDays, type Relation } from './explore-model.ts';
 
 const rel = (station: string, daily: number | null, compareDaily: number | null, share = 0): Relation => ({ station, daily, share, compareDaily, compareShare: 0 });
 
@@ -239,4 +239,19 @@ test('maskUncoveredExits blanks only the side whose exits the data never covered
   assert.deepEqual([a.exits, a.compareExits], [null, 50]);
   assert.equal(b, rows[1]);
   assert.equal(c, rows[2]);
+});
+
+test('matchingEvents matches month or day and filters station-specific milestones', () => {
+  assert.ok(NETWORK_EVENTS.length >= 6);
+  const domeEvents = matchingEvents('2024-12', '國父紀念館').map(e => e.label);
+  assert.equal(domeEvents.includes('臺北大巨蛋首場大型演唱會'), true);
+  assert.equal(domeEvents.includes('環狀線全線復駛'), true);
+
+  const ximenEvents = matchingEvents('2024-12', '西門').map(e => e.label);
+  assert.equal(ximenEvents.includes('臺北大巨蛋首場大型演唱會'), false);
+  assert.equal(ximenEvents.includes('環狀線全線復駛'), true);
+
+  const exactDay = matchingEvents('2023-12-02', '國父紀念館');
+  assert.equal(exactDay.length, 1);
+  assert.match(exactDay[0].label, /大巨蛋/);
 });

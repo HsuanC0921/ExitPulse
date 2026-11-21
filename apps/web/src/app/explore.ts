@@ -4,12 +4,14 @@ import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, shareReplay, switchMap, timer, type Observable, type Subscription } from 'rxjs';
 import {
-  DAY_LABELS, NETWORK_EVENTS, maskUncoveredExits, amount, baselineIndex2017, distanceBands, stationRole, unusualDays, change, classifyStationPersonality, computeStationMetrics, dayName, diff, exploreErrorMessage, growth, hourlySvgPoints, periodLabel, radialClockPoints, resolveAvailablePeriod, signed, sortNetwork, sortNetworkTable, sortRelationTable, sortRelations, stationRadius, summarizeByLine,
+  DAY_LABELS, NETWORK_EVENTS, maskUncoveredExits, matchingEvents, amount, baselineIndex2017, distanceBands, stationRole, unusualDays, change, classifyStationPersonality, computeStationMetrics, dayName, diff, exploreErrorMessage, growth, hourlySvgPoints, periodLabel, radialClockPoints, resolveAvailablePeriod, signed, sortNetwork, sortNetworkTable, sortRelationTable, sortRelations, stationRadius, summarizeByLine,
   type CalendarAnswer, type CatalogAnswer, type DayType, type LeadersAnswer, type MatrixAnswer, type NetworkAnswer, type NetworkSort, type NetworkTableColumn,
   type Relation, type RelationSort, type RelationTableColumn, type StationAnswer, type TableSortDir, type TrendAnswer,
 } from './explore-model';
 import { formatDailyTrips, lineWidth, glue } from './radar-model';
 import { buildCsv, downloadCsv, exportBasis, type CsvCell } from './csv-export';
+import { exportNetworkCard, exportStationCard } from './card-export';
+import { ExploreCoverage } from './explore-coverage';
 import { Hint, type HintEntry } from './hint';
 import { MonthCalendar } from './month-calendar';
 import { OdMatrix } from './od-matrix';
@@ -65,7 +67,7 @@ function hourRangesText(hours: readonly number[] | undefined): string {
 }
 
 @Component({
-  selector: 'app-explore', imports: [DecimalPipe, Hint, MonthCalendar, OdMatrix, AnimatedCount, RankChart], templateUrl: './explore.html', styleUrls: ['./explore.css', './explore-wide.css', './rank-link.css'],
+  selector: 'app-explore', imports: [DecimalPipe, Hint, MonthCalendar, OdMatrix, AnimatedCount, RankChart, ExploreCoverage], templateUrl: './explore.html', styleUrls: ['./explore.css', './explore-wide.css', './rank-link.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, encapsulation: ViewEncapsulation.None,
 })
 export class Explore implements OnDestroy {
@@ -204,6 +206,7 @@ export class Explore implements OnDestroy {
   readonly peerLoading = signal(false);
   readonly loading = signal(false);
   readonly failure = signal('');
+  readonly cardNotice = signal('');
   /** 失敗原因是網路或伺服器暫時性問題（可自動重試），不是查詢條件本身有誤 */
   private readonly failureRetryable = signal(false);
   readonly calendarLoading = signal(false);
@@ -395,14 +398,22 @@ export class Explore implements OnDestroy {
   /** 事件註記拆成「標題」與「明細項目」，明細每一項不可從中間斷行，括號跟著頭尾兩項，避免括號孤立或詞被切開。 */
   readonly eventNotes = computed(() => {
     const ev = (this.stationAnswer() ?? this.networkAnswer())?.events;
-    if (!ev) return [];
+    const out: { lead: string; items: string[] }[] = [];
+    const city = matchingEvents(this.period(), this.mode() === 'station' ? this.station() : null);
+    if (city.length) {
+      const labels = city.map(c => `${+c.date.slice(5, 7)}/${+c.date.slice(8)} ${c.label}`);
+      out.push({
+        lead: '城市事件：',
+        items: labels.map((item, i) => item + (i === labels.length - 1 ? '' : '、')),
+      });
+    }
+    if (!ev) return out;
     const note = (lead: string, items: string[], more = '') => {
       const parts = items.map((item, i) => item + (i === items.length - 1 ? more : '、'));
       return { lead: lead + '：', items: parts };
     };
     // 「孔子誕辰紀念日/教師節」這類並列名稱只取通稱，避免斜線斷行
     const day = (d: { date: string; note?: string }, withNote: boolean) => `${+d.date.slice(5, 7)}/${+d.date.slice(8)}${withNote && d.note ? ' ' + d.note.split('/').pop() : ''}`;
-    const out: { lead: string; items: string[] }[] = [];
     if (ev.offDays.length) out.push(note(`含國定假日 ${ev.offDays.length} 天`, ev.offDays.slice(0, 3).map(d => day(d, true)), ev.offDays.length > 3 ? '等' : ''));
     if (ev.makeupDays.length) out.push(note(`含補班日 ${ev.makeupDays.length} 天`, ev.makeupDays.slice(0, 2).map(d => day(d, false))));
     return out;
@@ -615,6 +626,7 @@ export class Explore implements OnDestroy {
     const labelMap = new Map([...milestoneMap].map(([month, codes]) => [month, [codes.join(' / ') + ' 線通車']]));
     const eventMonths = new Set<string>();
     for (const e of NETWORK_EVENTS) {
+      if (station && e.stations?.length && !e.stations.includes(station)) continue;
       const month = e.date.slice(0, 7);
       eventMonths.add(month);
       labelMap.set(month, [...(labelMap.get(month) ?? []), e.label]);
@@ -1316,6 +1328,63 @@ export class Explore implements OnDestroy {
     const name = this.mode() === 'station' ? `${this.station()}-${scope === 'list' ? this.direction() : scope}` : `network-${scope}`;
     const suffix = scope === 'trend' ? 'trend' : `${this.period()}${this.comparePeriod() ? '-vs-' + this.comparePeriod() : ''}`;
     downloadCsv(`exitpulse-${name}-${suffix}.csv`, buildCsv(meta, head, rows));
+  }
+
+  async exportCard() {
+    if (this.loading() || this.failure() || this.unrecorded() || this.sameAsCompare()) return;
+    const periodLabel = this.unit() === 'date' ? this.periodDate() : this.periodBaseText();
+    const hoursText = this.hoursText();
+    const compareLabel = this.comparePeriod() ? this.compareText() : null;
+    this.cardNotice.set('正在產生圖卡…');
+    let res: { ok: true } | { ok: false; reason: string };
+    if (this.mode() === 'station') {
+      const a = this.stationAnswer();
+      if (!a) { this.cardNotice.set(''); return; }
+      const lines = this.linesOf()(a.station);
+      res = await exportStationCard({
+        station: a.station,
+        periodLabel,
+        hoursText,
+        direction: this.direction(),
+        dailyEntries: a.entries,
+        dailyExits: this.exitGap() ? null : a.exits,
+        compareLabel,
+        compareEntries: a.compareEntries,
+        hourlyEntries: a.hourly.entries,
+        topRelations: this.relations().slice(0, 3).map(r => ({
+          station: r.station,
+          daily: r.daily,
+          color: this.linesOf()(r.station)[0]?.color,
+        })),
+        badges: lines.map(l => ({ code: this.stationCode(l.code, a.station), line: l.code, color: l.color })),
+        lineColor: lines[0]?.color,
+      });
+    } else {
+      const na = this.networkAnswer();
+      if (!na) { this.cardNotice.set(''); return; }
+      const metric = this.networkMetric();
+      const rows = this.networkRows().filter(r => r.entries != null);
+      const sorted = [...rows].sort((x, y) => metric === 'net'
+        ? Math.abs((y.exitCovered !== false && y.exits != null ? y.exits - (y.entries ?? 0) : 0))
+          - Math.abs((x.exitCovered !== false && x.exits != null ? x.exits - (x.entries ?? 0) : 0))
+        : (y.entries ?? 0) - (x.entries ?? 0));
+      res = await exportNetworkCard({
+        metric,
+        periodLabel,
+        hoursText,
+        totalEntries: na.total,
+        compareLabel,
+        compareTotal: na.compareTotal,
+        stationCount: rows.length,
+        topStations: sorted.slice(0, 5).map(r => ({
+          station: r.station,
+          value: metric === 'net' ? (r.exitCovered !== false && r.exits != null ? r.exits - (r.entries ?? 0) : null) : r.entries,
+          color: this.linesOf()(r.station)[0]?.color,
+        })),
+      });
+    }
+    this.cardNotice.set(res.ok ? '已下載分享圖卡' : res.reason);
+    setTimeout(() => this.cardNotice.set(''), 2600);
   }
 
   // ----- Map -----

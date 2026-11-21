@@ -361,12 +361,29 @@ export function radialClockPoints(
   return { entriesPaths: buildPaths(entries), exitsPaths: buildPaths(exits), missingHours, peak };
 }
 
-/** 影響全網人流的重大事件，標在歷年走勢上；只列日期確定、影響全線的事件。 */
-export const NETWORK_EVENTS: readonly { date: string; label: string }[] = [
+export type NetworkEvent = { date: string; label: string; stations?: readonly string[] };
+
+/** 影響全網或指標車站人流的重大事件，用於歷年走勢與單站／全線脈絡提示。 */
+export const NETWORK_EVENTS: readonly NetworkEvent[] = [
   { date: '2020-01-31', label: '環狀線通車' },
   { date: '2021-05-19', label: '全國三級警戒' },
   { date: '2023-07-01', label: 'TPASS 1200 月票上路' },
+  { date: '2023-12-02', label: '臺北大巨蛋正式啟用首賽', stations: ['國父紀念館'] },
+  { date: '2024-04-03', label: '花蓮強震，環狀線部分停駛' },
+  { date: '2024-12-05', label: '臺北大巨蛋首場大型演唱會', stations: ['國父紀念館'] },
+  { date: '2024-12-12', label: '環狀線全線復駛' },
 ];
+
+/** 回傳指定期間（YYYY-MM 或 YYYY-MM-DD）適用的重大城市與捷運事件。 */
+export function matchingEvents(period: string, station?: string | null): NetworkEvent[] {
+  if (!period) return [];
+  return NETWORK_EVENTS.filter(ev => {
+    const samePeriod = period.length === 10 ? ev.date === period : ev.date.slice(0, 7) === period;
+    if (!samePeriod) return false;
+    if (!ev.stations?.length) return true;
+    return !station || ev.stations.includes(station);
+  });
+}
 
 // 爆量與偏少都跟「同類型日」的中位數比：平日比平日，週末與國定假日比週末與國定假日
 export const SURGE_RATIO = 1.45;

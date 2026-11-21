@@ -19,7 +19,6 @@ import { Hint, type HintEntry } from './hint';
 import { Brand } from './brand';
 import { About } from './about';
 import { PairDetail } from './pair-detail';
-import { AnimatedCount } from './animated-count';
 import { buildCsv, downloadCsv, exportBasis } from './csv-export';
 import { exportPairCard } from './card-export';
 import {
@@ -32,8 +31,7 @@ import {
 } from './radar-map-style';
 import { FirstQuery, type FirstQueryPreset } from './first-query';
 import { resolveStationInput } from './station-match';
-import { StationHistory } from './station-history';
-import type { StationHistoryLine } from './station-history-model';
+import { StationPreview, type Entrance, type StationInfo } from './station-preview';
 import { daylightAt } from './daylight';
 import { change, type NetworkAnswer } from './explore-model';
 import type { ElevatedFlow } from './radar-3d';
@@ -49,20 +47,10 @@ type Mode = 'volume' | 'direction' | 'time';
 type MapPanel = 'station' | 'route' | 'rank' | 'tower' | 'legend';
 type Stream = { key: string; label: string; daily: number; color: string; dashed: boolean; emphasis?: number; path: [number, number][] };
 type Place = { name: string; area: string; address?: string; category?: string; lng: number; lat: number };
-type Entrance = { code: string; name: string; label?: string; lng: number; lat: number; accessible: boolean;
-  history?: { opened?: string; closed?: string; reopened?: string; source: string; closureSource?: string } | null };
-type StationInfo = { retrieved: string; facilities: { label: string; area: string; value: string }[]; entrances: Entrance[];
-  opening?: { date: string; source: string }; lines?: StationHistoryLine[]; addresses?: string[];
-  story?: { summary: string; source: string; sourceLabel?: string } | null; nearby?: { name: string; distance: number; summary: string; lng?: number; lat?: number }[];
-  youbike?: { name: string; distance: number; capacity: number; address?: string; lng?: number; lat?: number }[];
-  hubs?: { name: string; officialName?: string; kind: string; distance: number; lng?: number; lat?: number; source?: string; sourceLabel?: string }[];
-  districtPop?: { district: string; period: string; population: number; yoyPct?: number | null } | null;
-  catchmentPop?: { districts: string[]; period: string; population: number; yoyPct?: number | null } | null;
-  latestStats?: { month: string; period?: string; isDate?: boolean; dailyEntries: number; dailyExits: number; rank: number; totalStations: number; yoyPct?: number | null } };
 
 @Component({
-  selector: 'app-root', imports: [DecimalPipe, NgTemplateOutlet, Explore, MobileShell, TimePlayer, Hint, Brand, FirstQuery, StationHistory, About, PairDetail, AnimatedCount],
-  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './station-preview.css', './mobile-map.css', './radar.css', './radar-responsive.css', './hour-chart.css', './interface-motion.css'],
+  selector: 'app-root', imports: [DecimalPipe, NgTemplateOutlet, Explore, MobileShell, TimePlayer, Hint, Brand, FirstQuery, StationPreview, About, PairDetail],
+  encapsulation: ViewEncapsulation.None, templateUrl: './radar.html', styleUrls: ['./map-tools.css', './mobile-map.css', './radar.css', './radar-responsive.css', './hour-chart.css', './interface-motion.css'],
   changeDetection: ChangeDetectionStrategy.OnPush, host: {
     '[attr.data-theme]': 'theme()',
     '[attr.data-inset]': 'device().inset',
@@ -317,38 +305,6 @@ export class Radar implements OnDestroy {
       return !(history?.closed && history.reopened && period > at(history.closed) && period < at(history.reopened))
         && !(period.length === 10 && history?.closed && period === history.closed);
     });
-  });
-  readonly hubSources = computed(() => {
-    const seen = new Map<string, string>();
-    for (const hub of this.stationInfo()?.hubs ?? []) {
-      const label = hub.sourceLabel?.trim();
-      const url = hub.source?.trim();
-      if (label && !seen.has(label)) seen.set(label, url || '');
-    }
-    return [...seen.entries()].map(([label, url]) => ({ label, url }));
-  });
-  readonly nearbyTab = linkedSignal<'hubs' | 'nearby' | 'youbike'>(() => {
-    const info = this.stationInfo();
-    if (info?.hubs?.length) return 'hubs';
-    if (info?.nearby?.length) return 'nearby';
-    if (info?.youbike?.length) return 'youbike';
-    return 'hubs';
-  });
-  readonly youbikeSummary = computed(() => {
-    const list = this.stationInfo()?.youbike ?? [];
-    return { count: list.length, totalDocks: list.reduce((sum, s) => sum + (s.capacity || 0), 0) };
-  });
-  walkMinutes(meters: number) {
-    return Math.max(1, Math.round(meters / 80));
-  }
-  readonly snapshotBalance = computed(() => {
-    const s = this.stationSnapshot();
-    if (!s || s.exits == null || s.entries + s.exits <= 0) return null;
-    const total = s.entries + s.exits;
-    const entryPct = Math.round(s.entries / total * 100);
-    const exitPct = 100 - entryPct;
-    const label = entryPct - exitPct >= 4 ? '偏淨流出' : exitPct - entryPct >= 4 ? '偏淨流入' : '進出均衡';
-    return { entryPct, exitPct, label };
   });
   private stationInfoRequest = 0;
   private autoFindTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1899,31 +1855,6 @@ export class Radar implements OnDestroy {
     map.fitBounds(bounds, { padding: this.padding(), maxZoom: 17.4, bearing: map.getBearing(), duration: this.reducedMotion ? 0 : 700 });
   }
 
-  readonly hasEntranceHistory = computed(() => this.entrancesAtPeriod().some(e => !!e.history));
-  readonly accessibleExitCount = computed(() => this.entrancesAtPeriod().filter(e => e.accessible).length);
-
-  shortExitName(station: string, name: string): string {
-    const stripped = name.replace(new RegExp(`^${station}站?`), '').trim();
-    if (!stripped) return name;
-    if (/^[A-Za-z0-9]+$/.test(stripped)) return `出口 ${stripped}`;
-    return stripped.replace(/^出口\s*/, '出口 ');
-  }
-
-  facilityLines(value: string): string[] {
-    return value.split(/\n|(?=\d+\.)/).map(s => s.trim()).filter(Boolean);
-  }
-
-  readonly stationCleanNote = computed(() => {
-    const raw = this.stationInfo()?.story?.summary?.trim();
-    if (!raw) return '';
-    return raw
-      .replace(/[^。]*屬於[^。]*通車。/g, '')
-      .replace(/\d+\s*年\s*\d+\s*月平均每天約[^。]*排第\s*\d+。/g, '')
-      .replace(/現況資料顯示共有[^。]*。/g, '')
-      .replace(/站外(?:當時已確認啟用|共有)的?[^。]*捷運出入口[^。]*。/g, '')
-      .trim();
-  });
-
   readonly stationSnapshot = computed(() => {
     const station = this.selectedMapStation(), info = this.stationInfo();
     if (!station || !info) return null;
@@ -1976,16 +1907,6 @@ export class Radar implements OnDestroy {
       diffLabel: '較去年同月',
     };
   });
-
-  entranceEvents(exit: Entrance) {
-    const history = exit.history;
-    if (!history) return [];
-    return [
-      ...(history.opened ? [{ date: history.opened, label: '啟用', source: history.source }] : []),
-      ...(history.closed ? [{ date: history.closed, label: '暫停開放', source: history.closureSource ?? history.source }] : []),
-      ...(history.reopened ? [{ date: history.reopened, label: '重新開放', source: history.source }] : []),
-    ];
-  }
 
   /** 出口圖釘放在車站旁，不壓在站圈或站名上：在螢幕座標中逐個往外推到不重疊為止。 */
   private spreadEntrances() {

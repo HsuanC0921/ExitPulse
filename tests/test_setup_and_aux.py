@@ -8,6 +8,9 @@ from unittest.mock import MagicMock, patch
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+import json
+import os
+import notify
 import setup
 import update_auxiliary
 
@@ -63,6 +66,43 @@ class AuxiliaryYearsTests(unittest.TestCase):
             mock_date.today.return_value = date(2026, 11, 21)
             self.assertEqual(update_auxiliary.target_holiday_years(), [2026, 2027])
         self.assertEqual(update_auxiliary.target_holiday_years(2028), [2028])
+
+
+class NotifyTests(unittest.TestCase):
+    def test_send_alert_skips_cleanly_when_unconfigured(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(notify.send_alert('Test', 'Msg'))
+
+    def test_build_alert_payload_contains_discord_and_slack_keys(self):
+        payload = notify.build_alert_payload('更新失敗', 'HTTP 500', host='test-host')
+        self.assertEqual(payload['title'], '更新失敗')
+        self.assertIn('[test-host ·', payload['content'])
+        self.assertEqual(payload['content'], payload['text'])
+
+    def test_send_alert_posts_json_to_configured_webhook(self):
+        captured = {}
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b'ok'
+
+        def fake_urlopen(req, timeout=0):
+            captured['url'] = req.full_url
+            captured['body'] = json.loads(req.data.decode('utf-8'))
+            return FakeResp()
+
+        with patch.dict(os.environ, {'EXITPULSE_ALERT_WEBHOOK': 'https://example.invalid/hook'}, clear=True):
+            with patch('urllib.request.urlopen', side_effect=fake_urlopen):
+                self.assertTrue(notify.send_alert('任務失敗', 'exit 1'))
+
+        self.assertEqual(captured['url'], 'https://example.invalid/hook')
+        self.assertIn('exit 1', captured['body']['content'])
 
 
 if __name__ == '__main__':
