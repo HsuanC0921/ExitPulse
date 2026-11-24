@@ -254,6 +254,7 @@ docker-compose.yml      本機 PostgreSQL 設定
 - **資安待改善**：
   - 唯讀資料庫角色的腳本還沒在正式資料庫上實際執行，建議先在備份還原的環境試跑，再套用到正式環境。
   - API 容器還不是唯讀檔案系統，匯入工具要寫入掛載目錄，要先確認不會影響才能開。
+  - CSP 的 `style-src` 仍含 `'unsafe-inline'`（ZAP Medium），要改成 nonce 需先處理 Angular 與 MapLibre 的行內樣式。
   - 容器基底映像用浮動標籤，尚未固定到 `@sha256` 摘要。`requirements.lock` 也還沒有雜湊，可改用 `pip-compile --generate-hashes`。
   - `systemd` 單元檔還沒有加固設定（`NoNewPrivileges`、`ProtectSystem` 等），需要先確認不會影響 `sudo` 與 Docker。
   - git 歷史裡有本機開發用的預設連線字串，只綁 `127.0.0.1`，風險低，但不會改寫歷史。
@@ -284,11 +285,15 @@ ExitPulse 是沒有登入的公開唯讀服務，攻擊面集中在 API、資料
 | `npm audit` | 前端 npm 相依 | 0 個漏洞 |
 | `pip-audit` | Python 相依與鎖定檔 | 沒有已知漏洞 |
 | `bandit` | Python 程式碼 | `apps/api` 無發現。`tools/` 的 B608 是人工確認過的誤報，片段只有常數與佔位符。B310 已改成只接受 https |
-| `semgrep`（python、typescript、dockerfile 規則集） | 75 個檔案、226 條規則 | 0 個發現 |
+| `semgrep`（`p/default` 規則集） | `apps/api`、`tools`、`deploy` | `apps/api` 無發現。`tools/` 的 `formatted-sql-query` 與 `dynamic-urllib-use-detected` 同樣是已人工確認的誤報，拼進去的只有常數片段，值都走 `%s` 參數，網址來源是固定常數或已限定 https |
 | `shellcheck` | `deploy/*.sh` | 無警告 |
+| `gitleaks` 8.30.1 | 整份 git 歷史 | 1 筆誤報：`collection.ts` 的 `COLLECTION_KEY` 是 `localStorage` 鍵名，不是密鑰。已記在 `.gitleaksignore`，其餘沒有發現 |
+| `trivy` 0.76.2 | `deploy/` 設定、前端 `package-lock.json` | 0 個錯誤設定，npm 0 個漏洞，沒有密鑰。`requirements.lock` 檔名不被 `trivy` 辨識，Python 相依改以 `pip-audit` 為準 |
+| `hadolint` 2.15.1 | `deploy/Dockerfile.api` | 3 筆。`USER` 改成數字 UID、`HEALTHCHECK` 改成 JSON 格式已修。`apt-get install` 不釘版本是刻意的，Debian 小版號會輪替，釘死會讓建置隨時失敗，已用 `hadolint ignore` 註記 |
+| OWASP ZAP 2.17.0（蜘蛛加主動掃描） | 本機的靜態網站，帶與正式環境相同的 CSP，**沒有掃線上站台** | Medium 1 筆：`style-src 'unsafe-inline'`。這是 Angular 與 MapLibre 的行內樣式所需，已知取捨，尚未改成 nonce。另有 2 筆資訊級（註解字樣、現代網頁應用偵測） |
 | 正則掃描 git 歷史 | token、私鑰、連線字串 | 只有本機開發用的預設密碼 |
 
-這台機器沒有裝 `gitleaks`、`trivy`、`hadolint` 與 OWASP ZAP，建議之後補上：`gitleaks detect` 掃歷史密鑰，`trivy image` 與 `trivy config deploy/` 掃映像與設定，`hadolint deploy/Dockerfile.api` 檢查 Dockerfile。ZAP 的 baseline 掃描只對自己的測試環境執行，不要對別人的主機掃。
+沒有跑的項目：`trivy image` 需要 Docker 常駐，這次本機沒有啟動，所以沒掃建置後的映像。ZAP 沒對 API 動態掃描，因為本機沒有資料庫。ZAP 的 baseline 掃描只對自己的測試環境執行，不要對別人的主機掃。
 
 ### 啟用唯讀資料庫角色
 

@@ -1,0 +1,2 @@
+# gitleaks 誤報清單（已人工確認）。collection.ts 的 COLLECTION_KEY 是 localStorage 鍵名，不是密鑰。
+d8e656e45182d37856f7bb934c8a6f7c042c3a19:apps/web/src/app/collection.ts:generic-api-key:6
