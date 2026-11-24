@@ -101,6 +101,29 @@ def _selected_days(db, dates, start, end):
     return rows, hourly
 
 
+def _selected_hours(db, dates):
+    return db.execute(
+        'SELECT hour,station,SUM(entries)::bigint,SUM(exits)::bigint FROM station_hours '
+        'WHERE date=ANY(%s) GROUP BY hour,station', (sorted(dates),),
+    ).fetchall()
+
+
+def _workday_hours(db, dates, workdays):
+    weekdays = {day for day in dates if day_type(day, 'weekday')}
+    removed, added = weekdays - workdays, workdays - weekdays
+    if len(removed) + len(added) >= len(workdays):
+        return _selected_hours(db, workdays)
+    hours = {(hour, station): (entries, exits) for hour, station, entries, exits in _month_hours(db, (0,))}
+    for sign, changed_dates in ((-1, removed), (1, added)):
+        if not changed_dates:
+            continue
+        for hour, station, entries, exits in _selected_hours(db, changed_dates):
+            key = (hour, station)
+            before_in, before_out = hours.get(key, (0, 0))
+            hours[key] = (before_in + sign * entries, before_out + sign * exits)
+    return [(h, s, e, x) for (h, s), (e, x) in hours.items() if e or x]
+
+
 def _workday_totals(db, dates, workdays, start, end):
     weekdays = {day for day in dates if day_type(day, 'weekday')}
     removed, added = weekdays - workdays, workdays - weekdays
@@ -149,7 +172,7 @@ class Period:
 
     def __init__(self, spec, days, start, end, *, daily_totals_only=False):
         self.spec, self.is_date = spec, len(spec) == 10
-        self.daily_totals_only = self.is_date and daily_totals_only
+        self.daily_totals_only = bool(daily_totals_only)
         self.month = spec[:7]
         with open_month(self.month) as db:
             self.metadata = metadata(db)
@@ -192,7 +215,14 @@ class Period:
                     raise ValueError(f'{spec}: selected hours do not cover the same dates')
                 else:
                     self.days = len(selected[0])
-                if days == 'workday':
+                if self.daily_totals_only:
+                    rows = ()
+                    if days == 'workday':
+                        hourly = _workday_hours(db, self.metadata['dates'], candidate)
+                    else:
+                        weekend = {'weekday': (0,), 'weekend': (1,), 'all': (0, 1)}[days]
+                        hourly = _month_hours(db, weekend)
+                elif days == 'workday':
                     rows, hourly = _load_workday_totals(db, self.metadata, candidate, start, end)
                 else:
                     weekend = {'weekday': (0,), 'weekend': (1,), 'all': (0, 1)}[days]
@@ -223,10 +253,10 @@ class Period:
             start, end = self.hours
 
             def band_totals(by_hour):
-                return {station: float(total) for station, counts in by_hour.items()
+                return {station: total / self.days for station, counts in by_hour.items()
                         if (total := sum(counts[start:end]))}
 
-            # station_hours is built from the same OD rows, grouped by entry hour for both sides.
+            # station_hours / station_hour_flow are built from the same OD rows, grouped by entry hour for both sides.
             return band_totals(self.entries_by_hour), band_totals(self.exits_by_hour)
         entries, exits = defaultdict(float), defaultdict(float)
         for (o, d), n in self.flows.items():
@@ -442,16 +472,30 @@ def relation_hours_query(args):
         ).fetchall()}
         if not origin_ids or not destination_ids or origin not in present or destination not in present:
             raise ValueError('A selected station is not present on this date')
-        rows = db.execute(
-            'SELECT hour, '
-            'SUM(trips) FILTER (WHERE origin=ANY(%s) AND destination=ANY(%s)), '
-            'SUM(trips) FILTER (WHERE origin=ANY(%s) AND destination=ANY(%s)) '
-            'FROM trips WHERE day=%s AND '
-            '((origin=ANY(%s) AND destination=ANY(%s)) OR (origin=ANY(%s) AND destination=ANY(%s))) '
-            'GROUP BY hour',
-            (origin_ids, destination_ids, destination_ids, origin_ids, int(day[8:]),
-             origin_ids, destination_ids, destination_ids, origin_ids),
-        ).fetchall()
+        if table_exists(db, 'trip_groups'):
+            rows = db.execute(
+                'SELECT tg.hour, '
+                'SUM(u.trips) FILTER (WHERE tg.origin=ANY(%s) AND u.destination=ANY(%s)), '
+                'SUM(u.trips) FILTER (WHERE tg.origin=ANY(%s) AND u.destination=ANY(%s)) '
+                'FROM trip_groups tg '
+                'CROSS JOIN LATERAL unnest(tg.destinations, tg.counts) AS u(destination, trips) '
+                'WHERE tg.day=%s AND tg.origin=ANY(%s) '
+                'AND ((tg.origin=ANY(%s) AND u.destination=ANY(%s)) OR (tg.origin=ANY(%s) AND u.destination=ANY(%s))) '
+                'GROUP BY tg.hour',
+                (origin_ids, destination_ids, destination_ids, origin_ids, int(day[8:]),
+                 origin_ids + destination_ids, origin_ids, destination_ids, destination_ids, origin_ids),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                'SELECT hour, '
+                'SUM(trips) FILTER (WHERE origin=ANY(%s) AND destination=ANY(%s)), '
+                'SUM(trips) FILTER (WHERE origin=ANY(%s) AND destination=ANY(%s)) '
+                'FROM trips WHERE day=%s AND '
+                '((origin=ANY(%s) AND destination=ANY(%s)) OR (origin=ANY(%s) AND destination=ANY(%s))) '
+                'GROUP BY hour',
+                (origin_ids, destination_ids, destination_ids, origin_ids, int(day[8:]),
+                 origin_ids, destination_ids, destination_ids, origin_ids),
+            ).fetchall()
 
     return {
         'date': day,

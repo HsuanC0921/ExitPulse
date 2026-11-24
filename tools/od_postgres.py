@@ -262,10 +262,18 @@ def get_catalog():
         ).fetchall()
         sc_map = dict(db.execute('SELECT month, COUNT(*) FROM station_month GROUP BY month').fetchall())
         st_rows = db.execute(
-            'SELECT s.name, MIN(sd.date), MAX(sd.date), COUNT(DISTINCT sd.date), '
-            '(SELECT COUNT(*) FROM station_month sm WHERE sm.station_id=s.id) '
-            'FROM station s LEFT JOIN station_day sd ON sd.station_id=s.id '
-            'GROUP BY s.id, s.name ORDER BY MIN(sd.date) NULLS LAST, s.name'
+            'WITH sd AS ('
+            '  SELECT station_id, MIN(date) AS first_date, MAX(date) AS last_date, COUNT(*) AS day_count '
+            '  FROM station_day GROUP BY station_id'
+            '), sm AS ('
+            '  SELECT station_id, COUNT(*) AS month_count '
+            '  FROM station_month GROUP BY station_id'
+            ') '
+            'SELECT s.name, sd.first_date, sd.last_date, COALESCE(sd.day_count, 0), COALESCE(sm.month_count, 0) '
+            'FROM station s '
+            'LEFT JOIN sd ON sd.station_id=s.id '
+            'LEFT JOIN sm ON sm.station_id=s.id '
+            'ORDER BY sd.first_date NULLS LAST, s.name'
         ).fetchall()
         opening_map = {}
         if table_exists(db, 'exitpulse_station_info.stations'):

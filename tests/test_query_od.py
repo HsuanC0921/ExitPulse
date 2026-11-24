@@ -98,6 +98,73 @@ class MatrixTests(unittest.TestCase):
             _load_workday_totals(None, dict(info, sha256='updated'), {first}, 7, 10)
             self.assertEqual(compute.call_count, 3)
 
+    def test_monthly_daily_totals_only_skips_pair_flows_and_averages_by_days(self):
+        class FakeMonthDB:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        meta = {
+            'stations': ['台北車站', '市政府'],
+            'origins': ['台北車站', '市政府'],
+            'destinations': ['台北車站', '市政府'],
+            'dates': ['2026-09-01', '2026-09-02'],
+            'hours': [7, 8],
+        }
+        hourly = [
+            (7, '台北車站', 200, 100),
+            (8, '台北車站', 100, 50),
+            (7, '市政府', 60, 140),
+        ]
+        with (patch('query_od.open_month', return_value=FakeMonthDB()),
+              patch('query_od.metadata', return_value=meta),
+              patch('query_od._month_hours', return_value=hourly) as month_hours,
+              patch('query_od._month_flows', side_effect=AssertionError('should not scan pair flows'))):
+            period = Period('2026-09', 'weekday', 7, 9, daily_totals_only=True)
+            entries, exits = period.totals()
+        self.assertEqual(month_hours.call_count, 1)
+        self.assertEqual(period.flows, {})
+        self.assertEqual(entries['台北車站'], 150.0)
+        self.assertEqual(exits['台北車站'], 75.0)
+        self.assertEqual(entries['市政府'], 30.0)
+        self.assertEqual(exits['市政府'], 70.0)
+
+    def test_relation_hours_prefers_trip_groups_when_available(self):
+        executed = []
+
+        class FakeCursor:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def fetchall(self):
+                return self._rows
+
+        class FakeMonthDB:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def execute(self, sql, params=()):
+                executed.append((sql, params))
+                if 'FROM stations' in sql:
+                    return FakeCursor([(1, '南港'), (2, '南港展覽館')])
+                if 'FROM station_hours' in sql:
+                    return FakeCursor([('南港',), ('南港展覽館',)])
+                return FakeCursor([(7, 120, 45)])
+
+        meta = {'dates': ['2026-09-15'], 'hours': [7, 8]}
+        args = SimpleNamespace(origin='南港', destination='南港展覽館', date='2026-09-15')
+        with (patch('query_od.open_month', return_value=FakeMonthDB()),
+              patch('query_od.metadata', return_value=meta),
+              patch('query_od.table_exists', return_value=True)):
+            result = relation_hours_query(args)
+        self.assertTrue(any('FROM trip_groups tg' in sql for sql, _ in executed))
+        self.assertEqual(result['byHour'][7], {'hour': 7, 'forward': 120, 'reverse': 45, 'recorded': True})
+
 
 @unittest.skipUnless(POSTGRES, 'PostgreSQL connection not configured')
 class RawDetailTests(unittest.TestCase):
