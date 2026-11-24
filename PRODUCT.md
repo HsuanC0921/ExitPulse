@@ -6,9 +6,9 @@
 | --- | --- |
 | 產品 | ExitPulse（捷運旅次變化雷達） |
 | 文件性質 | 產品需求規格，是 Spec-Driven Development 的需求來源。設計、實作與測試都回頭對照本文件 |
-| 對應版本 | 1.5.0 |
+| 對應版本 | 1.5.1 |
 | 平台 | Web，桌機與手機同為一級支援 |
-| 相關文件 | [DESIGN.md](DESIGN.md) 視覺與互動規範、[docs/API.md](docs/API.md) 介面與效能、[docs/DECISIONS.md](docs/DECISIONS.md) 設計取捨、[CONTRIBUTING.md](CONTRIBUTING.md) 專案規則、[README.md](README.md) 使用與架設 |
+| 相關文件 | [DESIGN.md](DESIGN.md) 視覺與互動規範、[SECURITY.md](SECURITY.md) 資安防護與弱掃、[docs/API.md](docs/API.md) 介面與效能、[docs/METHODOLOGY.md](docs/METHODOLOGY.md) 分析口徑與資料限制、[docs/DECISIONS.md](docs/DECISIONS.md) 設計取捨、[docs/README.md](docs/README.md) 文件導覽、[CONTRIBUTING.md](CONTRIBUTING.md) 專案規則、[README.md](README.md) 使用與架設 |
 | 變更方式 | 需求變更先改本文件，再改程式與測試。每個版本的差異記在 [CHANGELOG.md](CHANGELOG.md) |
 
 需求編號規則：`G` 為目標，`FR` 為功能需求，`NFR` 為非功能需求，`DR` 為資料需求，`CON` 為限制。編號一旦使用不重用，刪除的需求在變更紀錄註明。
@@ -84,7 +84,7 @@ ExitPulse 比較兩個月份之間的起訖旅次（OD，Origin-Destination）�
 | --- | --- | --- |
 | 前端 | Angular 22、MapLibre GL JS | 三種檢視、地圖、結論與匯出 |
 | 後端 | FastAPI、常駐 Python 分析行程池 | 參數驗證、分析、快取、排隊與逾時 |
-| 資料庫 | PostgreSQL 18 | 每月一個 schema，交易式發佈 |
+| 資料庫 | PostgreSQL 18 | 每月一個 schema，交易式發布 |
 | 部署 | Docker Compose、Caddy | HTTPS、靜態檔、反向代理、標頭 |
 
 ### 3.3 外部相依
@@ -209,7 +209,7 @@ ExitPulse 比較兩個月份之間的起訖旅次（OD，Origin-Destination）�
 | 編號 | 需求 |
 | --- | --- |
 | DR-1 | 資料全部來自官方公開資料，每個數字可追溯到原始筆數 |
-| DR-2 | 每個月份以獨立 schema 在單一交易內發佈，通過日期、時段與矩陣完整度驗證才開放查詢 |
+| DR-2 | 每個月份以獨立 schema 在單一交易內發布，通過日期、時段與矩陣完整度驗證才開放查詢 |
 | DR-3 | 新通車的站不補 0，也不納入舊期比較。兩站都已營運但某方向當月無紀錄時才記為 0 |
 | DR-4 | 只有兩個月份同時以起站與迄站出現的車站才納入比較 |
 | DR-5 | 板橋、大坪林、景安、頭前庄四座轉乘站因不同年份站名寫法不同，合併規則確認前排除於站對比較之外。路網命名未經驗證的轉乘站一律排除 |
@@ -304,7 +304,7 @@ ExitPulse 比較兩個月份之間的起訖旅次（OD，Origin-Destination）�
 
 | 風險 | 可能性 | 影響 | 對策 |
 | --- | --- | --- | --- |
-| 上游資料格式或站名寫法變動 | 中 | 匯入失敗或站對錯配 | 匯入時驗證日期、時段與矩陣完整度，通過才發佈 |
+| 上游資料格式或站名寫法變動 | 中 | 匯入失敗或站對錯配 | 匯入時驗證日期、時段與矩陣完整度，通過才發布 |
 | 外部底圖服務中斷 | 低 | 底圖消失 | 分析不依賴底圖，保留三種底圖可切換 |
 | 匿名大量查詢 | 中 | 排隊額滿 | 每 IP 速率限制、全域排隊上限、結果快取 |
 | 使用者誤把排行當統計顯著 | 中 | 錯誤解讀 | 介面與文件明說排行分數不是顯著性檢定 |
@@ -313,7 +313,7 @@ ExitPulse 比較兩個月份之間的起訖旅次（OD，Origin-Destination）�
 
 - 機場線旅次資料：需先確認桃園捷運是否公開站間旅次資料，再評估補上。目前只找到各站每月總量，沒有 OD。
 - 站卡介紹定期更新與覆蓋率統計。
-- 資安待改善項目，見 README「待辦」。
+- 資安待改善項目，見 [SECURITY.md](SECURITY.md#待改善項目)。
 - 真人使用者測試。
 
 ## 12. 驗收與追溯
@@ -336,3 +336,4 @@ ExitPulse 比較兩個月份之間的起訖旅次（OD，Origin-Destination）�
 | 版本 | 變更 |
 | --- | --- |
 | 1.5.0 | 改為需求編號與驗收條件格式，更正資料量為 117 個月，手機提升為一級支援 |
+| 1.5.1 | 補齊全網月檢視、單日站對逐時與目錄查詢三項 SQL 效能修復，拆分 `SECURITY.md`、`docs/METHODOLOGY.md` 與 `docs/README.md` |

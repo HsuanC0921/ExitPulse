@@ -285,9 +285,9 @@ function assert(cond, msg) {
 
     await page.locator('button.map-about').click();
     const aboutText = await page.locator('app-about dialog').innerText();
-    assert(aboutText.includes('v1.4.1'), 'About dialog must mention v1.4.1');
+    assert(aboutText.includes('v1.5.1'), 'About dialog must mention v1.5.1');
     await page.locator('app-about button.close').click();
-    console.log('PASS 5: Pairs auto-update, manual swap, 3D lowAngle exit & About v1.4.1');
+    console.log('PASS 5: Pairs auto-update, manual swap, 3D lowAngle exit & About v1.5.1');
 
     assert(consoleErrors.length === 0, `Console errors: ${JSON.stringify(consoleErrors)}`);
     assert(pageErrors.length === 0, `Page errors: ${JSON.stringify(pageErrors)}`);

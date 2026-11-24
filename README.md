@@ -1,87 +1,58 @@
 # ExitPulse｜臺北捷運旅次變化雷達
 
-![Version 1.5.0](https://img.shields.io/badge/version-1.5.0-1d2125)
+![Version 1.5.1](https://img.shields.io/badge/version-1.5.1-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3-009688)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-336791)
 
-**打開地圖，看臺北捷運的人從哪裡來、往哪裡去。** 用公開進出站資料比較兩站旅次消長、追蹤單站逐時人流，或以圓面積看全線進站規模。資料涵蓋 2017 年 1 月至 2026 年 9 月（共 117 個月），線上版位於 [exitpulse.150-230-109-154.sslip.io](https://exitpulse.150-230-109-154.sslip.io)。
+**打開地圖，看臺北捷運的人從哪裡來、往哪裡去。** 以公開進出站資料比較兩站旅次消長、追蹤單站逐時人流，或以圓面積看全線進站規模。資料涵蓋 2017 年 1 月至 2026 年 9 月（共 117 個月），線上版位於 [exitpulse.150-230-109-154.sslip.io](https://exitpulse.150-230-109-154.sslip.io)。
 
-> **快速入口**
-> - **本機啟動**：`docker compose up -d --wait db` → `python tools/setup.py` → 啟動 `uvicorn` 與 `ng serve`（詳見[快速開始](#快速開始)）。
-> - **資安審查**：防護清單與弱掃結果見[資安](#資安)，取捨理由在 [docs/DECISIONS.md](docs/DECISIONS.md#2026-11-24-資安的三個取捨)。
-
-**[線上體驗](https://exitpulse.150-230-109-154.sslip.io)** · [三種檢視](#三種檢視與操作方式) · [畫面預覽](#畫面預覽) · [本機開發](#快速開始) · [AI 開發流程](#我如何用-ai-開發並驗證) · [自行架設](#自行架設正式環境) · [系統架構](#系統架構與專案結構) · [分析與限制](#分析方法與資料限制) · [資安](#資安) · [API 與效能](docs/API.md)
+**[線上體驗](https://exitpulse.150-230-109-154.sslip.io)** · [三種檢視](#三種檢視與操作) · [快速開始](#快速開始) · [系統架構](#系統架構) · [AI 開發與驗證](#我如何用-ai-開發並驗證) · [資安現況](#資安現況) · [文件導覽](docs/README.md)
 
 ![實站 16:9 桌機淺色：2022-09 與 2026-09 平日早尖峰站對變化比較、可收合右上工具列與流向弧線](docs/images/live-pairs-16x9.png)
 
 ## 為什麼做 ExitPulse
 
-單看各站進出人次，只知道哪一站人多。把旅次的起點和終點連回地圖上，才看得見哪兩站往來最密、哪條動線在不同月份與時段出現消長。從正式站切到「兩站比較」、「單站往來」或「全線人次」，可以直接試這三個例子：
+單看各站進出人次，只知道哪一站人多。把旅次的起點和終點連回地圖上，才看得見哪兩站往來最密、哪條動線在不同月份與時段出現消長。點開正式站可直接試這三個例子：
 
-- **南港 → 南港展覽館**：比較 `2022-09` 與 `2026-09` 平日早尖峰，日均從 `770.7` 增至 `1,594.4` 人次。點開站卡就能對照周邊設施與 6 公里生活圈現住人口。
-- **國父紀念館**：切換週末或 24 小時「環形指紋」，查看各時段進站分布與自動標出的爆量日。
-- **全線上班日**：選「純工作日」依行事曆排除國定假日並納入補班日，比較各站平均每日進站人次，不被連假天數稀釋。
+- **南港 → 南港展覽館**：比較 `2022-09` 與 `2026-09` 平日早尖峰，日均從 `770.7` 增至 `1,594.4` 人次。站卡旁列出周邊設施與 6 公里生活圈現住人口。
+- **國父紀念館**：切到週末或 24 小時「環形指紋」，查看各時段進站分布與自動標出的爆量日。
+- **全線上班日**：選「純工作日」依政府行事曆排除國定假日並納入補班日，比較各站日均進站人次，不被連假天數稀釋。
 
-## 三種檢視與操作方式
+## 三種檢視與操作
 
-網站分為「兩站比較」、「單站往來」與「全線人次」三種模式。桌機版採左面板、右地圖配置，視窗縮至 1100 px 以下展開明細也不會遮擋重疊。手機版以頂欄切換「地圖」、「分析」、「條件」與檢視模式，各浮層皆可摺疊讓出地圖視野，橫放時會提示轉回直立，並支援加入主畫面使用。
+桌機版採左面板、右地圖配置（視窗縮至 1100 px 以下展開明細不重疊），手機版以頂欄切換分頁、可摺疊浮層並支援加入主畫面。
 
 | 檢視模式 | 看什麼 | 核心操作與分析 |
 | --- | --- | --- |
-| **兩站比較** | 兩期間哪幾對車站的往來變化最大 | 依占比變化、人次增減或成長率排行（表頭可反轉排序、清單可收合），可篩選日型、時段、路線、變化類型與最低人次，變更條件即自動重查。「手選兩站」可用站名片段或站代號查榜外組合，並對調起迄方向 |
-| **單站往來** | 這一站的人從哪裡來、往哪裡去 | 點六線色塊，或輸入站名／站代號（如 `BL12`、`R10`）按 Enter 切站。「比站」選完會自動收合并列兩站曲線。結果附 24 小時環形指紋、逐時進出、站型判讀、距離分段、爆量日、城市重大事件註記與歷年走勢 |
-| **全線人次** | 整個路網的人潮集中在哪裡 | 切換「進站量」（空心圓表當期、實心內圓表對照期）與「淨進出」（橘色淨流入、藍色淨流出，前 10 大站直接標人次）。內含「各站」、「每天」、「歷年」、「互搭表」、「榜單」與「紀錄」六分頁與線別彙總 |
+| **兩站比較** | 兩期間哪幾對車站的往來變化最大 | 依占比變化、人次增減或成長率排行，可篩選日型、時段、路線與最低人次，變更條件即自動重查。「手選兩站」可用站名片段或站代號查榜外組合並對調起迄 |
+| **單站往來** | 這一站的人從哪裡來、往哪裡去 | 點六線色塊或輸入站名／站代號（如 `BL12`、`R10`）按 Enter 切站。「比站」並列兩站曲線，附 24 小時環形指紋、站型判讀、距離分段、爆量日、重大事件註記與歷年走勢 |
+| **全線人次** | 整個路網的人潮集中在哪裡 | 切換「進站量」（空心圓表當期、實心內圓表對照期）與「淨進出」（橘色淨流入、藍色淨流出，前 10 大站直接標人次）。含各站、每天、歷年、互搭表、榜單、紀錄六分頁 |
 
-三種模式皆可一鍵匯出 `1200×630` PNG 分享圖卡，各表格也都能匯出相容 Excel 的 UTF-8 BOM CSV。
-
-### 地圖操作與輔助功能
-
-- **多底圖與 3D 視角**：圖層選單可在 OpenFreeMap「簡潔」（Positron）、「詳圖」（Liberty）與國土測繪中心「臺灣地圖」（WMTS）間即時切換。開啟「立體」會依距離分級過濾遠景低矮平房並保留地標細部 `building:part` 結構，人流柱體高度採平方根縮放並附對照刻度。從「臺灣地圖」切入 3D 會自動回切上一個向量底圖，點「全圖」或跨區站對時也會從 72° 低視角自動退回標準俯瞰角。
-- **地圖工具與收藏**：右上工具列可收合，點「只看地圖」會隱藏全部浮層（按 `Esc` 還原）。桌機版整合 Photon 地名搜尋（附周邊車站直線距離）、收藏（「精選觀察」與嵌入碼）、定位、全圖、深淺色切換、全線圓圈淡化（0–80%）與獨立圖層開關，手機版則將常用次要開關折進工具抽屜。
-- **時間軸與日夜底圖**：面板底部的時間軸支援前後一小時微調，以及早尖峰、午間、晚尖峰、夜間四個快跳鈕。自動播放逐時人流時會依日期估算臺北日出日落，平滑調整底圖明暗與街道路網對比。
-- **車站詳情與出口沿革**：點選車站會開啟獨立預覽卡，顯示當期進出站比例、周邊設施／景點／YouBike 步行時間、6 公里生活圈現住人口與各年代啟閉的出入口清單。展開出口可在地圖標出圖釘，官方有公告紀錄者附上日期與來源連結，指標旁另附 `?` 說明卡片。資料來源：[車站資料服務](https://data.taipei/dataset/detail?id=1eefa68d-7c8d-491b-8e75-66a161947426)、[出口座標](https://data.taipei/dataset/detail?id=cfa4778c-62c1-497b-b704-756231de348b)、[設施資訊](https://data.gov.tw/dataset/128453)、[觀光署景點](https://data.gov.tw/dataset/7777)。
-- **狀態判讀與分享連結**：結論句明確標示有效天數與實際有紀錄的小時（`recordedHours`），區分「零人次」、「出站資料不足」、「尚未通車」（提示通車日並附一鍵跳轉至首個有紀錄月份）與「查詢失敗」。全站中文僅在標點或空白處換行，保持數字、單位與「台北101/世貿」這類複合站名完整不斷行。網址列即時同步檢視條件，加上 `?embed=1` 即可作為嵌入視圖。
-
-#### 鍵盤快捷鍵
+三種模式皆支援網址同步、`?embed=1` 嵌入模式、一鍵匯出 `1200×630` PNG 分享圖卡與相容 Excel 的 UTF-8 BOM CSV。地圖提供 OpenFreeMap「簡潔／詳圖」與國土測繪中心「臺灣地圖」即時切換、3D 立體地標視角、Photon 地名搜尋、日出日落漸變時間軸與車站出口沿革圖釘。
 
 | 快捷鍵 | 動作 |
 | --- | --- |
-| `/` | 在三種檢視模式中直接跳到對應搜尋欄 |
+| `/` | 跳到當前檢視模式的搜尋欄 |
 | `[` | 收合或展開左側面板 |
 | `J` / `K` | 切換下一組／上一組站對 |
-| `Space`、`←` / `→` | 單日時間軸播放／暫停、逐小時切換（焦點不在按鈕、輸入框、滑桿或地圖畫布時） |
+| `Space`、`←` / `→` | 單日時間軸播放／暫停、逐小時切換（焦點不在表單或地圖畫布時） |
 | `Esc` | 關閉浮層或退出「只看地圖」 |
 
-<details>
-<summary>實測範例：預設條件「南港 → 南港展覽館」（平日 07:00–10:00，兩期各 22 天，納入 104 站）</summary>
+### 畫面預覽
 
-| 指標 | 2022-09 | 2026-09 |
-| --- | --- | --- |
-| 平均每日人次 | 770.7 | 1,594.4 |
-| 原始人次 | 16,956 | 35,077 |
-| 南港出發可比較旅次總數 | 118,278 | 171,077 |
-| 占比變化 | | +6.17 百分點 |
-| 方向指數（兩期皆正，屬單純成長） | 0.78 | 0.79 |
-
-</details>
-
-## 畫面預覽
-
-| 實站 16:9：單站往來與站區開放資料 | 實站 16:9：全線各站進站規模 |
+| 單站往來與站區開放資料 | 全線各站進站規模 |
 | --- | --- |
-| ![單站往來：南港站「往來車站」排行、6 公里生活圈人口與 Wikidata／公運處周邊設施距離](docs/images/live-station-16x9.png) | ![全線人次：以圓面積呈現 119 站進站人次、圖例與可收合表頭排行](docs/images/live-network-16x9.png) |
+| ![單站往來：南港站往來排行、6 公里生活圈人口與周邊設施](docs/images/live-station-16x9.png) | ![全線人次：119 站進站規模圓面積與排行](docs/images/live-network-16x9.png) |
 
-![實站 16:9 深色 3D 立體模式：臺北盆地夜色底圖、立體弧線與可收合右上工具列](docs/images/live-3d-dark-16x9.png)
-
-| 手機：站對清單 | 手機：站對詳情 |
+| 深色 3D 立體模式 | 手機：站對清單與詳情 |
 | --- | --- |
-| ![手機深色：頂欄分頁切換與站對排行清單](docs/images/mobile-list-dark.png) | ![手機深色：站對詳情與歷年走勢](docs/images/mobile-detail-dark.png) |
+| ![深色 3D 立體模式：臺北盆地夜色底圖與立體弧線](docs/images/live-3d-dark-16x9.png) | ![手機深色：站對詳情與歷年走勢](docs/images/mobile-detail-dark.png) |
 
 ## 快速開始
 
-本機開發需要 Docker（或自備 UTF-8 編碼的 PostgreSQL）、Python 3.13，以及符合 [Angular 22 版本需求](https://angular.dev/reference/versions)的 Node.js。
+本機開發需要 Docker（或自備 UTF-8 PostgreSQL）、Python 3.13 與符合 [Angular 22 版本需求](https://angular.dev/reference/versions)的 Node.js。
 
 ### 1. 啟動資料庫並匯入預設資料
 
@@ -91,27 +62,19 @@ python -m pip install -r requirements.txt
 python tools/setup.py
 ```
 
-`tools/setup.py` 會從臺北市資料大平臺抓檔，預設匯入最近 12 個月並寫入車站資料與驗證結果，單月連同下載約 40 秒。要匯入 2017-01 起的完整資料請跑 `python tools/setup.py --all`，也可指定起訖月份（例如 `python tools/setup.py 2025-01 2026-09`）。已經匯入過的月份會自動跳過。
+`tools/setup.py` 預設匯入最近 12 個月（單月連下載約 40 秒），完整匯入 2017-01 起請加 `--all`，也可指定區間（如 `2025-01 2026-09`）。若要清除重建 Docker 資料庫 volume 可跑 `docker compose down -v`（`data/` 內的原始檔會保留）。
 
-### 2. 設定連線字串並啟動 FastAPI
-
-```powershell
-# PowerShell
-$env:EXITPULSE_DATABASE_URL = 'postgresql://exitpulse:exitpulse@127.0.0.1:55432/exitpulse'
-uvicorn main:app --app-dir apps/api --host 127.0.0.1 --port 5011
-```
+### 2. 啟動 FastAPI 後端
 
 ```bash
-# bash
+# bash（PowerShell 請用 $env:EXITPULSE_DATABASE_URL = '...'）
 export EXITPULSE_DATABASE_URL='postgresql://exitpulse:exitpulse@127.0.0.1:55432/exitpulse'
 uvicorn main:app --app-dir apps/api --host 127.0.0.1 --port 5011
 ```
 
-互動式 API 文件位在 [http://127.0.0.1:5011/docs](http://127.0.0.1:5011/docs)。
+互動式 API 文件位在 [http://127.0.0.1:5011/docs](http://127.0.0.1:5011/docs)。建議綁在 `127.0.0.1`，避開 Windows `localhost` 優先嘗試 IPv6 造成的 2 秒逾時。
 
-### 3. 啟動前端
-
-另開終端啟動開發伺服器，接著打開 [http://localhost:4200/](http://localhost:4200/)：
+### 3. 啟動 Angular 前端
 
 ```bash
 cd apps/web
@@ -119,85 +82,27 @@ npm ci
 npx ng serve
 ```
 
-前端開發伺服器會把 `/api` 代理到 `http://127.0.0.1:5011`。建議後端固定綁在 `127.0.0.1`，因為 Windows 上的 `localhost` 會先嘗試 IPv6，連不上時每次新連線會多等約 2 秒。
+打開 [http://localhost:4200/](http://localhost:4200/)，開發伺服器會自動把 `/api` 代理至 `127.0.0.1:5011`。
 
-### 使用自備 PostgreSQL
-
-先建好 UTF-8 資料庫，再設定 `EXITPULSE_DATABASE_URL`（或 `PGHOST`、`PGPORT`、`PGDATABASE`、`PGUSER`、`PGPASSWORD`）即可。`docker-compose.yml` 預設帳密只供本機測試，切勿將資料庫埠直接對外開放。若本機 55432 埠已被占用，可用 `EXITPULSE_DB_PORT=55433 docker compose up -d --wait db` 換埠並同步調整連線字串。
-
-### 重建資料庫
+### 測試與正式部署
 
 ```bash
-docker compose down -v
-docker compose up -d --wait db
-python tools/setup.py --all
+python -m unittest discover -s tests   # 後端單元與合約測試（未設 DB 連線時自動略過 31 項實庫測試）
+npm --prefix apps/web test             # 前端單元測試
+npm --prefix apps/web run build        # 正式建置
+npm --prefix apps/web run test:e2e     # Playwright 瀏覽器煙霧測試（零 Console 錯誤）
 ```
 
-`down -v` 會清除 Docker 資料庫 volume，下載過的原始檔留在專案目錄的 `data/` 裡不會一起刪除。若只要單獨驗證已匯入月份可執行 `python tools/verify_od.py 2019-01 2026-09`，更新景點、出口與通車日等車站資訊則跑 `python tools/station_info.py --import`。
-
-### 開發與測試
+在全新的 Linux 主機部署正式環境（需 Docker 與 Compose）：
 
 ```bash
-python -m unittest discover -s tests
-npm --prefix apps/web test
-npm --prefix apps/web run build
-npm --prefix apps/web run test:e2e
-```
-
-`test:e2e` 會跑 `apps/web/e2e/ux-smoke.mjs` 檢查編譯後的網頁，涵蓋首頁鍵盤搜尋與站碼解析、單站／全線快捷鍵、兩站自動重查、3D 低視角歸位，並要求零 Console 錯誤。
-
-API 啟動後可跑連通測試與併發壓測：
-
-```bash
-python tools/smoke.py --web http://localhost:4200
-python tools/stress_api.py --requests 200 --concurrency 20 --p95-ms 3000
-```
-
-需連資料庫的測試會讀取 `EXITPULSE_DATABASE_URL`（或 `PGDATABASE`），未設定時自動略過。另附 `tools/ux-scan.js` 可貼進瀏覽器開發者工具檢查過小觸控目標、文字遮擋與橫向捲動。正式站與本機的效能量測紀錄見 [API 與效能](docs/API.md)。
-
-### 持續整合與部署
-
-| 工作流程 | 觸發 | 內容 |
-| --- | --- | --- |
-| `ci.yml` | 推送 `main`、Pull Request、手動 | 後端單元測試、前端測試與正式建置、gitleaks、hadolint、pip-audit、`npm audit` |
-| `release.yml` | 推送 `v*` 標籤、手動 | 先跑完整 CI，再建置前端，把壓縮檔與 SHA-256 附到 GitHub Release，最後可選擇部署到 VPS |
-
-所有 Action 都固定到 commit SHA，權限預設只有讀取。推送 `v*` 標籤後，CI 通過才會建置與部署，不需要再從本機手動上傳。CI 沒有連資料庫，需要已匯入資料的 31 個測試會略過，瀏覽器煙霧測試 `test:e2e` 與 `trivy` 亦在本機執行。
-
-<details>
-<summary>自動部署金鑰設定與發版檢查清單</summary>
-
-部署用一把專用的 SSH 金鑰。它在 VPS 的 `authorized_keys` 加了 `restrict` 與強制指令，只能執行 `./deploy/update-all.sh upgrade`，不能開 shell、轉發連線或執行其他指令。升級會拉取 `main`、重建前端與容器，並檢查 `/ready`，失敗時整個 Release 工作流程標示失敗。
-
-GitHub 設定在 `production` 環境：密鑰 `DEPLOY_SSH_KEY`、`DEPLOY_KNOWN_HOSTS`、`DEPLOY_HOST`、`DEPLOY_USER`，以及 repository 變數 `DEPLOY_ENABLED`。要暫停自動部署，把 `DEPLOY_ENABLED` 改成 `false`。要撤銷金鑰，刪掉 VPS `authorized_keys` 裡註解為 `exitpulse-github-deploy` 的那一行。本機手動部署指令見 [deploy/README.md](deploy/README.md)。
-
-版本號以 [CHANGELOG.md](CHANGELOG.md) 最上面那一版為準。發版時同步改 `apps/web/package.json`、`apps/web/package-lock.json`、關於頁 `apps/web/src/app/about.ts`、README 徽章與 `PRODUCT.md` 的對應版本，提交到 `main` 後打 `vX.Y.Z` 標籤推送。每一版一個新標籤，已發布的標籤不移動、不重用。部署拉的是 `main` 的最新提交，所以打標籤前 `main` 要停在要發的那一版。
-
-</details>
-
-## 我如何用 AI 開發並驗證
-
-這個專案從頭到尾由我指揮 AI 工具完成，包含程式、測試與文件。以下只寫專案裡查得到的做法。
-
-- **規格與規則寫成文件**：需求寫成 [PRODUCT.md](PRODUCT.md) 的規格（功能需求都有驗收條件），介面規則寫在 [DESIGN.md](DESIGN.md)，工具與人都照 [CONTRIBUTING.md](CONTRIBUTING.md) 的專案規則做事。
-- **小步提交**：40 個以上的提交，訊息採 Conventional Commits，每次改動小而完整。推送、部署與刪除資料要我明確授權，AI 不能自己決定。
-- **跨工作階段接力靠文件**：[docs/PROGRESS.md](docs/PROGRESS.md) 記已驗證的改動，[docs/NEXT.md](docs/NEXT.md) 收待辦，[docs/DECISIONS.md](docs/DECISIONS.md) 留取捨理由。
-- **改動後一定跑測試**：後端 `python -m unittest discover -s tests` 目前 104 個通過、31 個因沒有資料庫而跳過，前端則跑 `npm --prefix apps/web test` 與 `test:e2e` 煙霧測試。改用 FastAPI 時，拿舊 API 的 27 組回應當黃金樣本逐一比對（見 [docs/PROGRESS.md](docs/PROGRESS.md)）。
-- **不信任 AI 的自我報告**：資安審查用 gitleaks、trivy、hadolint、bandit、semgrep、pip-audit 與 ZAP 實際掃描，每一筆發現都人工判斷是真問題還是誤報，結果寫在[用過的弱掃工具](#用過的弱掃工具)。
-- **沒驗證的就寫沒驗證**：[待辦](#待辦)、[待改善項目](#待改善項目)與[已知限制](#其他已知限制與系統邊界)列出還沒做的事，例如唯讀資料庫角色腳本還沒在正式庫跑過，也沒做過真人使用者測試。
-
-## 自行架設正式環境
-
-在裝好 Docker 與 Docker Compose 的 Linux 主機上，抓下程式庫執行安裝腳本即可上線：
-
-```bash
-./deploy/install.sh            # 產生 .env 密碼、編譯前端、建庫匯入資料並安裝 systemd 排程
+./deploy/install.sh            # 產生 .env 密碼、編譯前端、建庫匯入並安裝 systemd 排程
 ./deploy/update-all.sh upgrade # 日後更新版本用
 ```
 
-安裝參數、`.env` 環境變數表、`pg_dump` 備份還原與 Caddy HTTPS 反向代理設定，完整寫在 **[從零自行架設與自動更新指南](deploy/README.md)**。
+CI／Release 工作流程固定所有 GitHub Actions 至 commit SHA：推送 `main` 或 PR 時執行前後端測試、建置與弱掃（gitleaks、hadolint、pip-audit、`npm audit`），推送 `v*` 標籤時額外建置 Release 壓縮檔並透過受限強制指令的專用 SSH 金鑰自動部署 VPS。完整部署手冊見 [deploy/README.md](deploy/README.md)。
 
-## 系統架構與專案結構
+## 系統架構
 
 ```mermaid
 flowchart LR
@@ -217,10 +122,10 @@ flowchart LR
   end
   DB[("PostgreSQL 18<br/>每月一個 schema<br/>加上 exitpulse_ref")]
   subgraph api["FastAPI（apps/api）"]
-    F["/api/v1/od/*<br/>快取與請求合併"]
+    F["/api/v1/od/*<br/>限速、快取與同鍵合併"]
     G["分析行程池<br/>query_od.py、analyze_od.py、leaders.py"]
   end
-  H["Angular 22 與 MapLibre GL JS<br/>（apps/web：radar / explore / station-preview / explore-coverage）"]
+  H["Angular 22 與 MapLibre GL JS<br/>（apps/web）"]
   M["OpenFreeMap Positron / Liberty 3D<br/>國土測繪中心 WMTS · Photon 地點搜尋"]
   A --> D --> DB
   C --> E --> DB
@@ -233,171 +138,33 @@ flowchart LR
   M -. 瀏覽器直接取用 .-> H
 ```
 
-- **匯入與排程**：每月資料通過日期、時段與矩陣完整度驗證後，於單一交易內寫入才開放查詢。跨月站名對照與行事曆存於 `exitpulse_ref`，排程統一由 `deploy/update-all.sh` 呼叫並在任一步驟失敗時經 `tools/notify.py` 發出通知。
-- **查詢**：API 透過常駐 Python 行程池執行分析（預設 2 個行程，各自持有 `od_postgres.ConnectionPool`），同鍵併發合併計算並以 gzip 回傳，排隊滿載回 `429`，逾時回 `504`。
-- **前端**：地圖與面板共用查詢狀態並同步網址列，`station-preview` 與 `explore-coverage` 拆為獨立元件。查詢失敗會依退避排程自動重試，頁面回到前景或每 5 分鐘檢查新版部署並自動清除快取重載。遇到 WebGL context 遺失或底圖暫時斷線時，會保留原查詢條件與視角自動重建畫布。
+- **匯入與壓縮**：每月資料通過日期、時段與矩陣完整度驗證後才於單一交易內發布，逐時旅次採 `trip_groups` 分組陣列儲存（117 個月由 36.51 GiB 降至 4.15 GiB）。
+- **查詢與併發保護**：API 透過常駐 Python 行程池執行分析，同鍵併發請求合併計算，排隊滿載回 429，逾時回 504。詳細端點規格與效能實測見 [docs/API.md](docs/API.md)。
+- **核心文件**：所有規格與技術文件整理於 [docs/README.md](docs/README.md)，包含產品需求規格 [PRODUCT.md](PRODUCT.md)、設計規範 [DESIGN.md](DESIGN.md)、分析口徑與限制 [docs/METHODOLOGY.md](docs/METHODOLOGY.md) 與架構決策 [docs/DECISIONS.md](docs/DECISIONS.md)。
 
-```text
-apps/
-  api/                  FastAPI 應用（路由、分析行程池、地點搜尋）
-  web/                  Angular 22 前端（radar、explore、station-preview、explore-coverage、time-player 等）
-    e2e/ux-smoke.mjs    瀏覽器端互動與零 Console 錯誤煙霧測試
-tools/
-  setup.py              一鍵建庫與初始化（下載、匯入、車站資訊、驗證）
-  update_monthly.py     每月新月份偵測、對帳與原子發布
-  update_auxiliary.py   跨年度假日曆、人口、出口與周邊資料更新
-  fetch-metro-osm.mjs   OSM 路網與車站擷取（含 90% 站數防呆與備份）
-  notify.py             排程失敗 Webhook／Telegram 通知
-  import_od*.py         單月與區間 OD 匯入工具
-  pack_trips.py         逐時旅次分組壓縮與無損切換工具
-  query_od.py           單站、全網、矩陣、趨勢查詢模組
-  analyze_od.py         站對比較與排行榜分析模組
-  leaders.py            全網最忙與增減榜單模組
-  station_info.py       車站通車日、出口、YouBike、人口與周邊設施匯入
-  smoke.py / stress_api.py  API 基本連通驗證與併發壓測
-  ui-smoke.mjs          多視口版面與截圖檢查
-tests/                  Python 單元與資料庫合約測試
-deploy/                 正式部署設定（install.sh、update-all.sh、Compose、Caddyfile、systemd 範本）
-docs/                   交接紀錄、架構決策、API 效能、自動更新與截圖
-docker-compose.yml      本機 PostgreSQL 設定
-```
+## 我如何用 AI 開發並驗證
 
-## 分析方法與資料限制
+這個專案從頭到尾由我指揮 AI 工具完成，包含程式、測試與文件。以下只寫專案裡查得到的做法：
 
-### 指標定義
+- **規格與規則寫成文件**：需求寫在 [PRODUCT.md](PRODUCT.md)（含需求編號與驗收條件），介面規則在 [DESIGN.md](DESIGN.md)，專案規範在 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- **小步提交與人工授權**：40 個以上 Conventional Commits 小步提交，推送、部署與刪除資料均須我明確授權。
+- **跨工作階段接力靠文件**：[docs/PROGRESS.md](docs/PROGRESS.md) 記已驗證改動，[docs/NEXT.md](docs/NEXT.md) 收待辦，[docs/DECISIONS.md](docs/DECISIONS.md) 留取捨理由。
+- **改動後一定跑測試**：後端 `python -m unittest discover -s tests` 目前 106 個通過、31 個因無資料庫略過，前端跑 `npm --prefix apps/web test` 與 `test:e2e` 煙霧測試。改寫為 FastAPI 時，曾拿舊 API 的 27 組回應當黃金樣本逐位元比對。
+- **不信任 AI 的自我報告**：資安審查以 gitleaks、trivy、hadolint、bandit、semgrep、pip-audit 與本機 OWASP ZAP 實際掃描，每一筆告警皆回到程式碼逐條判讀真問題與誤報。
+- **沒驗證的就如實標示**：尚未做過真人使用者測試，唯讀資料庫角色腳本也還沒在正式庫實際執行。
 
-- **占比**：A → B 旅次數除以 A 出發的所有可比較旅次，變化量以百分點表示。
-- **平均每日人次**：原始旅次數除以所選日型的有效天數。單站與全網查詢先將各起訖站對除以天數後加總，再四捨五入至小數點後一位，因此遇到恰好 `.05` 尾數時可能與原始整數總和直接相除相差 0.1。
-- **方向指數**：`(AB−BA)/(AB+BA)`，其中 `AB` 為 A → B 旅次數，`BA` 為 B → A 旅次數。
+## 資安現況
 
-### 可比較站點與主要方向反轉
+ExitPulse 是沒有帳號登入的公開唯讀服務。2026-11-24 完成一輪完整審查與 10 項弱掃，已落實 SQL 全參數化、入口輸入驗證、單一來源 IP 速率限制（僅在直連對端屬內網反向代理時採信 `X-Forwarded-For`）、API 非 root 容器並移除 Linux capability、嚴格 `script-src 'self'` CSP 與固定 commit SHA 的 GitHub Actions。
 
-- 只有兩個月份同時以起站與迄站出現的車站才納入比較。當兩站皆已營運但某方向當月無紀錄時才記為 0 人次，新通車車站不補 0，也不納入舊期比較。
-- 板橋、大坪林、景安、頭前庄這四座轉乘站因不同年份的站名寫法不同，在確認合併規則前先排除於站對比較之外。
-- 同時滿足四項條件才標示為**主要方向反轉**：兩期方向指數正負號相反、兩期方向指數絕對值皆至少 `0.10`、兩期方向指數差值至少 `0.25`、兩期雙向合計的每日人次均達所選門檻。
+**尚未處理完的項目**（如實公開）：
+- CSP 的 `style-src` 仍保留 `'unsafe-inline'`（本機 OWASP ZAP 列為 Medium，Angular 與 MapLibre 行內樣式所需的已知取捨，尚未改用 nonce）。
+- 唯讀資料庫角色腳本（`deploy/create-readonly-role.sh`）尚未在正式資料庫實跑，API 容器亦尚未啟用唯讀檔案系統。
+- 容器基底映像尚未固定 `@sha256`、`requirements.lock` 尚未加雜湊、`systemd` 加固與 Photon 查詢隱私說明待補。
 
-### 排名分數與日型篩選
+完整縱深防禦清單、10 項弱點掃描明細與待改善項目請見 **[SECURITY.md](SECURITY.md)**，三項核心資安取捨與代價評估請見 **[docs/DECISIONS.md](docs/DECISIONS.md#2026-11-24-資安的三個取捨)**。
 
-```text
-|占比變化（百分點）| × sqrt(min(max daily, 500) / 100)
-```
+## 資料限制與授權
 
-若符合主要方向反轉，分數再乘以 `1.25`。排行分數用來篩出變動顯著的候選組合，不等於統計學上的顯著性檢定。
-
-- **平日**指週一至週五（含落在平日的國定假日），**純工作日**（`workday`）依政府行事曆排除國定假日並納入補班日，**週末**指週六與週日。兩站比較、單站往來、全線人次、互搭表、趨勢與榜單皆支援 `workday`。
-- 可篩選基準月份、比較月份、日型、進站時段（07–10、10–16、16–19、19–24）、變化類型（全部、占比上升、占比下降、主要方向反轉）與每日最低人次（10、20、50、100）。
-
-### 環狀線出站資料限制
-
-已匯入的 `2017-01` 至 `2026-09`（共 117 個月）起訖旅次中，`2020-01` 及 `2023-05` 至 `2026-09` 共 42 個月有部分環狀線單線車站的目的站紀錄未完整涵蓋。受影響月份因站而異，涉及中原、中和、十四張、幸福、新北產業園區、新埔民生、景平、板新、橋和、秀朗橋共 10 站。
-
-查到涵蓋不足的期間時，API 會回傳 `exitCovered: false`，介面出站欄與互搭表均顯示「資料不足」。只有完整涵蓋且實際無旅次時才顯示 `0`，進站人次則照常依已匯入紀錄顯示。
-
-### 其他已知限制與系統邊界
-
-- **閘門統計層級**：OD 資料與出入口座標分屬不同資料集，旅次統計僅到車站閘門層級，無法還原中途轉乘路線或單一出口進出人數。車站分段通車與出口異動日期的來源 URL 皆記錄於 `tools/station_info.py`。
-- **周邊設施涵蓋範圍**：站卡周邊設施整合 Wikidata 與政府開放清冊，不保證完整收錄所有地標（例如台北 101 購物中心因 Wikidata 分類為摩天大樓而未列入商場清單），未收錄項目於介面會明確標示。
-- **瀏覽器與前端載入**：地圖需支援 WebGL 2 的瀏覽器。前端已將 `maplibre-gl`（6.19.0）、3D 繪圖、圖卡匯出與月曆／矩陣／資料紀錄元件拆為延遲載入，Initial bundle 為 `925.18 kB`（估算傳輸 `197.60 kB`，零預算警告）。
-- **後端逾時與測試邊界**：查詢逾時回傳 `504` 後，背景分析行程仍會跑完該次查詢才釋放（單一 SQL 敘述則受 PostgreSQL `statement_timeout` 限制，排隊中的請求在用戶端提前斷線時會即時取消）。目前尚未做過真人使用者測試。
-
-### 待辦
-
-- **機場捷運**：目前匯入的臺北捷運旅次只涵蓋板南、淡水信義、松山新店、中和新蘆、文湖、環狀六條線，沒有機場線。台北車站等轉乘站的色環因此只有六條線的顏色，機場線的進出站人次也沒有納入全線人次。機場捷運由桃園捷運營運，需先確認是否有公開的站間旅次資料，才能評估補上。
-- **車站介紹更新**：站卡介紹是 `python tools/station_info.py --import` 匯入當下的維基摘要快照，不會自動更新，也還沒統計有幾站抓不到介紹。
-- **資安相關項目**：見下方[資安 → 待改善項目](#待改善項目)。
-
-## 資安
-
-ExitPulse 是沒有登入的公開唯讀服務，攻擊面集中在 API、資料庫與部署。2026-11-24 完成一輪完整審查，核心取捨的詳細評估與代價寫在 [docs/DECISIONS.md](docs/DECISIONS.md#2026-11-24-資安的三個取捨)，以下列出目前的防護現況、弱掃紀錄與待改善項目。
-
-### 已有的防護
-
-**應用與輸入防線**
-- **SQL 全部參數化**：查詢值一律走 `%s` 佔位符，識別字用 `sql.Identifier`，動態組合的片段只有常數與佔位符。分析於行程池內直接呼叫函式，不經 shell。
-- **入口輸入驗證**：月份、日期、站名長度、時段與日型均於入口檢查，站名禁止以 `-` 開頭避免被誤判為命令列選項。驗證失敗統一回 400 且只回固定錯誤訊息，不附堆疊。
-- **前端安全邊界**：沒有使用 `innerHTML`、`bypassSecurityTrust` 或 `eval`。`localStorage` 僅存介面偏好與收藏，不含權杖。匯入分享連結會檢查格式，並有測試擋掉外部網址與 `javascript:`。
-- **正式環境關閉文件端點**：線上以 `EXITPULSE_DOCS=0` 關閉 `/docs` 與 `/openapi.json`，本機開發預設維持開啟。
-
-**流量與標頭防護**
-- **單一來源 IP 速率限制**：預設每分鐘 240 次、瞬間 80 次，超量回 429 並附 `Retry-After`，同時記錄 `Rate limit exceeded` 警告日誌。只有在直連對端屬內網反向代理時才採信 `X-Forwarded-For`，避免用戶端偽造。可透過 `EXITPULSE_RATE_PER_MINUTE` 與 `EXITPULSE_RATE_BURST` 調整，設 `0` 關閉。
-- **資源與查詢上限**：設有查詢逾時 30 秒、資料庫語句逾時、排隊上限與快取上限，地點搜尋全域限速每秒 1 次。
-- **傳輸與安全標頭**：外層主機 Caddy 送出 HSTS 與 `X-Frame-Options: DENY`（範例見 `deploy/README.md`），容器內 Caddy 送出 `Permissions-Policy`、`nosniff` 與 `Referrer-Policy`。CSP 僅放行本站、`tiles.openfreemap.org` 與 `wmts.nlsc.gov.tw`，並設 `object-src 'none'`、`base-uri 'self'`、`form-action 'self'`、`frame-ancestors 'none'`，已以正式建置實際載入地圖確認無違規。
-
-**容器、密鑰與供應鏈**
-- **最小權限容器與網路隔離**：API 以非 root 的 `app` 身分執行，移除所有 Linux capability 並禁止提權。Caddy 檔案系統設為唯讀。資料庫不對外開埠，網頁容器僅綁定 `127.0.0.1`。
-- **密鑰管理**：`.env` 與 `data/` 不進版本庫，`install.sh` 以 `openssl rand` 產生密碼並將 `.env` 權限設為 `600`。整份 git 歷史經掃描確認沒有金鑰、私鑰或 token。
-- **下載與告警限制**：資料匯入工具與告警 webhook 只接受 `https`。
-- **相依套件鎖定**：`requirements.lock` 記錄通過 `pip-audit` 檢查的版本，Docker 建置以 `-c requirements.lock` 安裝。
-
-### 用過的弱掃工具
-
-2026-11-24 共執行 10 項掃描，每一筆告警都回到程式碼逐條確認是真問題還是誤報。相依套件（`npm audit`、`pip-audit`、`trivy`）與 shell 腳本均為 0 漏洞，僅餘 1 筆已知取捨（OWASP ZAP Medium：`style-src 'unsafe-inline'`）與人工確認過的誤報。
-
-<details>
-<summary>展開完整弱掃結果與未執行項目（2026-11-24）</summary>
-
-| 工具 | 檢查範圍 | 結果與處置（2026-11-24） |
-| --- | --- | --- |
-| `npm audit` | 前端 npm 相依 | 0 個漏洞 |
-| `pip-audit` | Python 相依與鎖定檔 | 沒有已知漏洞 |
-| `bandit` | Python 程式碼 | `apps/api` 無發現。`tools/` 的 B608 經人工確認為誤報（僅拼接常數與佔位符），B310 已改為只接受 https |
-| `semgrep`（`p/default` 規則集） | `apps/api`、`tools`、`deploy` | `apps/api` 無發現。`tools/` 的 `formatted-sql-query` 與 `dynamic-urllib-use-detected` 經人工確認為誤報，SQL 值皆走 `%s` 參數，網址為固定常數或已限定 https |
-| `shellcheck` | `deploy/*.sh` | 無警告 |
-| `gitleaks` 8.30.1 | 整份 git 歷史 | 1 筆誤報：`collection.ts` 的 `COLLECTION_KEY` 是 `localStorage` 鍵名，不是密鑰，已記在 `.gitleaksignore`。其餘無發現 |
-| `trivy` 0.76.2 | `deploy/` 設定、前端 `package-lock.json` | 0 個錯誤設定、npm 0 個漏洞、無密鑰。因 `trivy` 不辨識 `requirements.lock` 檔名，Python 相依改以 `pip-audit` 為準 |
-| `hadolint` 2.15.1 | `deploy/Dockerfile.api` | 共 3 筆：`USER` 改數字 UID 與 `HEALTHCHECK` 改 JSON 格式已修。`apt-get install` 刻意不釘小版號以免 Debian 套件輪替造成建置失敗，已以 `hadolint ignore` 註記 |
-| OWASP ZAP 2.17.0（蜘蛛加主動掃描） | 本機靜態站，帶與正式環境相同的 CSP（**未掃線上站台**） | Medium 1 筆：`style-src 'unsafe-inline'`，屬 Angular 與 MapLibre 行內樣式所需的已知取捨，尚未改 nonce。另有 2 筆資訊級（註解字樣、現代網頁應用偵測） |
-| 正規表示式掃描 git 歷史 | token、私鑰、連線字串 | 只有本機開發用的預設密碼 |
-
-未執行項目：`trivy image` 需要 Docker 常駐，本次本機未啟動因此未掃映像檔。OWASP ZAP 未對 API 動態掃描，因本機環境沒有資料庫。ZAP baseline 掃描僅限於自有測試環境，不對外部主機執行。
-
-</details>
-
-### 啟用唯讀資料庫角色
-
-API 預設仍沿用擁有者帳號連線。要改成唯讀角色，在主機專案根目錄執行一次：
-
-```sh
-./deploy/create-readonly-role.sh
-docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d api
-```
-
-腳本可重複執行，會建立 `exitpulse_api`、授予所有月份 schema 的唯讀權限，並設定之後匯入的新月份自動授權，最後把帳密寫進 `.env`。匯入工具仍使用 `POSTGRES_USER`。
-
-### 待改善項目
-
-- 唯讀資料庫角色的腳本還沒在正式資料庫上實際執行，建議先在備份還原的環境試跑，再套用到正式環境。
-- API 容器還不是唯讀檔案系統，匯入工具要寫入掛載目錄，要先確認不會影響才能開。
-- CSP 的 `style-src` 仍含 `'unsafe-inline'`（ZAP Medium），要改成 nonce 需先處理 Angular 與 MapLibre 的行內樣式。
-- 容器基底映像用浮動標籤，尚未固定到 `@sha256` 摘要。`requirements.lock` 也還沒有雜湊，可改用 `pip-compile --generate-hashes`。
-- `systemd` 單元檔還沒有加固設定（`NoNewPrivileges`、`ProtectSystem` 等），需要先確認不會影響 `sudo` 與 Docker。
-- git 歷史裡有本機開發用的預設連線字串，只綁 `127.0.0.1`，風險低，但不會改寫歷史。
-- 地點搜尋會把使用者輸入的文字送到 `photon.komoot.io`，隱私說明還沒補上。
-
-## 資料來源、儲存與授權
-
-旅次資料取自臺北市資料大平臺的「[臺北捷運每日分時各站 OD 流量統計](https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d)」，欄位涵蓋日期、進站時段、進站、出站與人次，官方索引自 2017 年 1 月起算，實際可查範圍以 API 回報為準。
-
-- PostgreSQL 存放月總量、分組壓縮後的每日逐時表（`trip_groups` 與相容檢視表 `trips`）及跨月參考資料。下載的原始 CSV 快取放在 `data/` 目錄並由 Git 忽略。
-- 捷運路線與車站幾何由 `tools/fetch-metro-osm.mjs` 自 OpenStreetMap 抓取，存於 `apps/web/public/metro/`。向量底圖採用 OpenFreeMap（Positron 簡潔與 Liberty 詳圖，含 3D 建築圖層），並提供內政部國土測繪中心臺灣通用電子地圖（WMTS）切換。
-- `apps/web/public/od/default.json` 存放離線備援資料，就算後端未啟動，打開首頁也能直接操作預設比較範例。
-- 系統規則與資料語意細節寫在 [CONTRIBUTING.md](CONTRIBUTING.md)，服務配置見 [deploy/README.md](deploy/README.md)，排程自動更新見 [docs/AUTO_UPDATE.md](docs/AUTO_UPDATE.md)。
-
-本專案程式碼依 [MIT 授權](LICENSE)釋出。下列外部資料與服務分別適用各自條款，散布或商用前請依原頁面規範為準：
-
-| 項目 | 用途 | 授權或條款 |
-| --- | --- | --- |
-| [臺北捷運 OD 流量統計](https://data.taipei/dataset/detail?id=63f31c7e-7fc3-418b-bd82-b95158755b4d) | 旅次資料 | 政府資料開放授權條款－第 1 版（依[同系列資料集](https://data.gov.tw/dataset/128506)標示，實際以資料集頁面為準） |
-| OpenStreetMap | 捷運路線、車站與底圖資料 | © OpenStreetMap contributors，[ODbL](https://www.openstreetmap.org/copyright) |
-| [OpenFreeMap](https://openfreemap.org/) | 向量圖磚與 Positron／Liberty 底圖樣式 | 見網站授權說明 |
-| [內政部國土測繪中心](https://maps.nlsc.gov.tw/) | 臺灣通用電子地圖（WMTS 點陣圖磚） | 政府資料開放授權條款／依中心服務規範 |
-| [Photon](https://photon.komoot.io/) | 地點搜尋 | 資料源自 OpenStreetMap，使用規範見網站說明 |
-| [TaiwanCalendar](https://github.com/ruyut/TaiwanCalendar) | 國定假日與補班日 | 見儲存庫授權 |
-| 觀光署景點、出口座標、設施與雙北 YouBike 2.0 | 車站資訊與周邊導覽 | 依各資料集頁面標示為準 |
-| [Wikidata](https://www.wikidata.org/) | 周邊商場、大學、鐵路與轉運站 | CC0 |
-| 臺北市醫院清冊、新北市醫院清單、國土測繪中心、臺北市公運處 | 醫院與客運轉運站清單 | 依各資料集頁面標示為準（連結列於「關於」對話框） |
-| 內政部戶政司開放資料 API | 各區現住人口與 6 公里生活圈人口 | 依原 API 頁面規範為準 |
-| 中文維基百科 | 部分車站簡介摘要 | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.zh-hant)，於站卡附原文連結 |
-| [Lucide](https://lucide.dev/) 圖示 | 介面圖示 | ISC，授權全文見 `apps/web/public/lucide-license.txt` |
-
-ExitPulse 為獨立開發的資料視覺化專案，與臺北大眾捷運股份有限公司無任何隸屬關係。
+- **環狀線出站限制**：2017-01 至 2026-09 共 117 個月中，有 42 個月涉及環狀線 10 座單線車站目的站紀錄未完整涵蓋。API 回傳 `exitCovered: false`，介面明確標示「資料不足」並補上測試防漏，完整口徑、指標公式與 12 項外部資料授權見 **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)**。
+- **程式碼授權**：本專案依 [MIT 授權](LICENSE)釋出。ExitPulse 為獨立開發的資料視覺化專案，與臺北大眾捷運股份有限公司無任何隸屬關係。
