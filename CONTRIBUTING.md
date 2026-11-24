@@ -5,7 +5,6 @@ ExitPulse 比較臺北捷運起訖旅次。適用於所有貢獻者與使用的�
 ## 從哪裡開始
 
 - [README.md](README.md) 說明產品、安裝、資料匯入與驗證指令。
-- [docs/HANDOFF.md](docs/HANDOFF.md) 記錄目前可操作的功能、本機服務與已知限制。
 - [PRODUCT.md](PRODUCT.md) 與 [DESIGN.md](DESIGN.md) 說明產品用語、資料語意和介面規則。
 - [docs/DECISIONS.md](docs/DECISIONS.md) 保留技術取捨，[docs/PROGRESS.md](docs/PROGRESS.md) 記錄已驗證的改動，[docs/NEXT.md](docs/NEXT.md) 收錄待辦。
 

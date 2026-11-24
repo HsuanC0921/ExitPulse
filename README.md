@@ -147,9 +147,9 @@ python tools/stress_api.py --requests 200 --concurrency 20 --p95-ms 3000
 
 這個專案從頭到尾由我指揮 AI 工具完成，包含程式、測試與文件。以下只寫專案裡查得到的做法。
 
-- **規格與規則寫成文件**：產品用語與資料語意寫在 [PRODUCT.md](PRODUCT.md)，介面規則寫在 [DESIGN.md](DESIGN.md)，工具與人都照 [CONTRIBUTING.md](CONTRIBUTING.md) 的專案規則做事。
-- **小步提交**：39 個提交，訊息採 Conventional Commits，每次改動小而完整。推送、部署與刪除資料要我明確授權，AI 不能自己決定。
-- **跨工作階段接力靠文件**：[docs/HANDOFF.md](docs/HANDOFF.md) 記目前可操作的功能與未解問題，[docs/PROGRESS.md](docs/PROGRESS.md) 記已驗證的改動，[docs/NEXT.md](docs/NEXT.md) 收待辦，[docs/DECISIONS.md](docs/DECISIONS.md) 留取捨理由。
+- **規格與規則寫成文件**：需求寫成 [PRODUCT.md](PRODUCT.md) 的規格（功能需求都有驗收條件），介面規則寫在 [DESIGN.md](DESIGN.md)，工具與人都照 [CONTRIBUTING.md](CONTRIBUTING.md) 的專案規則做事。
+- **小步提交**：40 個以上的提交，訊息採 Conventional Commits，每次改動小而完整。推送、部署與刪除資料要我明確授權，AI 不能自己決定。
+- **跨工作階段接力靠文件**：[docs/PROGRESS.md](docs/PROGRESS.md) 記已驗證的改動，[docs/NEXT.md](docs/NEXT.md) 收待辦，[docs/DECISIONS.md](docs/DECISIONS.md) 留取捨理由。
 - **改動後一定跑測試**：後端 `python -m unittest discover -s tests` 目前 104 個通過、31 個因沒有資料庫而跳過。前端 `npm --prefix apps/web test` 與 `test:e2e` 煙霧測試。改用 FastAPI 時，拿舊 API 的 27 組回應當黃金樣本逐一比對（見 [docs/PROGRESS.md](docs/PROGRESS.md)）。
 - **不信任 AI 的自我報告**：資安審查用 gitleaks、trivy、hadolint、bandit、semgrep、pip-audit 與 ZAP 實際掃描，每一筆發現都人工判斷是真問題還是誤報，結果寫在[用過的弱掃工具](#用過的弱掃工具)。
 - **沒驗證的就寫沒驗證**：[待辦](#待辦)與[已知限制](#其他已知限制與系統邊界)列出還沒做的事，例如唯讀資料庫角色腳本還沒在正式庫跑過，也沒做過真人使用者測試。
@@ -329,7 +329,7 @@ docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d api
 - PostgreSQL 存放月總量、分組壓縮後的每日逐時表（`trip_groups` 與相容檢視表 `trips`）及跨月參考資料。下載的原始 CSV 快取放在 `data/` 目錄並由 Git 忽略。
 - 捷運路線與車站幾何由 `tools/fetch-metro-osm.mjs` 自 OpenStreetMap 抓取，存於 `apps/web/public/metro/`。向量底圖採用 OpenFreeMap（Positron 簡潔與 Liberty 詳圖，含 3D 建築圖層），並提供內政部國土測繪中心臺灣通用電子地圖（WMTS）切換。
 - `apps/web/public/od/default.json` 存放離線備援資料，就算後端未啟動，打開首頁也能直接操作預設比較範例。
-- 系統規則與資料語意細節寫在 [CONTRIBUTING.md](CONTRIBUTING.md)，服務配置與交接細節見 [docs/HANDOFF.md](docs/HANDOFF.md)，排程自動更新見 [docs/AUTO_UPDATE.md](docs/AUTO_UPDATE.md)。
+- 系統規則與資料語意細節寫在 [CONTRIBUTING.md](CONTRIBUTING.md)，服務配置見 [deploy/README.md](deploy/README.md)，排程自動更新見 [docs/AUTO_UPDATE.md](docs/AUTO_UPDATE.md)。
 
 本專案程式碼依 [MIT 授權](LICENSE)釋出。下列外部資料與服務分別適用各自條款，散布或商用前請依原頁面規範為準：
 
