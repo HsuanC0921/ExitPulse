@@ -133,57 +133,77 @@
 
 ## 2026-11-24 資安的三個取捨
 
-API 是沒有登入的公開唯讀服務，所以這三個決定都在回答同一件事：一個匿名使用者最多能耗掉多少資源，以及我們怎麼知道他是誰。完整審查與掃描結果見 [README 資安一節](../README.md#資安)。
+ExitPulse 的 API 是公開唯讀服務，沒有帳號登入。這三個決策都圍繞兩個核心問題：怎麼辨識真實來源，以及單一匿名來源最多能用掉多少資源。完整防護清單與弱掃結果見 [README 資安一節](../README.md#資安)。
 
-### 1. X-Forwarded-For 只信內網的反向代理
+| 取捨主題 | 採用做法 | 主要代價 |
+| --- | --- | --- |
+| 來源 IP 判定 | 直連對端屬內網位址時才採信 `X-Forwarded-For` | 仰賴網路拓樸隔離，多層未信任代理時可能取錯 IP |
+| 單 IP 速率限制 | 在 FastAPI 記憶體內建 token bucket（240 次／分，瞬間 80 次） | 僅適用於單行程（`--workers 1`），擋不住大量來源的分散式攻擊 |
+| CSP 行內樣式 | 嚴格鎖死 `script-src 'self'`，放寬 `style-src 'unsafe-inline'` | OWASP ZAP 列為 Medium，若出現 HTML 注入仍有樣式層風險 |
 
-**問題。** 限速要以使用者 IP 為單位。API 前面有兩層 Caddy，API 看到的直連對端永遠是 Caddy 容器的內網位址。只看對端，全站使用者會共用一個桶子，一個人刷滿就全部被擋。直接採信 `X-Forwarded-For`，又會讓任何人在請求裡塞一個假位址，換一個 IP 就換一個新桶子，限速形同虛設。
+### 1. `X-Forwarded-For` 只信內網反向代理
 
-**考慮過的選項。**
-- 只用直連對端。簡單，但擋一個人等於擋所有人。
-- 一律信 `X-Forwarded-For`。誰都能偽造。
-- 只在直連對端是內網位址時才信，否則用對端本身。
-- 在 API 加一份代理白名單設定。比上一項精確，但多一個要維護的設定。
+#### 要解決的問題
+限速必須以真實使用者 IP 計算，但 API 前面經過兩層 Caddy，API 看到的直連對端永遠是 Caddy 容器的內網位址。若直接以直連對端限速，全站使用者會共用同一個額度，一個人刷滿就連累所有人。若無條件採信 `X-Forwarded-For`，任何人都能在請求標頭塞假 IP 繞過限速。
 
-**選擇與原因。** 採第三項。[limiter.py:19-33](../apps/api/limiter.py#L19) 的 `client_ip()` 在 `ipaddress.ip_address(peer).is_private` 為真時，才取 `X-Forwarded-For` 的第一個位址，格式不合就退回對端。外部連線直接打到 API 時對端是公網位址，帶什麼標頭都不採信。容器內 Caddy 在 [deploy/Caddyfile:2-6](../deploy/Caddyfile#L2) 設了 `trusted_proxies static private_ranges`，只信任來自內網的上一層標頭。API 容器沒有對外開埠，compose 只把網頁容器綁在 `127.0.0.1`（[deploy/docker-compose.prod.yml:89-90](../deploy/docker-compose.prod.yml#L89)），所以外部流量一定經過 Caddy。三個情境各有測試，見 [tests/test_security.py:43-47](../tests/test_security.py#L43)。
+#### 比較過的做法
+- **只看直連對端**：實作最簡單，但擋一個人等於擋全站。
+- **一律採信 `X-Forwarded-For`**：用戶端可任意偽造，限速形同虛設。
+- **只在直連對端屬內網位址時才採信**：兼顧安全與零額外設定（採用）。
+- **在 API 維護代理 IP 白名單**：比內網判斷更精確，但多一份需隨部署更新的設定。
 
-**代價與已知限制。**
-- `is_private` 也包含內網其他主機。如果之後有別的內網服務能直接連到 API，它可以任意指定來源 IP。目前 API 不對外開埠，所以不成立，但若改變部署方式要重新檢查。
-- 只取第一個位址。再多一層未列入信任範圍的代理時，取到的會是那一層以前的值，不一定是最終使用者。
-- 這個判斷只靠網路拓樸，不是密碼學驗證。
+#### 最後採用的做法
+- [limiter.py:19-33](../apps/api/limiter.py#L19) 的 `client_ip()` 會先檢查 `ipaddress.ip_address(peer).is_private`，為真時才取 `X-Forwarded-For` 第一個位址，格式不符則退回直連對端。若外部連線直接打到 API，對端是公網位址，帶任何標頭都會被忽略。
+- 容器內 Caddy 於 [deploy/Caddyfile:2-6](../deploy/Caddyfile#L2) 設定 `trusted_proxies static private_ranges`，只信任來自內網上一層代理的標頭。
+- API 容器不對外開埠，Compose 只把網頁容器綁在 `127.0.0.1`（[deploy/docker-compose.prod.yml:89-90](../deploy/docker-compose.prod.yml#L89)），確保外部流量一定經過 Caddy。
+- 上述三種情境皆已寫入單元測試，見 [tests/test_security.py:43-47](../tests/test_security.py#L43)。
+
+#### 已知邊界與代價
+- `is_private` 包含同內網的其他主機。未來若有別的內網服務能直接連到 API，就有機會自填來源 IP，改變部署拓樸時必須重新檢查。
+- 只取 `X-Forwarded-For` 第一個位址。若前方再多一層未列入信任範圍的代理，取到的可能不是最終使用者 IP。
+- 這是以網路拓樸把關，並非密碼學驗證。
 
 ### 2. 每個來源 IP 的速率限制
 
-**問題。** 查詢有快取，但使用者只要換一個參數就能避開快取，讓分析行程池和排隊佇列滿載。原本只有全域的排隊上限，一個人就能把佇列塞滿，其他人收到 429。
+#### 要解決的問題
+查詢雖有快取，但只要不斷更換參數就能繞過快取，把分析行程池與排隊佇列塞滿。原本只有全域排隊上限，單一來源就能讓其他人全部收到 429。
 
-**考慮過的選項。**
-- 只留全域排隊上限。不分人，一人造成全體受害。
-- 在 Caddy 做限速。需要額外外掛模組，而且和 API 的來源 IP 判斷分成兩套。
-- 在 API 內做每個 IP 的 token bucket。
-- 外接 Redis 之類的共用儲存。
+#### 比較過的做法
+- **只留全域排隊上限**：無法隔離異常來源，一人刷量導致全體受影響。
+- **在 Caddy 層限速**：需另編譯外掛模組，且來源 IP 判斷會與 API 分成兩套。
+- **在 API 記憶體內建單 IP token bucket**：零外部相依，邏輯集中好測（採用）。
+- **外接 Redis 共用計數**：適合多節點擴展，但目前沒有外部共用狀態需求。
 
-**選擇與原因。** 採第三項。[limiter.py:36-53](../apps/api/limiter.py#L36) 的 `RateLimit` 是記憶體內的 token bucket，預設每分鐘補 240 次、瞬間可用 80 次（[limiter.py:14-15](../apps/api/limiter.py#L14)），可用 `EXITPULSE_RATE_PER_MINUTE` 與 `EXITPULSE_RATE_BURST` 調整，設 0 關閉。只管 `/api/` 路徑（[limiter.py:56](../apps/api/limiter.py#L56)），所以 `/health` 與 `/ready` 不受限，測試也驗證這點。超量回 429 並附 `Retry-After`（[limiter.py:68-69](../apps/api/limiter.py#L68)），同一個 IP 每 60 秒最多記一筆警告日誌（[limiter.py:65-67](../apps/api/limiter.py#L65)），避免被刷時日誌爆量。中介層在 [apps/api/main.py:77](../apps/api/main.py#L77) 掛上。目前沒有外部共用狀態的需求，所以不加 Redis。
+#### 最後採用的做法
+- [limiter.py:36-53](../apps/api/limiter.py#L36) 的 `RateLimit` 以記憶體 token bucket 控管，預設每分鐘補充 240 次、瞬間上限 80 次（[limiter.py:14-15](../apps/api/limiter.py#L14)），可透過 `EXITPULSE_RATE_PER_MINUTE` 與 `EXITPULSE_RATE_BURST` 調整，設 `0` 即可關閉。
+- 限速中介層掛在 [apps/api/main.py:77](../apps/api/main.py#L77)，且只攔截 `/api/` 路徑（[limiter.py:56](../apps/api/limiter.py#L56)），讓 `/health` 與 `/ready` 探針不受影響（已有測試驗證）。
+- 超量時回傳 429 並附上 `Retry-After`（[limiter.py:68-69](../apps/api/limiter.py#L68)）。同一個 IP 每 60 秒最多寫一筆警告日誌（[limiter.py:65-67](../apps/api/limiter.py#L65)），避免被刷請求時連帶塞爆日誌。
 
-**代價與已知限制。**
-- 狀態只在單一行程的記憶體內。Dockerfile 的啟動指令是 `--workers 1`，所以現在正確。改成多個 worker 或多個容器，每個行程各算各的，實際上限會乘上行程數。
-- 重啟後桶子歸零。
-- 桶子最多記 10,000 個 IP，超過時清掉閒置超過 600 秒的項目（[limiter.py:16](../apps/api/limiter.py#L16)、[limiter.py:46-48](../apps/api/limiter.py#L46)）。大量不同來源的分散攻擊仍然擋不住，這需要在 Caddy 前面或上游處理。
-- 240 次與 80 次是估計值，沒有用真實流量調過。
-- 後端測試環境把限速設為 0（[tests/test_api.py:14](../tests/test_api.py#L14)），限速行為由 `test_security.py` 單獨驗證。
+#### 已知邊界與代價
+- 計數存在單一行程的記憶體內，仰賴 Dockerfile 的 `--workers 1`。若日後改為多 worker 或多容器，每個行程會各自計算，實際上限會等比放大。
+- 服務重啟後計數歸零。
+- 記憶體最多保留 10,000 個 IP，超過上限時清除閒置超過 600 秒的項目（[limiter.py:16](../apps/api/limiter.py#L16)、[limiter.py:46-48](../apps/api/limiter.py#L46)）。遇到大量不同 IP 的分散式攻擊仍擋不住，需由上游或反向代理前層處理。
+- 240 次與 80 次是目前估計值，尚未依真實線上流量調校。
+- 一般後端測試將限速設為 `0`（[tests/test_api.py:14](../tests/test_api.py#L14)），限速行為由 `test_security.py` 獨立驗證。
 
 ### 3. CSP 保留 `style-src 'unsafe-inline'`
 
-**問題。** CSP 能擋掉注入的腳本，但前端的樣式有行內寫法。想收得最嚴，就要拿掉 `'unsafe-inline'`，可能弄壞版面。
+#### 要解決的問題
+CSP 的主要目的是阻擋注入的惡意腳本，但前端元件與地圖套件有行內樣式需求。直接封鎖行內樣式可能會弄壞版面。
 
-**考慮過的選項。**
-- 全面禁止行內樣式。最嚴，但要先改掉所有行內樣式來源。
-- 改用 nonce 或 hash。要在每次回應產生 nonce，而前端是純靜態檔，由 Caddy 直接提供。
-- 腳本嚴格，樣式放寬。
+#### 比較過的做法
+- **全面禁止行內樣式**：規則最嚴，但需先清查並改寫所有行內樣式來源。
+- **改用 nonce 或 hash**：需在每次回應動態產生 nonce，但前端是交由 Caddy 直接提供的純靜態檔。
+- **腳本規則收緊、樣式暫時放寬**：守住最關鍵的腳本執行防線，接受樣式層風險（採用）。
 
-**選擇與原因。** 採第三項。[deploy/Caddyfile:17](../deploy/Caddyfile#L17) 的 `script-src 'self'` 不含 `'unsafe-inline'` 與 `'unsafe-eval'`，所以注入腳本無法執行，這是 CSP 最重要的保護。`style-src` 放寬到 `'self' 'unsafe-inline'`。圖片與連線只放行本站、`tiles.openfreemap.org` 與 `wmts.nlsc.gov.tw`，另有 `object-src 'none'`、`base-uri 'self'`、`form-action 'self'`、`frame-ancestors 'none'`。HSTS 與 `X-Frame-Options` 不在這一層送，而是由主機 Caddy 送出，避免標頭重複（[deploy/Caddyfile:14-15](../deploy/Caddyfile#L14)、[deploy/README.md:139](../deploy/README.md#L139)）。用正式建置實際載入地圖，沒有任何 CSP 違規。
+#### 最後採用的做法
+- [deploy/Caddyfile:17](../deploy/Caddyfile#L17) 的 `script-src 'self'` 不含 `'unsafe-inline'` 與 `'unsafe-eval'`，直接封死外部與行內注入腳本的執行。
+- `style-src` 放寬為 `'self' 'unsafe-inline'`。圖片與連線來源僅放行本站、`tiles.openfreemap.org` 與 `wmts.nlsc.gov.tw`，並加上 `object-src 'none'`、`base-uri 'self'`、`form-action 'self'` 與 `frame-ancestors 'none'`。
+- HSTS 與 `X-Frame-Options` 交由外層主機 Caddy 送出，避免兩層反向代理重複輸出標頭（[deploy/Caddyfile:14-15](../deploy/Caddyfile#L14)、[deploy/README.md:139](../deploy/README.md#L139)）。
+- 已以正式建置實際載入地圖與各檢視驗證，沒有觸發任何 CSP 違規。
 
-**代價與已知限制。**
-- 攻擊者若能注入 HTML，仍可透過行內樣式改變外觀或做樣式式的資料外洩。腳本執行已被擋，所以風險比腳本低，但不是零。
-- OWASP ZAP 對本機靜態站的掃描把這一項列為 Medium，我們接受它並寫在 README 待辦。
-- 這份文件沒有逐一查證是哪些元件需要行內樣式，所以不能保證改用 nonce 一定可行，需要實測。
-- Caddy 提供的是靜態檔，沒有伺服端產生 nonce 的地方。要改用 nonce 得先決定怎麼產生與注入。
+#### 已知邊界與代價
+- 若攻擊者能注入 HTML，仍可能透過行內樣式竄改畫面或嘗試樣式類資訊外洩。因腳本已被擋下，風險低於 XSS，但並非零風險。
+- OWASP ZAP 本機掃描將這項列為 Medium，目前已接受並公開記錄在 [README 待改善項目](../README.md#待改善項目)。
+- 尚未逐一清查所有需要行內樣式的元件，無法保證改用 nonce 一定無痛相容，後續需實測確認。
+- 由於 Caddy 僅提供靜態檔，沒有伺服端動態產生 nonce 的環節，若要改用 nonce 須先規劃產生與注入方式。
