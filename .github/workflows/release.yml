@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build web bundle
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Build
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+      - name: Package
+        run: |
+          tar -C apps/web/dist/web/browser -czf exitpulse-web-${{ github.ref_name }}.tar.gz .
+          sha256sum exitpulse-web-${{ github.ref_name }}.tar.gz > exitpulse-web-${{ github.ref_name }}.tar.gz.sha256
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          gh release upload "$GITHUB_REF_NAME" exitpulse-web-*.tar.gz* --clobber
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    # repository 變數 DEPLOY_ENABLED 為 true 且 production 環境有 DEPLOY_* 密鑰時才執行
+    if: vars.DEPLOY_ENABLED == 'true' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Upgrade and check readiness
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        # 金鑰在 VPS 的 authorized_keys 綁定強制指令，只能執行 deploy/update-all.sh upgrade，送什麼指令都會被忽略
+        run: ssh -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST"

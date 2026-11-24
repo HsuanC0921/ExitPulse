@@ -68,7 +68,7 @@ flowchart TD
    - 含內容雜湊的 `.js` / `.css` 設 `max-age=31536000, immutable`。
    - `releases/<版本>/` 切換 `current` 符號連結時，**保留最近 3–5 版**不立刻刪除，避免還停在舊分頁的使用者操作時發生延遲載入 404。
 4. **發布節奏（建議走 Release Tag）**
-   - GitHub Actions 驗證 `v*` 標籤的前後端。首次上線由操作人員完成資料還原、驗證與切換，流程見 [正式部署](../deploy/README.md)。
+   - 推送 `v*` 標籤會觸發 `release.yml`：先跑完整 CI，再建置前端並把壓縮檔與 SHA-256 附到 GitHub Release。CI 通過後用專用部署金鑰在 VPS 執行 `deploy/update-all.sh upgrade`，設定與撤銷方式見 README「持續整合與部署」。首次上線由操作人員完成資料還原、驗證與切換，流程見 [正式部署](../deploy/README.md)。
    - 前端與 API 需要回切時使用同一個發布版本。先等 API `/ready` 通過，再切換 `current`，並從對外 HTTPS 路徑執行 `tools/smoke.py`。
 5. **資料庫結構版本（`schema_version`）與備份輪替**
    - `exitpulse_catalog` 建議紀錄 `schema_version`，當程式欄位有變動且尚未完成舊月份 `--recheck` 時能安全識別。

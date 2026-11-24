@@ -105,6 +105,7 @@
 - Caddy 補上 HSTS、`X-Frame-Options`、`Permissions-Policy`，CSP 收斂到實際用到的圖磚來源。API 容器改用非 root 身分並拿掉所有 capability。
 - 新增 `deploy/create-readonly-role.sh`，可讓 API 改用唯讀資料庫角色。新增 `requirements.lock`，匯入下載與告警網址只接受 https。
 - 用 gitleaks、trivy、hadolint、OWASP ZAP（只掃本機）補掃一輪，結果寫進 README。`Dockerfile.api` 的 `USER` 改數字 UID，`HEALTHCHECK` 改 JSON 格式。
+- CI/CD 重建：`ci.yml` 在推送 `main` 與 Pull Request 時跑前後端測試、建置與弱掃，`release.yml` 在推送 `v*` 標籤時建置前端附到 Release，並用綁定強制指令的部署金鑰自動上版 VPS。Action 一律固定到 commit SHA。
 
 ### 新增
 

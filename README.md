@@ -143,6 +143,23 @@ python tools/stress_api.py --requests 200 --concurrency 20 --p95-ms 3000
 
 需連資料庫的測試會讀取 `EXITPULSE_DATABASE_URL`（或 `PGDATABASE`），未設定時自動略過。另附 `tools/ux-scan.js` 可貼進瀏覽器開發者工具檢查過小觸控目標、文字遮擋與橫向捲動。正式站與本機的效能量測紀錄見 [API 與效能](docs/API.md)。
 
+### 持續整合與部署
+
+| 工作流程 | 觸發 | 內容 |
+| --- | --- | --- |
+| `ci.yml` | 推送 `main`、Pull Request、手動 | 後端單元測試、前端測試與正式建置、gitleaks、hadolint、pip-audit、`npm audit` |
+| `release.yml` | 推送 `v*` 標籤、手動 | 先跑完整 CI，再建置前端，把壓縮檔與 SHA-256 附到 GitHub Release，最後可選擇部署到 VPS |
+
+所有 Action 都固定到 commit SHA，權限預設只有讀取。推送 `v*` 標籤後，CI 通過才會建置與部署，不需要再從本機手動上傳。
+
+部署用一把專用的 SSH 金鑰。它在 VPS 的 `authorized_keys` 加了 `restrict` 與強制指令，只能執行 `./deploy/update-all.sh upgrade`，不能開 shell、轉發連線或執行其他指令。升級會拉取 `main`、重建前端與容器，並檢查 `/ready`，失敗時整個 Release 工作流程標示失敗。
+
+GitHub 設定在 `production` 環境：密鑰 `DEPLOY_SSH_KEY`、`DEPLOY_KNOWN_HOSTS`、`DEPLOY_HOST`、`DEPLOY_USER`，以及 repository 變數 `DEPLOY_ENABLED`。要暫停自動部署，把 `DEPLOY_ENABLED` 改成 `false`。要撤銷金鑰，刪掉 VPS `authorized_keys` 裡註解為 `exitpulse-github-deploy` 的那一行。
+
+本機仍可手動部署，指令見 [deploy/README.md](deploy/README.md)。
+
+CI 沒有連資料庫，需要已匯入資料的 31 個測試會略過。瀏覽器煙霧測試 `test:e2e` 與 `trivy` 也沒有放進 CI，仍在本機執行。
+
 ## 我如何用 AI 開發並驗證
 
 這個專案從頭到尾由我指揮 AI 工具完成，包含程式、測試與文件。以下只寫專案裡查得到的做法。
