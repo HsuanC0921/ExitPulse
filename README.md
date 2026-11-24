@@ -5,7 +5,7 @@
 > - **怎麼跑**：`docker compose up -d --wait db`，再 `python tools/setup.py` 匯入資料，最後啟動 `uvicorn` 與 `ng serve`。完整步驟見[快速開始](#快速開始)。
 > - **資安審查在哪**：[資安](#資安)一節有防護清單與弱掃結果，取捨理由在 [docs/DECISIONS.md](docs/DECISIONS.md#2026-11-24-資安的三個取捨)。
 
-![Version 1.4.1](https://img.shields.io/badge/version-1.4.1-1d2125)
+![Version 1.5.0](https://img.shields.io/badge/version-1.5.0-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3-009688)
@@ -157,6 +157,8 @@ python tools/stress_api.py --requests 200 --concurrency 20 --p95-ms 3000
 GitHub 設定在 `production` 環境：密鑰 `DEPLOY_SSH_KEY`、`DEPLOY_KNOWN_HOSTS`、`DEPLOY_HOST`、`DEPLOY_USER`，以及 repository 變數 `DEPLOY_ENABLED`。要暫停自動部署，把 `DEPLOY_ENABLED` 改成 `false`。要撤銷金鑰，刪掉 VPS `authorized_keys` 裡註解為 `exitpulse-github-deploy` 的那一行。
 
 本機仍可手動部署，指令見 [deploy/README.md](deploy/README.md)。
+
+版本號以 [CHANGELOG.md](CHANGELOG.md) 最上面那一版為準。發版時同步改 `apps/web/package.json`、`apps/web/package-lock.json`、關於頁 `apps/web/src/app/about.ts`、README 徽章與 `PRODUCT.md` 的對應版本，提交到 `main` 後打 `vX.Y.Z` 標籤推送。每一版一個新標籤，已發佈的標籤不移動、不重用。部署拉的是 `main` 的最新提交，所以打標籤前 `main` 要停在要發的那一版。
 
 CI 沒有連資料庫，需要已匯入資料的 31 個測試會略過。瀏覽器煙霧測試 `test:e2e` 與 `trivy` 也沒有放進 CI，仍在本機執行。
 

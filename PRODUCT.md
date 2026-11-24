@@ -6,7 +6,7 @@
 | --- | --- |
 | 產品 | ExitPulse（捷運旅次變化雷達） |
 | 文件性質 | 產品需求規格，是 Spec-Driven Development 的需求來源。設計、實作與測試都回頭對照本文件 |
-| 對應版本 | 1.4.1 |
+| 對應版本 | 1.5.0 |
 | 平台 | Web，桌機與手機同為一級支援 |
 | 相關文件 | [DESIGN.md](DESIGN.md) 視覺與互動規範、[docs/API.md](docs/API.md) 介面與效能、[docs/DECISIONS.md](docs/DECISIONS.md) 設計取捨、[CONTRIBUTING.md](CONTRIBUTING.md) 專案規則、[README.md](README.md) 使用與架設 |
 | 變更方式 | 需求變更先改本文件，再改程式與測試。每個版本的差異記在 [CHANGELOG.md](CHANGELOG.md) |
@@ -335,4 +335,4 @@ ExitPulse 比較兩個月份之間的起訖旅次（OD，Origin-Destination）�
 
 | 版本 | 變更 |
 | --- | --- |
-| 1.4.1 | 改為需求編號與驗收條件格式，更正資料量為 117 個月，手機提升為一級支援 |
+| 1.5.0 | 改為需求編號與驗收條件格式，更正資料量為 117 個月，手機提升為一級支援 |
