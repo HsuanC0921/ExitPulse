@@ -1,5 +1,10 @@
 # ExitPulse｜臺北捷運旅次變化雷達
 
+> **60 秒摘要**
+> - **這是什麼**：臺北捷運旅次變化雷達，用公開的進出站資料比較兩個月份、兩個站的人流變化。Angular 22、FastAPI、PostgreSQL，線上版在 [exitpulse.150-230-109-154.sslip.io](https://exitpulse.150-230-109-154.sslip.io)。
+> - **怎麼跑**：`docker compose up -d --wait db`，再 `python tools/setup.py` 匯入資料，最後啟動 `uvicorn` 與 `ng serve`。完整步驟見[快速開始](#快速開始)。
+> - **資安審查在哪**：[資安](#資安)一節有防護清單與弱掃結果，取捨理由在 [docs/DECISIONS.md](docs/DECISIONS.md#2026-11-24-資安的三個取捨)。
+
 ![Version 1.4.1](https://img.shields.io/badge/version-1.4.1-1d2125)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)
@@ -137,6 +142,17 @@ python tools/stress_api.py --requests 200 --concurrency 20 --p95-ms 3000
 ```
 
 需連資料庫的測試會讀取 `EXITPULSE_DATABASE_URL`（或 `PGDATABASE`），未設定時自動略過。另附 `tools/ux-scan.js` 可貼進瀏覽器開發者工具檢查過小觸控目標、文字遮擋與橫向捲動。正式站與本機的效能量測紀錄見 [API 與效能](docs/API.md)。
+
+## 我如何用 AI 開發並驗證
+
+這個專案從頭到尾由我指揮 AI 工具完成，包含程式、測試與文件。以下只寫專案裡查得到的做法。
+
+- **規格與規則寫成文件**：產品用語與資料語意寫在 [PRODUCT.md](PRODUCT.md)，介面規則寫在 [DESIGN.md](DESIGN.md)，工具與人都照 [CONTRIBUTING.md](CONTRIBUTING.md) 的專案規則做事。
+- **小步提交**：39 個提交，訊息採 Conventional Commits，每次改動小而完整。推送、部署與刪除資料要我明確授權，AI 不能自己決定。
+- **跨工作階段接力靠文件**：[docs/HANDOFF.md](docs/HANDOFF.md) 記目前可操作的功能與未解問題，[docs/PROGRESS.md](docs/PROGRESS.md) 記已驗證的改動，[docs/NEXT.md](docs/NEXT.md) 收待辦，[docs/DECISIONS.md](docs/DECISIONS.md) 留取捨理由。
+- **改動後一定跑測試**：後端 `python -m unittest discover -s tests` 目前 104 個通過、31 個因沒有資料庫而跳過。前端 `npm --prefix apps/web test` 與 `test:e2e` 煙霧測試。改用 FastAPI 時，拿舊 API 的 27 組回應當黃金樣本逐一比對（見 [docs/PROGRESS.md](docs/PROGRESS.md)）。
+- **不信任 AI 的自我報告**：資安審查用 gitleaks、trivy、hadolint、bandit、semgrep、pip-audit 與 ZAP 實際掃描，每一筆發現都人工判斷是真問題還是誤報，結果寫在[用過的弱掃工具](#用過的弱掃工具)。
+- **沒驗證的就寫沒驗證**：[待辦](#待辦)與[已知限制](#其他已知限制與系統邊界)列出還沒做的事，例如唯讀資料庫角色腳本還沒在正式庫跑過，也沒做過真人使用者測試。
 
 ## 自行架設正式環境
 
