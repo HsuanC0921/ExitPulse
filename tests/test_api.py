@@ -1,5 +1,6 @@
 """API 合約測試，不需要資料庫：分析行程以替身取代。"""
 import asyncio
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -8,6 +9,9 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'apps' / 'api'))
 sys.path.insert(0, str(ROOT / 'tools'))
+
+# 合約測試會在極短時間內送出大量請求，速率限制另有專屬測試
+os.environ.setdefault('EXITPULSE_RATE_PER_MINUTE', '0')
 
 from fastapi.testclient import TestClient  # noqa: E402
 

@@ -1,5 +1,6 @@
 **
 !requirements.txt
+!requirements.lock
 !apps/
 !apps/api/
 !apps/api/**

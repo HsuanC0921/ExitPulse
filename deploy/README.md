@@ -128,9 +128,15 @@ docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d --wait ap
 
 ```caddyfile
 exitpulse.example.com {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Frame-Options "DENY"
+	}
 	reverse_proxy 127.0.0.1:5080
 }
 ```
+
+這兩個標頭由主機這一層送出，容器內的 Caddy 只負責 `nosniff`、`Referrer-Policy`、`Permissions-Policy` 與 CSP，避免同名標頭重複。
 
 驗證主機端 Caddy 設定並重新載入：
 

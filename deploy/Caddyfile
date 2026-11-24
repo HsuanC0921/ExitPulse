@@ -1,10 +1,20 @@
+{
+	# 前面還有一層主機 Caddy，只信任內網來源的 X-Forwarded-For，API 才拿得到真實使用者 IP 做限流
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
 http://:80 {
 	encode zstd gzip
 
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https:; worker-src 'self' blob:; font-src 'self' data: https:;"
+		# HSTS 與 X-Frame-Options 由前面的主機 Caddy 送出（見 deploy/README.md），這裡不重複，避免出現兩份同名標頭。
+		# 防嵌入另由下方 CSP 的 frame-ancestors 負責。
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org https://wmts.nlsc.gov.tw; connect-src 'self' https://tiles.openfreemap.org https://wmts.nlsc.gov.tw; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 	}
 
 	handle /api/* {

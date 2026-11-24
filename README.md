@@ -251,6 +251,55 @@ docker-compose.yml      本機 PostgreSQL 設定
 
 - **機場捷運**：目前匯入的臺北捷運旅次只涵蓋板南、淡水信義、松山新店、中和新蘆、文湖、環狀六條線，沒有機場線。台北車站等轉乘站的色環因此只有六條線的顏色，機場線的進出站人次也沒有納入全線人次。機場捷運由桃園捷運營運，需先確認是否有公開的站間旅次資料，才能評估補上。
 - **車站介紹更新**：站卡介紹是 `python tools/station_info.py --import` 匯入當下的維基摘要快照，不會自動更新，也還沒統計有幾站抓不到介紹。
+- **資安待改善**：
+  - 唯讀資料庫角色的腳本還沒在正式資料庫上實際執行，建議先在備份還原的環境試跑，再套用到正式環境。
+  - API 容器還不是唯讀檔案系統，匯入工具要寫入掛載目錄，要先確認不會影響才能開。
+  - 容器基底映像用浮動標籤，尚未固定到 `@sha256` 摘要。`requirements.lock` 也還沒有雜湊，可改用 `pip-compile --generate-hashes`。
+  - `systemd` 單元檔還沒有加固設定（`NoNewPrivileges`、`ProtectSystem` 等），需要先確認不會影響 `sudo` 與 Docker。
+  - git 歷史裡有本機開發用的預設連線字串，只綁 `127.0.0.1`，風險低，但不會改寫歷史。
+  - 地點搜尋會把使用者輸入的文字送到 `photon.komoot.io`，隱私說明還沒補上。
+
+## 資安
+
+ExitPulse 是沒有登入的公開唯讀服務，攻擊面集中在 API、資料庫與部署。2026-11-24 做過一次完整審查，以下是現況與取捨。
+
+### 已有的防護
+
+- **SQL 全部參數化**：值一律用 `%s` 佔位符，識別字用 `sql.Identifier`，動態拼接的片段只有常數與佔位符。分析在行程池內直接呼叫函式，不經 shell。
+- **輸入驗證在入口**：月份、日期、站名長度、時段與日型都先檢查。站名不得以 `-` 開頭，避免被命令列解析當成選項。驗證失敗統一回 400，錯誤只回固定訊息，不含堆疊。
+- **資源上限**：查詢逾時 30 秒、資料庫語句逾時、排隊上限與快取上限。地點搜尋全域限速每秒 1 次。
+- **每個來源 IP 的速率限制**：預設每分鐘 240 次、瞬間 80 次，超量回 429 加 `Retry-After`，並記一筆 `Rate limit exceeded` 日誌。只在直連對端是內網（反向代理）時才採用 `X-Forwarded-For`，不能被使用者偽造。以 `EXITPULSE_RATE_PER_MINUTE` 與 `EXITPULSE_RATE_BURST` 調整，設 0 關閉。
+- **傳輸與標頭**：主機端 Caddy 送出 HSTS 與 `X-Frame-Options: DENY`（範例在 `deploy/README.md`），容器內 Caddy 送出 `Permissions-Policy`、`nosniff` 與 `Referrer-Policy`。CSP 只放行本站與實際用到的 `tiles.openfreemap.org`、`wmts.nlsc.gov.tw`，並有 `object-src 'none'`、`base-uri 'self'`、`form-action 'self'`、`frame-ancestors 'none'`。已用正式建置實際載入地圖驗證，沒有任何 CSP 違規。
+- **容器**：API 以非 root 的 `app` 身分執行，拿掉所有 Linux capability 並禁止提權。Caddy 檔案系統唯讀。資料庫不對外開埠，網頁只綁 `127.0.0.1`。
+- **密鑰**：`.env` 與 `data/` 不進版本庫，`install.sh` 以 `openssl rand` 產生密碼並把 `.env` 設為 600。審查時掃過整份 git 歷史，沒有金鑰、私鑰或 token。
+- **API 文件**：正式環境以 `EXITPULSE_DOCS=0` 關閉 `/docs` 與 `/openapi.json`，本機開發預設仍開啟。
+- **前端**：沒有 `innerHTML`、`bypassSecurityTrust` 或 `eval`。`localStorage` 只存介面偏好與收藏，沒有 token。分享連結匯入會驗證格式，並有測試擋掉外部網址與 `javascript:`。
+- **下載與告警網址**：匯入工具與告警 webhook 只接受 https。
+- **相依套件**：`requirements.lock` 記錄已通過 `pip-audit` 的版本，Docker 建置用 `-c requirements.lock` 安裝。
+
+### 用過的弱掃工具
+
+| 工具 | 掃什麼 | 結果（2026-11-24） |
+| --- | --- | --- |
+| `npm audit` | 前端 npm 相依 | 0 個漏洞 |
+| `pip-audit` | Python 相依與鎖定檔 | 沒有已知漏洞 |
+| `bandit` | Python 程式碼 | `apps/api` 無發現。`tools/` 的 B608 是人工確認過的誤報，片段只有常數與佔位符。B310 已改成只接受 https |
+| `semgrep`（python、typescript、dockerfile 規則集） | 75 個檔案、226 條規則 | 0 個發現 |
+| `shellcheck` | `deploy/*.sh` | 無警告 |
+| 正則掃描 git 歷史 | token、私鑰、連線字串 | 只有本機開發用的預設密碼 |
+
+這台機器沒有裝 `gitleaks`、`trivy`、`hadolint` 與 OWASP ZAP，建議之後補上：`gitleaks detect` 掃歷史密鑰，`trivy image` 與 `trivy config deploy/` 掃映像與設定，`hadolint deploy/Dockerfile.api` 檢查 Dockerfile。ZAP 的 baseline 掃描只對自己的測試環境執行，不要對別人的主機掃。
+
+### 啟用唯讀資料庫角色
+
+API 預設仍沿用擁有者帳號連線。要改成唯讀角色，在主機專案根目錄執行一次：
+
+```sh
+./deploy/create-readonly-role.sh
+docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d api
+```
+
+腳本可重複執行，會建立 `exitpulse_api`、授予所有月份 schema 的唯讀權限，並設定之後匯入的新月份自動授權，最後把帳密寫進 `.env`。匯入工具仍使用 `POSTGRES_USER`。
 
 ## 資料來源、儲存與授權
 

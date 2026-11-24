@@ -24,17 +24,32 @@ services:
     restart: unless-stopped
     environment:
       PGHOST: db
-      PGUSER: ${POSTGRES_USER:-exitpulse}
+      # 預設沿用擁有者帳號。執行 deploy/create-readonly-role.sh 後 .env 會有唯讀角色，API 就自動改用它
+      PGUSER: ${EXITPULSE_API_USER:-${POSTGRES_USER:-exitpulse}}
       PGDATABASE: ${POSTGRES_DB:-exitpulse}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGPASSWORD: ${EXITPULSE_API_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}}
       EXITPULSE_WORKERS: ${EXITPULSE_WORKERS:-2}
       EXITPULSE_PLACES_ENDPOINT: ${EXITPULSE_PLACES_ENDPOINT:-https://photon.komoot.io/api/}
+      EXITPULSE_DOCS: "0"
+      EXITPULSE_RATE_PER_MINUTE: ${EXITPULSE_RATE_PER_MINUTE:-240}
+      EXITPULSE_RATE_BURST: ${EXITPULSE_RATE_BURST:-80}
+    # 容器加固：以非 root 身分執行（見 Dockerfile.api）、拿掉所有 Linux capability、禁止提權
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       db:
         condition: service_healthy
 
   init:
     profiles: ["init"]
+    # 匯入工具要寫入掛載進來的 data 與發布目錄，沿用 root 並補回讀寫他人檔案所需的最小 capability
+    user: root
+    cap_add:
+      - DAC_OVERRIDE
+      - CHOWN
+      - FOWNER
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
@@ -58,6 +73,17 @@ services:
   web:
     image: caddy:2-alpine
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /data
+      - /config
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - api
     ports:

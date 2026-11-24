@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import date as Date
 from typing import Annotated
@@ -17,6 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import AfterValidator
 
+from limiter import RateLimit
 from places import PlaceSearch, TooMany, UpstreamLimited, local_matches
 from runner import CATALOG_TTL, Busy, Runner, Unavailable
 
@@ -35,7 +37,10 @@ async def lifespan(_):
     runner.close()
 
 
-app = FastAPI(title='ExitPulse API', lifespan=lifespan, docs_url='/docs', redoc_url=None)
+# 互動式文件只給本機開發，正式環境以 EXITPULSE_DOCS=0 關閉，連 openapi.json 一起不提供
+DOCS = os.environ.get('EXITPULSE_DOCS', '1') != '0'
+app = FastAPI(title='ExitPulse API', lifespan=lifespan, docs_url='/docs' if DOCS else None, redoc_url=None,
+              openapi_url='/openapi.json' if DOCS else None)
 # 站對排行的回應約 240 KB，壓縮後可省下大部分傳輸量
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
@@ -68,6 +73,8 @@ class CancelDisconnectedOdQuery:
 
 
 app.add_middleware(CancelDisconnectedOdQuery)
+# 最外層：先依來源 IP 限流，超量的請求不進入分析佇列
+app.add_middleware(RateLimit)
 api = APIRouter(prefix='/api/v1')
 
 
@@ -103,9 +110,10 @@ def is_period(value):
     return is_month(value) or is_date(value)
 
 
-# 站名長度限制 1 至 20 字
+# 站名長度限制 1 至 20 字，且不得以 - 開頭
 def is_name(value):
-    return value is not None and bool(value.strip()) and len(value) <= 20
+    # 站名會當成命令列參數交給分析程式，開頭是 - 的值會被當成選項，所以一律拒絕
+    return value is not None and bool(value.strip()) and len(value) <= 20 and not value.startswith('-')
 
 
 # 整數不帶小數點，讓快取鍵與命令列參數穩定
@@ -118,6 +126,7 @@ async def analyse(script, arguments):
     try:
         reply = await runner.run(script, arguments)
     except Busy:
+        log.warning('Analysis queue full: script=%s', script)
         return bad('旅次查詢忙碌中，請稍後重試。', 429)
     except Unavailable:
         return bad('旅次資料暫時無法載入。', 504)

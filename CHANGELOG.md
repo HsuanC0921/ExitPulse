@@ -101,6 +101,10 @@
 - 電腦滑過排行或地圖車站會預覽同一站，手機點一次選定，按「看排行」回到分析頁並捲到該列。全線排行點一下改成選站。
 - 手機工具列的找地點、收藏、工具、收合都是圖示加短標籤，高度與間距一致。
 
+- API 加上每個來源 IP 的速率限制，超量回 429。站名不得以 `-` 開頭。正式環境關閉 `/docs`。
+- Caddy 補上 HSTS、`X-Frame-Options`、`Permissions-Policy`，CSP 收斂到實際用到的圖磚來源。API 容器改用非 root 身分並拿掉所有 capability。
+- 新增 `deploy/create-readonly-role.sh`，可讓 API 改用唯讀資料庫角色。新增 `requirements.lock`，匯入下載與告警網址只接受 https。
+
 ### 新增
 
 - 手機瀏覽器會提示安裝成 App，可按「稍後」，之後在圖層面板第一項補裝。iPhone 的 Safari 與 Chrome 會顯示加入主畫面的步驟。已安裝成 App 時不再提示，電腦版也不顯示。

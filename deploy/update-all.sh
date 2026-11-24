@@ -102,7 +102,7 @@ fi
 run_py() {
   if [ "$USE_DOCKER" -eq 1 ]; then
     mkdir -p "$ROOT/data"
-    docker compose --env-file "$ROOT/.env" -f "$COMPOSE_FILE" run --rm --no-deps \
+    docker compose --env-file "$ROOT/.env" -f "$COMPOSE_FILE" run --rm --no-deps --user root --cap-add DAC_OVERRIDE --cap-add CHOWN --cap-add FOWNER \
       -v "$ROOT/data:/app/data" \
       -v "$RELEASES:/srv/web" \
       -e "EXITPULSE_DATABASE_URL=postgresql://${POSTGRES_USER:-exitpulse}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-exitpulse}" \

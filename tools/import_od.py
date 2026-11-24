@@ -46,6 +46,9 @@ def download(month):
     if not match:
         raise ValueError(f'No official index entry for {month}')
     url = match['url']
+    # 下載網址來自遠端索引，只接受 https，避免被指到 file: 或其他協定
+    if not url.startswith('https://'):
+        raise ValueError(f'Refusing non-https download URL for {month}')
     # Adjacent January/December imports can request the same source concurrently.
     temp = path.with_name(f'{month}.{os.getpid()}.part')
     for attempt in range(3):

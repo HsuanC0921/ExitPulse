@@ -20,6 +20,8 @@ def build_alert_payload(title: str, message: str, host: str | None = None) -> di
 
 
 def _post_json(url: str, payload: dict[str, object], timeout: float = 8.0) -> None:
+    if not url.startswith('https://'):
+        raise ValueError('Alert webhook must use https')
     data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
     req = urllib.request.Request(
         url,
